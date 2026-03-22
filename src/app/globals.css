@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/* ── A1 STUDIO Brand Color Tokens ─────────────────────────── */
+:root {
+  --color-bg:           #F7F3EB; /* 밀키 화이트 – 페이지 기본 배경 */
+  --color-surface:      #EFE7DA; /* 크림 아이보리 – 카드/패널 배경 */
+  --color-border:       #D8CCBC; /* 밝은 베이지 오크 – 보더/구분선 */
+  --color-text:         #3B342F; /* 딥 토프 – 본문/제목 */
+  --color-text-muted:   #6f655d; /* 웜 뉴트럴 – 보조 텍스트 */
+  --color-text-subtle:  #9b9189; /* 힌트/플레이스홀더 */
+  --color-accent:       #B98768; /* 뮤트 클레이 – 강조/CTA */
+  --color-accent-hover: #a9785c; /* 강조 hover */
+  --color-overlay:      #3B342F; /* 모달 오버레이 베이스 */
+
+  /* legacy compat */
+  --background: #F7F3EB;
+  --foreground: #3B342F;
+}
+
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --font-sans: var(--font-geist);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* ── 스크롤바 ───────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: var(--color-surface); }
+::-webkit-scrollbar-thumb  { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-accent); }
+
+/* ── 부드러운 스크롤 ────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+
+/* ── details/summary 기본 스타일 제거 ──────────────────────── */
+summary                       { list-style: none; }
+summary::-webkit-details-marker { display: none; }
