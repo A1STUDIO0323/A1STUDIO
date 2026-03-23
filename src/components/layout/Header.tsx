@@ -10,6 +10,8 @@ import { NAV_LINKS, STUDIO_NAME } from "@/lib/constants";
 import { useAdmin } from "@/lib/admin-context";
 import { registerMemberProfile, useMemberRole } from "@/lib/member-role";
 
+const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
+
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -23,7 +25,7 @@ export default function Header() {
   const [adminPw, setAdminPw] = useState("");
   const [adminError, setAdminError] = useState("");
   const [isProfileComplete, setIsProfileComplete] = useState<boolean | null>(null);
-  const isPhoneVerified = Boolean(session?.user?.phoneConfirmedAt);
+  const isPhoneVerified = !PHONE_OTP_ENABLED || Boolean(session?.user?.phoneConfirmedAt);
 
   const getGuardedHref = (href: string) => {
     if (!session?.user?.email) return href;

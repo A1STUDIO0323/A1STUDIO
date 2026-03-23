@@ -13,13 +13,15 @@ const KAKAO_CONFIGURED = !!(
   process.env.NEXT_PUBLIC_KAKAO_CONFIGURED === "true"
 );
 const ANY_OAUTH = GOOGLE_CONFIGURED || KAKAO_CONFIGURED;
+const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const error = searchParams.get("error");
-  const onboardingCallbackUrl = `/onboarding/phone?next=${encodeURIComponent(callbackUrl)}`;
+  const onboardingPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
+  const onboardingCallbackUrl = `${onboardingPath}?next=${encodeURIComponent(callbackUrl)}`;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#F7F3EB] px-4">

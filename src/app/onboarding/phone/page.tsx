@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { STUDIO_NAME } from "@/lib/constants";
 
+const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
+
 function toE164KRPhone(input: string) {
   const digits = input.replace(/\D/g, "");
 
@@ -54,6 +56,11 @@ export default function PhoneOnboardingPage() {
   const canGoNext = isPhoneVerified;
 
   useEffect(() => {
+    if (!PHONE_OTP_ENABLED) {
+      router.replace(`/onboarding/profile?next=${encodeURIComponent(next)}`);
+      return;
+    }
+
     void (async () => {
       const {
         data: { user },

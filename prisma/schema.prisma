@@ -24,7 +24,7 @@ model User {
 
 model Account {
   id                String  @id @default(cuid())
-  userId            String  @db.Uuid @map("user_id")
+  userId            String  @map("user_id") @db.Uuid
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   type              String
   provider          String
@@ -44,7 +44,7 @@ model Account {
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique @map("session_token")
-  userId       String   @db.Uuid @map("user_id")
+  userId       String   @map("user_id") @db.Uuid
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expires      DateTime
 
@@ -84,30 +84,30 @@ model PasswordResetToken {
 
 // ─── 원데이클래스 모델 ─────────────────────────────────────────
 enum OneDayClassStatus {
-  OPEN       // 신청 모집 중
-  CONFIRMED  // 인원 충족, 확정
-  CANCELLED  // 취소됨
-  COMPLETED  // 진행 완료
+  OPEN // 신청 모집 중
+  CONFIRMED // 인원 충족, 확정
+  CANCELLED // 취소됨
+  COMPLETED // 진행 완료
 }
 
 model OneDayClass {
-  id              String             @id @default(cuid())
+  id              String            @id @default(cuid())
   title           String
-  teacherName     String             @map("teacher_name")
-  teacherProfile  String             @map("teacher_profile") @db.Text
-  teacherImage    String?            @map("teacher_image")
-  classType       String             @map("class_type") // VOCAL / DANCE / ACT / MUSICAL
-  description     String             @db.Text
-  desiredDate     DateTime           @map("desired_date")
-  durationMinutes Int                @default(120) @map("duration_minutes")
-  minHeadcount    Int                @default(8) @map("min_headcount")
-  maxHeadcount    Int                @default(15) @map("max_headcount")
-  pricePerPerson  Int                @map("price_per_person")
-  status          OneDayClassStatus  @default(OPEN)
-  confirmedDate   DateTime?          @map("confirmed_date")
-  isPublished     Boolean            @default(true) @map("is_published")
-  createdAt       DateTime           @default(now()) @map("created_at")
-  updatedAt       DateTime           @updatedAt @map("updated_at")
+  teacherName     String            @map("teacher_name")
+  teacherProfile  String            @map("teacher_profile") @db.Text
+  teacherImage    String?           @map("teacher_image")
+  classType       String            @map("class_type") // VOCAL / DANCE / ACT / MUSICAL
+  description     String            @db.Text
+  desiredDate     DateTime          @map("desired_date")
+  durationMinutes Int               @default(120) @map("duration_minutes")
+  minHeadcount    Int               @default(8) @map("min_headcount")
+  maxHeadcount    Int               @default(15) @map("max_headcount")
+  pricePerPerson  Int               @map("price_per_person")
+  status          OneDayClassStatus @default(OPEN)
+  confirmedDate   DateTime?         @map("confirmed_date")
+  isPublished     Boolean           @default(true) @map("is_published")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
 
   applications OneDayClassApplication[]
 
@@ -118,7 +118,7 @@ model OneDayClassApplication {
   id          String      @id @default(cuid())
   classId     String      @map("class_id")
   class       OneDayClass @relation(fields: [classId], references: [id], onDelete: Cascade)
-  userId      String?     @db.Uuid @map("user_id")
+  userId      String?     @map("user_id") @db.Uuid
   user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   guestName   String      @map("guest_name")
   guestPhone  String      @map("guest_phone")
@@ -132,17 +132,17 @@ model OneDayClassApplication {
 }
 
 model Room {
-  id           String   @id @default(cuid())
-  name         String
-  slug         String   @unique
-  description  String?
-  capacity     Int
-  sizeM2       Float    @map("size_m2")
-  amenities    Json     @default("[]") @map("amenities_json")
-  images       Json     @default("[]")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  capacity    Int
+  sizeM2      Float    @map("size_m2")
+  amenities   Json     @default("[]") @map("amenities_json")
+  images      Json     @default("[]")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   pricingRules PricingRule[]
   reservations Reservation[]
@@ -158,7 +158,7 @@ model PricingRule {
   label         String
   dayOfWeekMask Int      @map("day_of_week_mask") // bitmask: Sun=1,Mon=2,Tue=4,Wed=8,Thu=16,Fri=32,Sat=64
   timeStart     String   @map("time_start") // "HH:MM"
-  timeEnd       String   @map("time_end")   // "HH:MM"
+  timeEnd       String   @map("time_end") // "HH:MM"
   pricePerHour  Int      @map("price_per_hour")
   minHours      Int      @default(1) @map("min_hours")
   isPackage     Boolean  @default(false) @map("is_package")
@@ -183,13 +183,13 @@ model Reservation {
   id          String            @id @default(cuid())
   roomId      String            @map("room_id")
   room        Room              @relation(fields: [roomId], references: [id])
-  userId      String?           @db.Uuid @map("user_id")
+  userId      String?           @map("user_id") @db.Uuid
   guestName   String            @map("guest_name")
   guestPhone  String            @map("guest_phone")
   guestEmail  String?           @map("guest_email")
-  date        String            // "YYYY-MM-DD"
+  date        String // "YYYY-MM-DD"
   startTime   String            @map("start_time") // "HH:MM"
-  endTime     String            @map("end_time")   // "HH:MM"
+  endTime     String            @map("end_time") // "HH:MM"
   headcount   Int               @default(1)
   status      ReservationStatus @default(HOLD)
   totalAmount Int               @map("total_amount")
@@ -198,9 +198,9 @@ model Reservation {
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
 
-  hold        ReservationHold?
-  payment     Payment?
-  review      Review?
+  hold    ReservationHold?
+  payment Payment?
+  review  Review?
 
   @@index([roomId, date])
   @@index([guestPhone])

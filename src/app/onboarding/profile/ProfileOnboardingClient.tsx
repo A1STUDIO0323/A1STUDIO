@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { STUDIO_NAME } from "@/lib/constants";
 
+const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
+
 type ProfileResponse = {
   success?: boolean;
   profile?: {
@@ -21,6 +23,7 @@ export default function ProfileOnboardingClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextUrl = useMemo(() => searchParams.get("next") ?? "/", [searchParams]);
+  const onboardingEntryPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
 
   const [email, setEmail] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -33,7 +36,7 @@ export default function ProfileOnboardingClient() {
     if (status === "loading") return;
     if (!session?.user?.email) {
       router.replace(
-        `/login?callbackUrl=${encodeURIComponent(`/onboarding/phone?next=${nextUrl}`)}`
+        `/login?callbackUrl=${encodeURIComponent(`${onboardingEntryPath}?next=${nextUrl}`)}`
       );
       return;
     }
@@ -64,7 +67,7 @@ export default function ProfileOnboardingClient() {
         setLoading(false);
       }
     })();
-  }, [nextUrl, router, session?.user?.email, session?.user?.phone, status]);
+  }, [nextUrl, onboardingEntryPath, router, session?.user?.email, session?.user?.phone, status]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -108,7 +111,7 @@ export default function ProfileOnboardingClient() {
           </p>
           <h1 className="text-2xl font-extrabold text-[#3B342F]">추가 정보 입력</h1>
           <p className="mt-2 text-sm text-[#6f655d]">
-            휴대폰 인증 완료 후 이용을 위해 필수 정보를 입력해주세요.
+            이용을 위해 필수 정보를 입력해주세요.
           </p>
         </div>
 
