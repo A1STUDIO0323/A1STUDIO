@@ -18,7 +18,7 @@ const STATUS_COLOR: Record<Status, string> = {
   EXPIRED: "text-[#6f655d] bg-[#F7F3EB]",
 };
 
-const DUMMY_RESERVATIONS: { id: string; status: Status; date: string; startTime: string; endTime: string; totalAmount: number }[] = [
+const DUMMY_RESERVATIONS: { id: string; status: Status; date: string; startTime: string; endTime: string; totalAmount: number; roomName: string }[] = [
   // 예약/결제 백엔드 재연결 전까지 임의 데이터는 노출하지 않습니다.
 ];
 
