@@ -1,4 +1,5 @@
-ï»¿import { NextRequest, NextResponse } from "next/server";
+export const dynamic = 'force-dynamic'
+import { NextRequest, NextResponse } from "next/server";
 import { prisma as db } from "@/lib/db";
 import { z } from "zod";
 
@@ -32,7 +33,7 @@ const applySchema = z.object({
   message: z.string().max(300).optional(),
 });
 
-// ì›ë°ì´í´ë˜ìŠ¤ ëª©ë¡ ì¡°íšŒ
+// ¿øµ¥ÀÌÅ¬·¡½º ¸ñ·Ï Á¶È¸
 export async function GET() {
   try {
     const classes = await db.oneDayClass.findMany({
@@ -54,38 +55,38 @@ export async function GET() {
 
     return NextResponse.json(result);
   } catch {
-    return NextResponse.json({ error: "ì„œë²„ ì˜¤ë¥˜ê°€ ë°œìƒí–ˆìŠµë‹ˆë‹¤." }, { status: 500 });
+    return NextResponse.json({ error: "¼­¹ö ¿À·ù°¡ ¹ß»ıÇß½À´Ï´Ù." }, { status: 500 });
   }
 }
 
-// ì›ë°ì´í´ë˜ìŠ¤ ì‚­ì œ (ê´€ë¦¬ì ì „ìš©)
+// ¿øµ¥ÀÌÅ¬·¡½º »èÁ¦ (°ü¸®ÀÚ Àü¿ë)
 export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json();
     const data = adminDeleteSchema.parse(body);
     if (data.adminPassword !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "ê¶Œí•œ ì—†ìŒ" }, { status: 403 });
+      return NextResponse.json({ error: "±ÇÇÑ ¾øÀ½" }, { status: 403 });
     }
     await db.oneDayClass.delete({ where: { id: data.id } });
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "ì…ë ¥ê°’ ì˜¤ë¥˜", details: err.issues }, { status: 400 });
+      return NextResponse.json({ error: "ÀÔ·Â°ª ¿À·ù", details: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "ì„œë²„ ì˜¤ë¥˜" }, { status: 500 });
+    return NextResponse.json({ error: "¼­¹ö ¿À·ù" }, { status: 500 });
   }
 }
 
-// ì›ë°ì´í´ë˜ìŠ¤ ì‹ ì²­ (ì¼ë°˜ ì‚¬ìš©ì) or ë“±ë¡ (ê´€ë¦¬ì)
+// ¿øµ¥ÀÌÅ¬·¡½º ½ÅÃ» (ÀÏ¹İ »ç¿ëÀÚ) or µî·Ï (°ü¸®ÀÚ)
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
-  // ê´€ë¦¬ì ë“±ë¡ ë¶„ê¸°
+  // °ü¸®ÀÚ µî·Ï ºĞ±â
   if (body.adminPassword !== undefined) {
     try {
       const data = adminCreateSchema.parse(body);
       if (data.adminPassword !== ADMIN_PASSWORD) {
-        return NextResponse.json({ error: "ê¶Œí•œ ì—†ìŒ" }, { status: 403 });
+        return NextResponse.json({ error: "±ÇÇÑ ¾øÀ½" }, { status: 403 });
       }
       const created = await db.oneDayClass.create({
         data: {
@@ -104,13 +105,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(created, { status: 201 });
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return NextResponse.json({ error: "ì…ë ¥ê°’ ì˜¤ë¥˜", details: err.issues }, { status: 400 });
+        return NextResponse.json({ error: "ÀÔ·Â°ª ¿À·ù", details: err.issues }, { status: 400 });
       }
-      return NextResponse.json({ error: "ì„œë²„ ì˜¤ë¥˜" }, { status: 500 });
+      return NextResponse.json({ error: "¼­¹ö ¿À·ù" }, { status: 500 });
     }
   }
 
-  // ì¼ë°˜ ì‚¬ìš©ì ì‹ ì²­
+  // ÀÏ¹İ »ç¿ëÀÚ ½ÅÃ»
   try {
     const body = await req.json();
     const data = applySchema.parse(body);
@@ -125,18 +126,18 @@ export async function POST(req: NextRequest) {
     });
 
     if (!oneDayClass) {
-      return NextResponse.json({ error: "í´ë˜ìŠ¤ë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤." }, { status: 404 });
+      return NextResponse.json({ error: "Å¬·¡½º¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù." }, { status: 404 });
     }
 
     if (oneDayClass.status !== "OPEN") {
-      return NextResponse.json({ error: "ì‹ ì²­ì´ ë§ˆê°ëœ í´ë˜ìŠ¤ì…ë‹ˆë‹¤." }, { status: 400 });
+      return NextResponse.json({ error: "½ÅÃ»ÀÌ ¸¶°¨µÈ Å¬·¡½ºÀÔ´Ï´Ù." }, { status: 400 });
     }
 
     if (oneDayClass._count.applications >= oneDayClass.maxHeadcount) {
-      return NextResponse.json({ error: "ì •ì›ì´ ì´ˆê³¼ë˜ì—ˆìŠµë‹ˆë‹¤." }, { status: 400 });
+      return NextResponse.json({ error: "Á¤¿øÀÌ ÃÊ°úµÇ¾ú½À´Ï´Ù." }, { status: 400 });
     }
 
-    // ì¤‘ë³µ ì‹ ì²­ í™•ì¸
+    // Áßº¹ ½ÅÃ» È®ÀÎ
     const existing = await db.oneDayClassApplication.findFirst({
       where: {
         classId: data.classId,
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (existing) {
-      return NextResponse.json({ error: "ì´ë¯¸ ì‹ ì²­í•˜ì…¨ìŠµë‹ˆë‹¤." }, { status: 400 });
+      return NextResponse.json({ error: "ÀÌ¹Ì ½ÅÃ»ÇÏ¼Ì½À´Ï´Ù." }, { status: 400 });
     }
 
     const application = await db.oneDayClassApplication.create({
@@ -160,7 +161,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // ì‹ ì²­ í›„ í˜„ì¬ ì¸ì› ì²´í¬ â†’ ìµœì†Œ ì¸ì› ì¶©ì¡± ì‹œ CONFIRMED ë¡œ ë³€ê²½
+    // ½ÅÃ» ÈÄ ÇöÀç ÀÎ¿ø Ã¼Å© ¡æ ÃÖ¼Ò ÀÎ¿ø ÃæÁ· ½Ã CONFIRMED ·Î º¯°æ
     const updatedCount = await db.oneDayClassApplication.count({
       where: { classId: data.classId, isCancelled: false },
     });
@@ -175,8 +176,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, applicationId: application.id }, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "ì…ë ¥ ì •ë³´ë¥¼ í™•ì¸í•´ì£¼ì„¸ìš”.", details: err.issues }, { status: 400 });
+      return NextResponse.json({ error: "ÀÔ·Â Á¤º¸¸¦ È®ÀÎÇØÁÖ¼¼¿ä.", details: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "ì„œë²„ ì˜¤ë¥˜ê°€ ë°œìƒí–ˆìŠµë‹ˆë‹¤." }, { status: 500 });
+    return NextResponse.json({ error: "¼­¹ö ¿À·ù°¡ ¹ß»ıÇß½À´Ï´Ù." }, { status: 500 });
   }
 }

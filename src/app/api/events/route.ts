@@ -1,4 +1,5 @@
-ï»¿import { NextRequest, NextResponse } from "next/server";
+export const dynamic = 'force-dynamic'
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 
@@ -26,7 +27,7 @@ export async function GET() {
     });
     return NextResponse.json(events);
   } catch {
-    return NextResponse.json({ error: "ì„œë²„ ì˜¤ë¥˜" }, { status: 500 });
+    return NextResponse.json({ error: "¼­¹ö ¿À·ù" }, { status: 500 });
   }
 }
 
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = createSchema.parse(body);
     if (data.adminPassword !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "ê¶Œí•œ ì—†ìŒ" }, { status: 403 });
+      return NextResponse.json({ error: "±ÇÇÑ ¾øÀ½" }, { status: 403 });
     }
     const event = await prisma.event.create({
       data: {
@@ -49,9 +50,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(event, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "ì…ë ¥ê°’ ì˜¤ë¥˜", details: err.issues }, { status: 400 });
+      return NextResponse.json({ error: "ÀÔ·Â°ª ¿À·ù", details: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "ì„œë²„ ì˜¤ë¥˜" }, { status: 500 });
+    return NextResponse.json({ error: "¼­¹ö ¿À·ù" }, { status: 500 });
   }
 }
 
@@ -60,14 +61,14 @@ export async function DELETE(req: NextRequest) {
     const body = await req.json();
     const data = deleteSchema.parse(body);
     if (data.adminPassword !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "ê¶Œí•œ ì—†ìŒ" }, { status: 403 });
+      return NextResponse.json({ error: "±ÇÇÑ ¾øÀ½" }, { status: 403 });
     }
     await prisma.event.delete({ where: { id: data.id } });
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "ì…ë ¥ê°’ ì˜¤ë¥˜", details: err.issues }, { status: 400 });
+      return NextResponse.json({ error: "ÀÔ·Â°ª ¿À·ù", details: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "ì„œë²„ ì˜¤ë¥˜" }, { status: 500 });
+    return NextResponse.json({ error: "¼­¹ö ¿À·ù" }, { status: 500 });
   }
 }

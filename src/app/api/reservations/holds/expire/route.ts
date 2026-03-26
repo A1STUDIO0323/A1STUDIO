@@ -1,11 +1,12 @@
-ï»¿import { NextRequest, NextResponse } from "next/server";
+export const dynamic = 'force-dynamic'
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/reservations/holds/expire
- * ë§Œë£Œëœ í™€ë“œë¥¼ EXPIRED ì²˜ë¦¬í•˜ëŠ” í¬ë¡  API
- * Vercel Cron: vercel.json ì—ì„œ "0 * * * *" ë“±ìœ¼ë¡œ ìŠ¤ì¼€ì¤„ ë“±ë¡
+ * ¸¸·áµÈ È¦µå¸¦ EXPIRED Ã³¸®ÇÏ´Â Å©·Ğ API
+ * Vercel Cron: vercel.json ¿¡¼­ "0 * * * *" µîÀ¸·Î ½ºÄÉÁÙ µî·Ï
  * 
- * í—¤ë” Authorization: Bearer {CRON_SECRET} ìœ¼ë¡œ ì¸ì¦
+ * Çì´õ Authorization: Bearer {CRON_SECRET} À¸·Î ÀÎÁõ
  */
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -16,17 +17,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // DB ì—°ê²° ì‹œ í™œì„±í™”
+    // DB ¿¬°á ½Ã È°¼ºÈ­
     // const { prisma } = await import("@/lib/db");
     // const now = new Date();
     //
-    // ë§Œë£Œëœ í™€ë“œ ì¡°íšŒ
+    // ¸¸·áµÈ È¦µå Á¶È¸
     // const expiredHolds = await prisma.reservationHold.findMany({
     //   where: { expiresAt: { lt: now } },
     //   include: { reservation: true },
     // });
     //
-    // íŠ¸ëœì­ì…˜ìœ¼ë¡œ ì¼ê´„ ë§Œë£Œ ì²˜ë¦¬
+    // Æ®·£Àè¼ÇÀ¸·Î ÀÏ°ı ¸¸·á Ã³¸®
     // const result = await prisma.$transaction(
     //   expiredHolds.map((hold) =>
     //     prisma.reservation.update({
@@ -36,18 +37,18 @@ export async function POST(req: NextRequest) {
     //   )
     // );
     //
-    // í™€ë“œ ë ˆì½”ë“œ ì‚­ì œ (ë˜ëŠ” CASCADE)
+    // È¦µå ·¹ÄÚµå »èÁ¦ (¶Ç´Â CASCADE)
     // await prisma.reservationHold.deleteMany({
     //   where: { expiresAt: { lt: now } },
     // });
 
     return NextResponse.json({
       processed: 0, // result.length
-      message: "ë§Œë£Œ ì²˜ë¦¬ ì™„ë£Œ",
+      message: "¸¸·á Ã³¸® ¿Ï·á",
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error("[POST /api/reservations/holds/expire]", error);
-    return NextResponse.json({ error: "ì²˜ë¦¬ ì¤‘ ì˜¤ë¥˜ ë°œìƒ" }, { status: 500 });
+    return NextResponse.json({ error: "Ã³¸® Áß ¿À·ù ¹ß»ı" }, { status: 500 });
   }
 }

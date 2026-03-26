@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAuthClient } from "@/lib/supabase-auth";
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     });
     if (sessionError) {
       return NextResponse.json(
-        { success: false, error: "유효하지 않거나 만료된 재설정 링크입니다." },
+        { success: false, error: "?�효?��? ?�거??만료???�설??링크?�니??" },
         { status: 400 }
       );
     }
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     });
     if (updateError) {
       return NextResponse.json(
-        { success: false, error: "비밀번호 변경에 실패했습니다." },
+        { success: false, error: "비�?번호 변경에 ?�패?�습?�다." },
         { status: 400 }
       );
     }
@@ -40,9 +41,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ success: false, error: "입력값 오류" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "?�력�??�류" }, { status: 400 });
     }
     console.error("[POST /api/auth/password-reset/confirm]", error);
-    return NextResponse.json({ success: false, error: "비밀번호 재설정 실패" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "비�?번호 ?�설???�패" }, { status: 500 });
   }
 }

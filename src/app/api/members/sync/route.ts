@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { NextRequest } from "next/server";
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user?.id) {
-      return NextResponse.json({ success: false, error: "로그인 세션이 없습니다." }, { status: 401 });
+      return NextResponse.json({ success: false, error: "로그???�션???�습?�다." }, { status: 401 });
     }
     const body = (await req.json().catch(() => ({}))) as {
       id?: string;
@@ -122,10 +123,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (isDbConnectionError(error)) {
-      // 로그인 동기화는 부가 기능이므로 DB 장애 시 요청을 성공으로 처리해 사용자 흐름을 막지 않습니다.
+      // 로그???�기?�는 부가 기능?��?�?DB ?�애 ???�청???�공?�로 처리???�용???�름??막�? ?�습?�다.
       return NextResponse.json({ success: true, skipped: true, reason: "DB_UNAVAILABLE" });
     }
     console.error("[POST /api/members/sync]", error);
-    return NextResponse.json({ success: false, error: "회원 동기화 실패" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "?�원 ?�기???�패" }, { status: 500 });
   }
 }

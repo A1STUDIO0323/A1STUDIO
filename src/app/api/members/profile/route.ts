@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
     const email = user?.email?.trim().toLowerCase() ?? "";
     if (!email) {
       return NextResponse.json(
-        { success: false, error: "로그인이 필요합니다." },
+        { success: false, error: "로그?�이 ?�요?�니??" },
         { status: 401 }
       );
     }
@@ -54,12 +55,12 @@ export async function GET(req: NextRequest) {
     if (isDbConnectionError(error)) {
       return NextResponse.json({
         success: false,
-        error: "프로필 조회를 위해 데이터베이스 연결이 필요합니다.",
+        error: "?�로??조회�??�해 ?�이?�베?�스 ?�결???�요?�니??",
       });
     }
     console.error("[GET /api/members/profile]", error);
     return NextResponse.json(
-      { success: false, error: "프로필 조회에 실패했습니다." },
+      { success: false, error: "?�로??조회???�패?�습?�다." },
       { status: 500 }
     );
   }
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     const email = user?.email?.trim().toLowerCase() ?? "";
     if (!email) {
       return NextResponse.json(
-        { success: false, error: "로그인이 필요합니다." },
+        { success: false, error: "로그?�이 ?�요?�니??" },
         { status: 401 }
       );
     }
@@ -100,19 +101,19 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { success: false, error: "입력값을 확인해주세요." },
+        { success: false, error: "?�력값을 ?�인?�주?�요." },
         { status: 400 }
       );
     }
     if (isDbConnectionError(error)) {
       return NextResponse.json({
         success: false,
-        error: "프로필 저장을 위해 데이터베이스 연결이 필요합니다.",
+        error: "?�로???�?�을 ?�해 ?�이?�베?�스 ?�결???�요?�니??",
       });
     }
     console.error("[POST /api/members/profile]", error);
     return NextResponse.json(
-      { success: false, error: "프로필 저장에 실패했습니다." },
+      { success: false, error: "?�로???�?�에 ?�패?�습?�다." },
       { status: 500 }
     );
   }

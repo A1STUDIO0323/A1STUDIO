@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAllBannedRows, getAllRoleRows } from "@/lib/member-role-db";
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
         const email = (user.email ?? "").trim().toLowerCase();
         return {
           email,
-          name: user.name?.trim() || "회원",
+          name: user.name?.trim() || "?�원",
           phone: phoneMap.get(email) ?? "",
           role: roleMap.get(email) ?? "MEMBER",
           isBanned: bannedMap.has(email),
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest) {
       if (mergedMap.has(email)) continue;
       mergedMap.set(email, {
         email,
-        name: "탈퇴회원",
+        name: "?�퇴?�원",
         phone: "",
         role: roleMap.get(email) ?? "MEMBER",
         isBanned: true,

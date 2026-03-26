@@ -1,8 +1,9 @@
-ï»¿import { NextRequest, NextResponse } from "next/server";
+export const dynamic = 'force-dynamic'
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/payments/toss/webhook
- * TossPayments ì›¹í›… ì²˜ë¦¬ (ê²°ì œ ìƒíƒœ ë³€ê²½ ì•Œë¦¼)
+ * TossPayments À¥ÈÅ Ã³¸® (°áÁ¦ »óÅÂ º¯°æ ¾Ë¸²)
  */
 export async function POST(req: NextRequest) {
   try {
@@ -36,6 +37,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("[POST /api/payments/toss/webhook]", error);
-    return NextResponse.json({ error: "ì²˜ë¦¬ ì‹¤íŒ¨" }, { status: 500 });
+    return NextResponse.json({ error: "Ã³¸® ½ÇÆĞ" }, { status: 500 });
   }
 }

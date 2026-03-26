@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requestKakaoPayReady } from "@/lib/payment/kakaopay";
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     const redirectUrl = ready.next_redirect_pc_url ?? ready.next_redirect_mobile_url;
     if (!redirectUrl) {
-      return NextResponse.json({ error: "카카오페이 리다이렉트 URL을 받지 못했습니다." }, { status: 500 });
+      return NextResponse.json({ error: "카카?�페??리다?�렉??URL??받�? 못했?�니??" }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -39,9 +40,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "입력값 오류", details: error.issues }, { status: 400 });
+      return NextResponse.json({ error: "?�력�??�류", details: error.issues }, { status: 400 });
     }
-    const message = error instanceof Error ? error.message : "카카오페이 결제 준비 실패";
+    const message = error instanceof Error ? error.message : "카카?�페??결제 준�??�패";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isValidKoreanMobile, normalizePhone, verifyOtp } from "@/lib/sms-otp";
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
     const phone = normalizePhone(data.phone);
 
     if (!isValidKoreanMobile(phone)) {
-      return NextResponse.json({ error: "휴대폰 번호 형식이 올바르지 않습니다." }, { status: 400 });
+      return NextResponse.json({ error: "?��???번호 ?�식???�바르�? ?�습?�다." }, { status: 400 });
     }
 
     const result = verifyOtp(phone, data.code);
@@ -25,8 +26,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "입력값을 확인해주세요.", details: err.issues }, { status: 400 });
+      return NextResponse.json({ error: "?�력값을 ?�인?�주?�요.", details: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "인증코드 확인 중 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json({ error: "?�증코드 ?�인 �??�류가 발생?�습?�다." }, { status: 500 });
   }
 }
