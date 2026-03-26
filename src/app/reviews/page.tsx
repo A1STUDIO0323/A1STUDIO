@@ -1,95 +1,142 @@
-﻿import { Metadata } from "next";
-import { ExternalLink, Star } from "lucide-react";
+import { Metadata } from "next";
+import Image from "next/image";
+import { Star } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import ReviewForm from "./_components/ReviewForm";
 
-export const metadata: Metadata = { title: "후기" };
+export const metadata: Metadata = { title: "후기 | A1 STUDIO" };
 
-const REVIEW_PLATFORMS = [
-  {
-    name: "네이버 플레이스",
-    description: "네이버 지도에서 A1 STUDIO 후기를 확인하고 작성하세요.",
-    url: "https://map.naver.com/v5/search/A1%20STUDIO%20문정동",
-    color: "bg-[#03C75A]",
-    textColor: "text-[#3B342F]",
-    logo: (
-      <svg viewBox="0 0 24 24" className="h-6 w-6 fill-white" aria-hidden="true">
-        <path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z" />
-      </svg>
-    ),
-  },
-  {
-    name: "스페이스클라우드",
-    description: "스페이스클라우드에서 A1 STUDIO 후기를 확인하고 작성하세요.",
-    url: "https://www.spacecloud.kr",
-    color: "bg-[#5C6BC0]",
-    textColor: "text-[#3B342F]",
-    logo: (
-      <svg viewBox="0 0 24 24" className="h-6 w-6 fill-white" aria-hidden="true">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
-      </svg>
-    ),
-  },
-];
+type Review = {
+  id: string;
+  author_name: string;
+  rating: number;
+  content: string;
+  created_at: string;
+  image_url: string | null;
+};
 
-export default function ReviewsPage() {
+async function getReviews(): Promise<Review[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reviews")
+    .select("id, author_name, rating, content, created_at, image_url")
+    .eq("is_visible", true)
+    .order("created_at", { ascending: false });
+  return data ?? [];
+}
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star
+          key={s}
+          className={`h-4 w-4 ${
+            s <= rating ? "fill-amber-400 text-amber-400" : "text-[#D8CCBC]"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+export default async function ReviewsPage() {
+  const reviews = await getReviews();
+
+  const avgRating =
+    reviews.length > 0
+      ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+      : null;
+
   return (
     <div className="min-h-screen bg-[#F7F3EB] py-20">
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+
+        {/* 헤더 */}
         <div className="mb-12 text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-[#B98768]">Reviews</p>
+          <p className="text-sm font-semibold uppercase tracking-widest text-[#B98768]">
+            Reviews
+          </p>
           <h1 className="mt-1 text-4xl font-extrabold text-[#3B342F]">이용 후기</h1>
-          <p className="mt-3 text-[#6f655d]">실제 이용하신 분들의 솔직한 후기</p>
+          <p className="mt-3 text-[#9b9189]">실제 이용하신 분들의 솔직한 후기</p>
         </div>
 
-        {/* 안내 문구 */}
-        <div className="mb-10 rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-center">
-          <div className="flex justify-center gap-1 mb-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star key={i} className="h-6 w-6 fill-amber-500 text-amber-500" />
+        {/* 평균 별점 요약 */}
+        {avgRating && (
+          <div className="mb-10 rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-center">
+            <p className="text-5xl font-black text-[#3B342F]">{avgRating}</p>
+            <div className="mt-2 flex justify-center gap-1">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Star
+                  key={s}
+                  className={`h-6 w-6 ${
+                    s <= Math.round(Number(avgRating))
+                      ? "fill-amber-400 text-amber-400"
+                      : "text-[#D8CCBC]"
+                  }`}
+                />
+              ))}
+            </div>
+            <p className="mt-2 text-sm text-[#9b9189]">
+              총 {reviews.length}개의 후기
+            </p>
+          </div>
+        )}
+
+        {/* 후기 작성 폼 */}
+        <div className="mb-10">
+          <ReviewForm />
+        </div>
+
+        {/* 후기 목록 */}
+        {reviews.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#D8CCBC] py-16 text-center">
+            <p className="text-sm text-[#9b9189]">
+              아직 후기가 없습니다. 첫 번째 후기를 남겨주세요!
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {reviews.map((review) => (
+              <div
+                key={review.id}
+                className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-5 sm:p-6"
+              >
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className="font-semibold text-[#3B342F]">{review.author_name}</p>
+                    <p className="text-xs text-[#9b9189] mt-0.5">
+                      {formatDate(review.created_at)}
+                    </p>
+                  </div>
+                  <StarRating rating={review.rating} />
+                </div>
+                <p className="text-sm leading-relaxed text-[#6f655d] whitespace-pre-wrap">
+                  {review.content}
+                </p>
+                {review.image_url && (
+                  <div className="mt-4">
+                    <Image
+                      src={review.image_url}
+                      alt="후기 사진"
+                      width={480}
+                      height={320}
+                      className="rounded-xl object-cover max-h-72 w-auto"
+                    />
+                  </div>
+                )}
+              </div>
             ))}
           </div>
-          <p className="text-base font-semibold text-[#3B342F]">
-            고객이 직접 작성한 후기를 소중히 생각합니다.
-          </p>
-          <p className="mt-2 text-sm text-[#6f655d]">
-            아래 플랫폼에서 A1 STUDIO 후기를 확인하거나 직접 작성해주세요.
-            <br />
-            소중한 피드백이 스튜디오 운영에 큰 도움이 됩니다.
-          </p>
-        </div>
-
-        {/* 플랫폼 링크 */}
-        <div className="grid gap-5 sm:grid-cols-2">
-          {REVIEW_PLATFORMS.map((platform) => (
-            <a
-              key={platform.name}
-              href={platform.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex flex-col rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 transition-all hover:border-[#B98768]/50 hover:bg-[#EFE7DA]"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${platform.color}`}>
-                  {platform.logo}
-                </div>
-                <h2 className="text-lg font-bold text-[#3B342F]">{platform.name}</h2>
-              </div>
-              <p className="flex-1 text-sm text-[#6f655d] leading-relaxed">
-                {platform.description}
-              </p>
-              <div className="mt-5 flex items-center gap-1.5 text-sm font-semibold text-[#B98768] group-hover:text-[#B98768] transition-colors">
-                후기 작성하러 가기
-                <ExternalLink className="h-4 w-4" />
-              </div>
-            </a>
-          ))}
-        </div>
-
-        {/* 추후 리뷰 영역 안내 */}
-        <div className="mt-10 rounded-2xl border border-dashed border-[#D8CCBC] p-8 text-center">
-          <p className="text-sm text-[#9b9189]">
-            고객 후기가 쌓이면 이 곳에 표시됩니다.
-          </p>
-        </div>
+        )}
       </div>
     </div>
   );

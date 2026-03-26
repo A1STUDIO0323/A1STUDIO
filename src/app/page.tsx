@@ -1,5 +1,7 @@
 import { Metadata } from "next";
-import Hero from "@/components/home/Hero";
+import HeroScroll from "@/components/HeroScroll";
+import StudioIntro from "@/components/home/StudioIntro";
+import FadeInSection from "@/components/FadeInSection";
 import GallerySection from "@/components/home/GallerySection";
 import PricingSummary from "@/components/home/PricingSummary";
 import ReviewsPreview from "@/components/home/ReviewsPreview";
@@ -32,10 +34,14 @@ const AMENITIES = [
 export default function HomePage() {
   return (
     <>
-      {/* 히어로 */}
-      <Hero />
+      {/* 히어로 스크롤 */}
+      <HeroScroll />
+
+      {/* 스튜디오 소개 */}
+      <StudioIntro />
 
       {/* 활용 용도 */}
+      <FadeInSection>
       <section className="border-y border-[#D8CCBC] bg-[#EFE7DA]/80 py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="mb-3 text-center text-sm font-semibold uppercase tracking-widest text-[#B98768]">
@@ -66,8 +72,10 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      </FadeInSection>
 
       {/* 구비 비품 */}
+      <FadeInSection>
       <section className="bg-[#F7F3EB] py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="mb-3 text-center text-sm font-semibold uppercase tracking-widest text-[#B98768]">
@@ -92,11 +100,15 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      </FadeInSection>
 
       {/* 갤러리 */}
-      <GallerySection />
+      <FadeInSection>
+        <GallerySection />
+      </FadeInSection>
 
       {/* 예약 흐름 안내 */}
+      <FadeInSection>
       <section className="bg-[#F7F3EB] py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
@@ -147,17 +159,25 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      </FadeInSection>
 
       {/* 요금 요약 */}
-      <PricingSummary />
+      <FadeInSection>
+        <PricingSummary />
+      </FadeInSection>
 
       {/* 후기 */}
-      <ReviewsPreview />
+      <FadeInSection>
+        <ReviewsPreview />
+      </FadeInSection>
 
       {/* 오시는 길 */}
-      <LocationSection />
+      <FadeInSection>
+        <LocationSection />
+      </FadeInSection>
 
       {/* 하단 CTA 배너 */}
+      <FadeInSection>
       <section className="relative overflow-hidden bg-gradient-to-r from-[#EFE7DA] to-[#D8CCBC] py-16">
         <div
           className="pointer-events-none absolute inset-0 opacity-10"
@@ -192,6 +212,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      </FadeInSection>
     </>
   );
 }

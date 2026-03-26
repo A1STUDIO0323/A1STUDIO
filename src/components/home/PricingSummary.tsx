@@ -40,9 +40,7 @@ export default function PricingSummary() {
           <h2 className="mt-1 text-3xl font-bold text-[#3B342F]">
             합리적인 요금, 숨겨진 비용 없음
           </h2>
-          <p className="mt-3 text-[#6f655d]">
-            스페이스클라우드·야놀자 수수료 없이 더 저렴하게 이용하세요
-          </p>
+
         </div>
 
         <div className="mt-12 grid gap-6 sm:grid-cols-3">
