@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         const email = (user.email ?? "").trim().toLowerCase();
         return {
           email,
-          name: user.name?.trim() || "?�원",
+          name: user.name?.trim() || "회원",
           phone: phoneMap.get(email) ?? "",
           role: roleMap.get(email) ?? "MEMBER",
           isBanned: bannedMap.has(email),
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       if (mergedMap.has(email)) continue;
       mergedMap.set(email, {
         email,
-        name: "?�퇴?�원",
+        name: "탈퇴회원",
         phone: "",
         role: roleMap.get(email) ?? "MEMBER",
         isBanned: true,

@@ -54,10 +54,6 @@ export default function ProfileOnboardingClient() {
         });
         const data = (await res.json()) as ProfileResponse;
         if (res.ok && data.success && data.profile) {
-          if (data.profile.isComplete) {
-            router.replace(nextUrl);
-            return;
-          }
           setBirthDate(data.profile.birthDate ?? "");
           setPhone(data.profile.phone ?? session.user.phone ?? "");
         }
@@ -85,6 +81,9 @@ export default function ProfileOnboardingClient() {
       if (!res.ok || !data.success) {
         setError(data.error ?? "정보 저장에 실패했습니다.");
         return;
+      }
+      if (data.profile) {
+        setBirthDate(data.profile.birthDate ?? "");
       }
       router.replace(nextUrl);
     } catch {

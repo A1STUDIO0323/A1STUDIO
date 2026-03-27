@@ -25,15 +25,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ success: false, error: "?�력�??�류" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "입력값 오류" }, { status: 400 });
     }
     if (isDbConnectionError(error)) {
       return NextResponse.json(
-        { success: false, error: "DB ?�결??불안?�합?�다. ?�시 ???�시 ?�도?�주?�요." },
+        { success: false, error: "DB 연결이 불안정합니다. 잠시 후 다시 시도해주세요." },
         { status: 503 }
       );
     }
     console.error("[POST /api/auth/password-reset/request]", error);
-    return NextResponse.json({ success: false, error: "비�?번호 ?�설???�청 ?�패" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "비밀번호 재설정 요청 실패" }, { status: 500 });
   }
 }

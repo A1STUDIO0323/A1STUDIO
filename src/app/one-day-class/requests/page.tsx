@@ -48,7 +48,8 @@ export default function ClassRequestsPage() {
     genre: "",
     preferredTime: "",
     preferredDays: [] as string[],
-    preferredDates: "",
+    dateFrom: "",
+    dateTo: "",
     message: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -66,12 +67,23 @@ export default function ClassRequestsPage() {
     }));
   };
 
+  const toYYMMDD = (iso: string) => iso.replace(/-/g, "").slice(2);
+
+  const preferredDatesFormatted = () => {
+    if (form.dateFrom && form.dateTo) return `${toYYMMDD(form.dateFrom)}~${toYYMMDD(form.dateTo)}`;
+    if (form.dateFrom) return toYYMMDD(form.dateFrom);
+    return "";
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.genre.trim()) e.genre = "원하는 장르를 입력해주세요.";
     if (!form.preferredTime) e.preferredTime = "원하는 시간대를 선택해주세요.";
-    if (form.preferredDays.length === 0 && !form.preferredDates.trim()) {
+    if (form.preferredDays.length === 0 && !form.dateFrom) {
       e.preferredDays = "원하는 요일 또는 날짜를 입력해주세요.";
+    }
+    if (form.dateFrom && form.dateTo && form.dateTo < form.dateFrom) {
+      e.dateTo = "종료일은 시작일 이후여야 합니다.";
     }
     return e;
   };
@@ -92,11 +104,11 @@ export default function ClassRequestsPage() {
       genre: form.genre.trim(),
       preferredTime: form.preferredTime,
       preferredDays: form.preferredDays,
-      preferredDates: form.preferredDates.trim(),
+      preferredDates: preferredDatesFormatted(),
       message: form.message.trim(),
     });
 
-    setForm({ genre: "", preferredTime: "", preferredDays: [], preferredDates: "", message: "" });
+    setForm({ genre: "", preferredTime: "", preferredDays: [], dateFrom: "", dateTo: "", message: "" });
     setShowSuccess(true);
   };
 
@@ -227,17 +239,40 @@ export default function ClassRequestsPage() {
               ))}
             </div>
 
-            {/* 특정 날짜 (캘린더 선택) */}
+            {/* 특정 날짜 범위 선택 */}
             <div className="mt-3">
-              <label className="block text-xs text-[#9b9189] mb-1">
+              <label className="block text-xs text-[#9b9189] mb-1.5">
                 특정 날짜가 있다면 선택해주세요 <span className="text-[#b0a89e]">(선택)</span>
               </label>
-              <input
-                type="date"
-                value={form.preferredDates}
-                onChange={(e) => { setForm({ ...form, preferredDates: e.target.value }); setErrors({ ...errors, preferredDays: "" }); }}
-                className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-emerald-500 focus:outline-none"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={form.dateFrom}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((prev) => ({ ...prev, dateFrom: v, dateTo: prev.dateTo && prev.dateTo < v ? "" : prev.dateTo }));
+                    setErrors((prev) => ({ ...prev, preferredDays: "", dateTo: "" }));
+                  }}
+                  className="flex-1 rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] focus:border-emerald-500 focus:outline-none"
+                />
+                <span className="text-sm font-semibold text-[#9b9189] shrink-0">~</span>
+                <input
+                  type="date"
+                  value={form.dateTo}
+                  min={form.dateFrom || undefined}
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, dateTo: e.target.value }));
+                    setErrors((prev) => ({ ...prev, dateTo: "" }));
+                  }}
+                  className="flex-1 rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              {form.dateFrom && (
+                <p className="mt-1.5 text-[11px] text-emerald-500 font-mono tracking-wide">
+                  {toYYMMDD(form.dateFrom)}{form.dateTo ? `~${toYYMMDD(form.dateTo)}` : ""}
+                </p>
+              )}
+              {errors.dateTo && <p className="mt-1 text-xs text-red-400">{errors.dateTo}</p>}
             </div>
             {errors.preferredDays && <p className="mt-1 text-xs text-red-400">{errors.preferredDays}</p>}
           </div>

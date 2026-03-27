@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = actionSchema.parse(body);
     if (data.adminPassword !== ADMIN_PASSWORD) {
-      return NextResponse.json({ success: false, error: "권한 ?�음" }, { status: 403 });
+      return NextResponse.json({ success: false, error: "권한 없음" }, { status: 403 });
     }
 
     const email = data.email.trim().toLowerCase();
@@ -33,10 +33,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ success: false, error: "?�력�??�류", details: error.issues }, { status: 400 });
+      return NextResponse.json({ success: false, error: "입력값 오류", details: error.issues }, { status: 400 });
     }
     console.error("[POST /api/admin/members/actions]", error);
-    const message = error instanceof Error ? error.message : "?�업 처리 ?�패";
+    const message = error instanceof Error ? error.message : "작업 처리 실패";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

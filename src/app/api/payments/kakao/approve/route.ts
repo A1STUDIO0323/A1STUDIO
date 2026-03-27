@@ -29,9 +29,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "?�력�??�류", details: error.issues }, { status: 400 });
+      return NextResponse.json({ error: "입력값 오류", details: error.issues }, { status: 400 });
     }
-    const message = error instanceof Error ? error.message : "카카?�페???�인 ?�패";
+    const message = error instanceof Error ? error.message : "카카오페이 승인 실패";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

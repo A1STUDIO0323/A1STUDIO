@@ -27,7 +27,7 @@ export async function GET() {
     });
     return NextResponse.json(events);
   } catch {
-    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+    return NextResponse.json({ error: " 윷" }, { status: 500 });
   }
 }
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = createSchema.parse(body);
     if (data.adminPassword !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "권한 없음" }, { status: 403 });
+      return NextResponse.json({ error: " 음" }, { status: 403 });
     }
     const event = await prisma.event.create({
       data: {
@@ -50,9 +50,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(event, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "입력값 오류", details: err.issues }, { status: 400 });
+      return NextResponse.json({ error: "韜째 윷", details: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+    return NextResponse.json({ error: " 윷" }, { status: 500 });
   }
 }
 
@@ -61,14 +61,14 @@ export async function DELETE(req: NextRequest) {
     const body = await req.json();
     const data = deleteSchema.parse(body);
     if (data.adminPassword !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "권한 없음" }, { status: 403 });
+      return NextResponse.json({ error: " 음" }, { status: 403 });
     }
     await prisma.event.delete({ where: { id: data.id } });
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "입력값 오류", details: err.issues }, { status: 400 });
+      return NextResponse.json({ error: "韜째 윷", details: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+    return NextResponse.json({ error: " 윷" }, { status: 500 });
   }
 }

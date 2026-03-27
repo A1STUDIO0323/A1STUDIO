@@ -33,7 +33,7 @@ const applySchema = z.object({
   message: z.string().max(300).optional(),
 });
 
-// 원데이클래스 목록 조회
+// 클  조회
 export async function GET() {
   try {
     const classes = await db.oneDayClass.findMany({
@@ -55,38 +55,38 @@ export async function GET() {
 
     return NextResponse.json(result);
   } catch {
-    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json({ error: " 윷 澁颯윱求." }, { status: 500 });
   }
 }
 
-// 원데이클래스 삭제 (관리자 전용)
+// 클 제 ( )
 export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json();
     const data = adminDeleteSchema.parse(body);
     if (data.adminPassword !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "권한 없음" }, { status: 403 });
+      return NextResponse.json({ error: " 음" }, { status: 403 });
     }
     await db.oneDayClass.delete({ where: { id: data.id } });
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "입력값 오류", details: err.issues }, { status: 400 });
+      return NextResponse.json({ error: "韜째 윷", details: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+    return NextResponse.json({ error: " 윷" }, { status: 500 });
   }
 }
 
-// 원데이클래스 신청 (일반 사용자) or 등록 (관리자)
+// 클 청 (球 ) or  ()
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
-  // 관리자 등록 분기
+  //   閨
   if (body.adminPassword !== undefined) {
     try {
       const data = adminCreateSchema.parse(body);
       if (data.adminPassword !== ADMIN_PASSWORD) {
-        return NextResponse.json({ error: "권한 없음" }, { status: 403 });
+        return NextResponse.json({ error: " 음" }, { status: 403 });
       }
       const created = await db.oneDayClass.create({
         data: {
@@ -105,13 +105,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(created, { status: 201 });
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return NextResponse.json({ error: "입력값 오류", details: err.issues }, { status: 400 });
+        return NextResponse.json({ error: "韜째 윷", details: err.issues }, { status: 400 });
       }
-      return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+      return NextResponse.json({ error: " 윷" }, { status: 500 });
     }
   }
 
-  // 일반 사용자 신청
+  // 球  청
   try {
     const body = await req.json();
     const data = applySchema.parse(body);
@@ -126,18 +126,18 @@ export async function POST(req: NextRequest) {
     });
 
     if (!oneDayClass) {
-      return NextResponse.json({ error: "클래스를 찾을 수 없습니다." }, { status: 404 });
+      return NextResponse.json({ error: "클 찾을  윱求." }, { status: 404 });
     }
 
     if (oneDayClass.status !== "OPEN") {
-      return NextResponse.json({ error: "신청이 마감된 클래스입니다." }, { status: 400 });
+      return NextResponse.json({ error: "청  클都求." }, { status: 400 });
     }
 
     if (oneDayClass._count.applications >= oneDayClass.maxHeadcount) {
-      return NextResponse.json({ error: "정원이 초과되었습니다." }, { status: 400 });
+      return NextResponse.json({ error: "정 歌퓸윱求." }, { status: 400 });
     }
 
-    // 중복 신청 확인
+    // 揷 청 확
     const existing = await db.oneDayClassApplication.findFirst({
       where: {
         classId: data.classId,
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (existing) {
-      return NextResponse.json({ error: "이미 신청하셨습니다." }, { status: 400 });
+      return NextResponse.json({ error: "譴 청究決윱求." }, { status: 400 });
     }
 
     const application = await db.oneDayClassApplication.create({
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 신청 후 현재 인원 체크 → 최소 인원 충족 시 CONFIRMED 로 변경
+    // 청   恝 체크  玲 恝 족  CONFIRMED  
     const updatedCount = await db.oneDayClassApplication.count({
       where: { classId: data.classId, isCancelled: false },
     });
@@ -176,8 +176,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, applicationId: application.id }, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "입력 정보를 확인해주세요.", details: err.issues }, { status: 400 });
+      return NextResponse.json({ error: "韜 정 확玲.", details: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json({ error: " 윷 澁颯윱求." }, { status: 500 });
   }
 }

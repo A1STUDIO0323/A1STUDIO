@@ -129,6 +129,7 @@ export default async function ReviewsPage() {
                       alt="후기 사진"
                       width={480}
                       height={320}
+                      unoptimized
                       className="rounded-xl object-cover max-h-72 w-auto"
                     />
                   </div>

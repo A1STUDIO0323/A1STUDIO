@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     const email = user?.email?.trim().toLowerCase() ?? "";
     if (!email) {
       return NextResponse.json(
-        { success: false, error: "ë¡œê·¸?¸ì´ ?„ìš”?©ë‹ˆ??" },
+        { success: false, error: "???? ?????" },
         { status: 401 }
       );
     }
@@ -55,12 +55,12 @@ export async function GET(req: NextRequest) {
     if (isDbConnectionError(error)) {
       return NextResponse.json({
         success: false,
-        error: "?„ë¡œ??ì¡°íšŒë¥??„í•´ ?°ì´?°ë² ?´ìŠ¤ ?°ê²°???„ìš”?©ë‹ˆ??",
+        error: "??? ??? ?? ?????? ??? ?????",
       });
     }
     console.error("[GET /api/members/profile]", error);
     return NextResponse.json(
-      { success: false, error: "?„ë¡œ??ì¡°íšŒ???¤íŒ¨?ˆìŠµ?ˆë‹¤." },
+      { success: false, error: "??? ??? ??????" },
       { status: 500 }
     );
   }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const email = user?.email?.trim().toLowerCase() ?? "";
     if (!email) {
       return NextResponse.json(
-        { success: false, error: "ë¡œê·¸?¸ì´ ?„ìš”?©ë‹ˆ??" },
+        { success: false, error: "???? ?????" },
         { status: 401 }
       );
     }
@@ -101,19 +101,19 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { success: false, error: "?…ë ¥ê°’ì„ ?•ì¸?´ì£¼?¸ìš”." },
+        { success: false, error: "???? ??????" },
         { status: 400 }
       );
     }
     if (isDbConnectionError(error)) {
       return NextResponse.json({
         success: false,
-        error: "?„ë¡œ???€?¥ì„ ?„í•´ ?°ì´?°ë² ?´ìŠ¤ ?°ê²°???„ìš”?©ë‹ˆ??",
+        error: "??? ??? ?? ?????? ??? ?????",
       });
     }
     console.error("[POST /api/members/profile]", error);
     return NextResponse.json(
-      { success: false, error: "?„ë¡œ???€?¥ì— ?¤íŒ¨?ˆìŠµ?ˆë‹¤." },
+      { success: false, error: "??? ??? ??????" },
       { status: 500 }
     );
   }

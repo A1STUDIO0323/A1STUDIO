@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const role = await getRoleByEmail(email.trim().toLowerCase());
     return NextResponse.json({ role });
   } catch {
-    // DB ?�애 ?�에??기본 ?�원권한?�로 ?�름???��??�니??
+    // DB 장애 시에는 기본 회원 권한으로 흐름을 이어갑니다
     return NextResponse.json({ role: "MEMBER", skipped: true });
   }
 }
@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "?�력�??�류", details: error.issues }, { status: 400 });
+      return NextResponse.json({ error: "입력값 오류", details: error.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: "?�원?�급 변�??�패" }, { status: 500 });
+    return NextResponse.json({ error: "회원등급 변경 실패" }, { status: 500 });
   }
 }

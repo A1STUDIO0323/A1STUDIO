@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/payments/toss/webhook
- * TossPayments 웹훅 처리 (결제 상태 변경 알림)
+ * TossPayments ?? ?? (?? ?? ?? ??)
  */
 export async function POST(req: NextRequest) {
   try {
@@ -37,6 +37,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("[POST /api/payments/toss/webhook]", error);
-    return NextResponse.json({ error: "처리 실패" }, { status: 500 });
+    return NextResponse.json({ error: "?? ??" }, { status: 500 });
   }
 }

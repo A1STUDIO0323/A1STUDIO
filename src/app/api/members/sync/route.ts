@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user?.id) {
-      return NextResponse.json({ success: false, error: "ë¡œê·¸???¸ì…˜???†ìŠµ?ˆë‹¤." }, { status: 401 });
+      return NextResponse.json({ success: false, error: "??? ??? ????." }, { status: 401 });
     }
     const body = (await req.json().catch(() => ({}))) as {
       id?: string;
@@ -123,10 +123,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (isDbConnectionError(error)) {
-      // ë¡œê·¸???™ê¸°?”ëŠ” ë¶€ê°€ ê¸°ëŠ¥?´ë?ë¡?DB ?¥ì•  ???”ì²­???±ê³µ?¼ë¡œ ì²˜ë¦¬???¬ìš©???ë¦„??ë§‰ì? ?ŠìŠµ?ˆë‹¤.
+      // ??? ???? ?? ???? DB ?? ? ??? ???? ??? ??? ??? ?? ????.
       return NextResponse.json({ success: true, skipped: true, reason: "DB_UNAVAILABLE" });
     }
     console.error("[POST /api/members/sync]", error);
-    return NextResponse.json({ success: false, error: "?Œì› ?™ê¸°???¤íŒ¨" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "?? ??? ??" }, { status: 500 });
   }
 }

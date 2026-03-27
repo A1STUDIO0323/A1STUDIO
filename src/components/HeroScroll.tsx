@@ -41,6 +41,18 @@ export default function HeroScroll() {
     reduced ? ["#0f0e0d", "#0f0e0d"] : ["#0f0e0d", "#F7F3EB"]
   );
 
+  /* ── studio info: appears after logo fades, before card ── */
+  const infoOpacity = useTransform(
+    scrollYProgress,
+    [0.30, 0.44, 0.54, 0.66],
+    reduced ? [0, 0, 0, 0] : [0, 1, 1, 0]
+  );
+  const infoScale = useTransform(
+    scrollYProgress,
+    [0.30, 0.44],
+    reduced ? [1, 1] : [0.96, 1]
+  );
+
   /* ── ambient glow: fade out as bg brightens ── */
   const glowOpacity = useTransform(
     scrollYProgress,
@@ -127,6 +139,36 @@ export default function HeroScroll() {
             <span className="block h-1 w-1 rounded-full bg-[#B98768]/50" />
             <span className="block h-px w-6 bg-white/10" />
           </div>
+        </motion.div>
+
+        {/* ── studio info overlay ── */}
+        <motion.div
+          style={{ opacity: infoOpacity, scale: infoScale }}
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-6 pointer-events-none select-none"
+        >
+          <span className="text-[9px] font-semibold tracking-[0.55em] text-white/25 uppercase mb-8">
+            Premium Practice Studio
+          </span>
+
+          <h2 className="text-5xl sm:text-6xl font-black tracking-tight text-white/90 mb-3">
+            A1 STUDIO
+          </h2>
+
+          <p className="text-sm sm:text-base font-medium tracking-[0.3em] text-[#B98768]/80 uppercase mb-8">
+            보컬&nbsp;·&nbsp;댄스&nbsp;·&nbsp;연기&nbsp;·&nbsp;뮤지컬 연습실
+          </p>
+
+          <span className="block h-px w-14 bg-white/10 mb-8" />
+
+          <p className="text-xs sm:text-sm text-white/45 leading-relaxed">
+            서울시 송파구 문정동 70-13 B1
+          </p>
+          <p className="text-xs sm:text-sm text-white/35 mt-1">
+            문정역 도보 8분&nbsp;·&nbsp;장지역 도보 10분
+          </p>
+          <p className="mt-4 text-[10px] sm:text-xs text-white/25 tracking-widest">
+            전신거울&nbsp;·&nbsp;전자피아노&nbsp;·&nbsp;촬영용 조명 완비
+          </p>
         </motion.div>
 
         {/* ── scroll indicator ── */}

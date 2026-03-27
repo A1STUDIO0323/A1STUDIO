@@ -90,6 +90,7 @@ export default async function ReviewsPreview() {
                     alt="후기 사진"
                     width={320}
                     height={180}
+                    unoptimized
                     className="mb-3 w-full rounded-lg object-cover max-h-36"
                   />
                 )}
