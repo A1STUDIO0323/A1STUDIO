@@ -1,9 +1,18 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 export default function TossPaymentFailPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#F7F3EB]"><div className="h-8 w-8 animate-spin rounded-full border-2 border-[#B98768] border-t-transparent" /></div>}>
+      <TossPaymentFailContent />
+    </Suspense>
+  );
+}
+
+function TossPaymentFailContent() {
   const searchParams = useSearchParams();
   const code = searchParams.get("code");
   const message = searchParams.get("message");

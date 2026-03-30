@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { STUDIO_NAME } from "@/lib/constants";
@@ -29,6 +29,18 @@ function toE164KRPhone(input: string) {
 }
 
 export default function PhoneOnboardingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-[#F7F3EB]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#B98768] border-t-transparent" />
+      </div>
+    }>
+      <PhoneOnboardingContent />
+    </Suspense>
+  );
+}
+
+function PhoneOnboardingContent() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();

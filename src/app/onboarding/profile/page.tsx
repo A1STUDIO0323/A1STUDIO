@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberProfileByEmail } from "@/lib/member-profile-db";
@@ -35,5 +36,13 @@ export default async function ProfileOnboardingPage({
     // DB 오류 시 폼을 그대로 표시
   }
 
-  return <ProfileOnboardingClient />;
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-[#F7F3EB]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#B98768] border-t-transparent" />
+      </div>
+    }>
+      <ProfileOnboardingClient />
+    </Suspense>
+  );
 }

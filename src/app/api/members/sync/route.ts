@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user?.id) {
-      return NextResponse.json({ success: false, error: "??? ??? ????." }, { status: 401 });
+      return NextResponse.json({ success: false, error: "로그인이 필요합니다." }, { status: 401 });
     }
     const body = (await req.json().catch(() => ({}))) as {
       id?: string;
@@ -98,7 +98,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Optional: keep Supabase public.profiles in sync when table/policies exist.
     try {
       if (id) {
         await supabase.from("profiles").upsert({
@@ -109,7 +108,7 @@ export async function POST(req: NextRequest) {
         });
       }
     } catch {
-      // Ignore when profiles table/RLS is not set yet.
+      // profiles 테이블/RLS 미설정 시 무시
     }
 
     if (!prismaUserSynced) {
@@ -123,10 +122,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (isDbConnectionError(error)) {
-      // ??? ???? ?? ???? DB ?? ? ??? ???? ??? ??? ??? ?? ????.
       return NextResponse.json({ success: true, skipped: true, reason: "DB_UNAVAILABLE" });
     }
     console.error("[POST /api/members/sync]", error);
-    return NextResponse.json({ success: false, error: "?? ??? ??" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "회원 동기화 실패" }, { status: 500 });
   }
 }

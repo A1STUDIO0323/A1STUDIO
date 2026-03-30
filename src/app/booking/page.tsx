@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
@@ -39,6 +39,18 @@ function loadTossScript() {
 }
 
 export default function BookingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-[#F7F3EB]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#B98768] border-t-transparent" />
+      </div>
+    }>
+      <BookingContent />
+    </Suspense>
+  );
+}
+
+function BookingContent() {
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const initDate = searchParams.get("date") ?? "";

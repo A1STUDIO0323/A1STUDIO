@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, AlertCircle } from "lucide-react";
@@ -15,6 +15,14 @@ type ConfirmResult = {
 };
 
 export default function TossPaymentSuccessPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#F7F3EB]"><div className="h-8 w-8 animate-spin rounded-full border-2 border-[#B98768] border-t-transparent" /></div>}>
+      <TossPaymentSuccessContent />
+    </Suspense>
+  );
+}
+
+function TossPaymentSuccessContent() {
   const searchParams = useSearchParams();
   const paymentKey = searchParams.get("paymentKey");
   const orderId = searchParams.get("orderId");

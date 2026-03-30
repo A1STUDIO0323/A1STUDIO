@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     const email = user?.email?.trim().toLowerCase() ?? "";
     if (!email) {
       return NextResponse.json(
-        { success: false, error: "???? ?????" },
+        { success: false, error: "로그인이 필요합니다" },
         { status: 401 }
       );
     }
@@ -55,12 +55,12 @@ export async function GET(req: NextRequest) {
     if (isDbConnectionError(error)) {
       return NextResponse.json({
         success: false,
-        error: "??? ??? ?? ?????? ??? ?????",
+        error: "데이터베이스 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
       });
     }
     console.error("[GET /api/members/profile]", error);
     return NextResponse.json(
-      { success: false, error: "??? ??? ??????" },
+      { success: false, error: "프로필 조회에 실패했습니다" },
       { status: 500 }
     );
   }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const email = user?.email?.trim().toLowerCase() ?? "";
     if (!email) {
       return NextResponse.json(
-        { success: false, error: "???? ?????" },
+        { success: false, error: "로그인이 필요합니다" },
         { status: 401 }
       );
     }
@@ -101,19 +101,19 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { success: false, error: "???? ??????" },
+        { success: false, error: "입력값이 올바르지 않습니다" },
         { status: 400 }
       );
     }
     if (isDbConnectionError(error)) {
       return NextResponse.json({
         success: false,
-        error: "??? ??? ?? ?????? ??? ?????",
+        error: "데이터베이스 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
       });
     }
     console.error("[POST /api/members/profile]", error);
     return NextResponse.json(
-      { success: false, error: "??? ??? ??????" },
+      { success: false, error: "프로필 저장에 실패했습니다" },
       { status: 500 }
     );
   }
