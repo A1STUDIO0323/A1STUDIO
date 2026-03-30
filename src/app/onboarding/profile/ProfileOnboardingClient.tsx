@@ -54,6 +54,10 @@ export default function ProfileOnboardingClient() {
         });
         const data = (await res.json()) as ProfileResponse;
         if (res.ok && data.success && data.profile) {
+          if (data.profile.isComplete) {
+            router.replace(nextUrl);
+            return;
+          }
           setBirthDate(data.profile.birthDate ?? "");
           setPhone(data.profile.phone ?? session.user.phone ?? "");
         }

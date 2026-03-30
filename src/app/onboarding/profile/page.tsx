@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMemberProfileByEmail } from "@/lib/member-profile-db";
 import ProfileOnboardingClient from "@/app/onboarding/profile/ProfileOnboardingClient";
 
 const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
@@ -17,11 +18,21 @@ export default async function ProfileOnboardingPage({
   const resolvedSearchParams = await searchParams;
   const next = resolvedSearchParams.next ?? "/";
   const onboardingEntryPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
+
   if (!user) {
     redirect(`/login?callbackUrl=${encodeURIComponent(`${onboardingEntryPath}?next=${next}`)}`);
   }
   if (PHONE_OTP_ENABLED && !user.phone_confirmed_at) {
     redirect(`/onboarding/phone?next=${encodeURIComponent(next)}`);
+  }
+
+  try {
+    const profile = await getMemberProfileByEmail(user.email!);
+    if (profile.isComplete) {
+      redirect(next);
+    }
+  } catch {
+    // DB 오류 시 폼을 그대로 표시
   }
 
   return <ProfileOnboardingClient />;

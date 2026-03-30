@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { MessageSquare, Phone, Send, CheckCircle2 } from "lucide-react";
@@ -64,7 +64,7 @@ export default function ContactPage() {
             </div>
             <div>
               <p className="font-semibold text-[#3B342F]">{STUDIO_PHONE}</p>
-              <p className="text-sm text-[#6f655d]">운영시간 09:00 – 24:00</p>
+              <p className="text-sm text-[#6f655d]">운영시간 00:00 – 24:00</p>
             </div>
           </a>
         </div>

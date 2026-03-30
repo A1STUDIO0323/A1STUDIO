@@ -28,6 +28,14 @@ export const STUDIO_AMENITIES = [
 
 export const NAV_LINKS = [
   { label: "홈", href: "/" },
+  {
+    label: "소개",
+    href: "/#about",
+    children: [
+      { label: "회사소개", href: "/#about" },
+      { label: "대표소개", href: "/#director" },
+    ],
+  },
   { label: "연습실 소개", href: "/spaces" },
   {
     label: "원데이클래스",

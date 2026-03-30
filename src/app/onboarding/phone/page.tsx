@@ -72,12 +72,13 @@ export default function PhoneOnboardingPage() {
         return;
       }
 
+      if (user.phone_confirmed_at) {
+        router.replace(`/onboarding/profile?next=${encodeURIComponent(next)}`);
+        return;
+      }
+
       if (user.phone) {
         setPhone(user.phone);
-      }
-      if (user.phone_confirmed_at) {
-        setIsOtpSent(true);
-        setIsPhoneVerified(true);
       }
     })();
   }, [next, router, supabase]);

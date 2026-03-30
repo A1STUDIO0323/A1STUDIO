@@ -13,13 +13,14 @@ type Review = {
   content: string;
   created_at: string;
   image_url: string | null;
+  video_url: string | null;
 };
 
 async function getReviews(): Promise<Review[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("reviews")
-    .select("id, author_name, rating, content, created_at, image_url")
+    .select("id, author_name, rating, content, created_at, image_url, video_url")
     .eq("is_visible", true)
     .order("created_at", { ascending: false });
   return data ?? [];
@@ -131,6 +132,16 @@ export default async function ReviewsPage() {
                       height={320}
                       unoptimized
                       className="rounded-xl object-cover max-h-72 w-auto"
+                    />
+                  </div>
+                )}
+                {review.video_url && (
+                  <div className="mt-4">
+                    <video
+                      src={review.video_url}
+                      controls
+                      preload="metadata"
+                      className="w-full rounded-xl max-h-72 bg-black"
                     />
                   </div>
                 )}

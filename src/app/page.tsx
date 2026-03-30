@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import HeroScroll from "@/components/HeroScroll";
 import StudioIntro from "@/components/home/StudioIntro";
+import AboutSection from "@/components/home/AboutSection";
 import FadeInSection from "@/components/FadeInSection";
 import GallerySection from "@/components/home/GallerySection";
 import PricingSummary from "@/components/home/PricingSummary";
@@ -40,67 +41,70 @@ export default function HomePage() {
       {/* 스튜디오 소개 */}
       <StudioIntro />
 
-      {/* 활용 용도 */}
+      {/* 회사 소개 */}
       <FadeInSection>
-      <section className="border-y border-[#D8CCBC] bg-[#EFE7DA]/80 py-14">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="mb-3 text-center text-sm font-semibold uppercase tracking-widest text-[#B98768]">
-            One Space · Four Uses
-          </p>
-          <h2 className="mb-2 text-center text-2xl font-bold text-[#3B342F]">
-            15평 단독 공간, 4가지 활용
-          </h2>
-          <p className="mb-10 text-center text-sm text-[#9b9189]">
-            하나의 연습실을 보컬·댄스·연기·뮤지컬 용도로 자유롭게 활용하세요.
-          </p>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {ROOM_USES.map(({ icon: Icon, label, ko, desc }) => (
-              <div
-                key={label}
-                className="flex flex-col items-center gap-3 rounded-xl border border-[#D8CCBC] bg-[#EFE7DA] p-5 text-center transition-all hover:border-[#B98768]/50 hover:bg-[#EFE7DA]"
-              >
-                <div className="rounded-full bg-[#B98768]/15 p-3">
-                  <Icon className="h-6 w-6 text-[#B98768]" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold tracking-widest text-[#B98768]">{label}</p>
-                  <p className="text-sm font-semibold text-[#3B342F]">{ko}</p>
-                </div>
-                <p className="text-xs leading-relaxed text-[#9b9189]">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        <AboutSection />
       </FadeInSection>
 
-      {/* 구비 비품 */}
-      <FadeInSection>
-      <section className="bg-[#F7F3EB] py-14">
+      {/* 활용 용도 */}
+      <section className="border-y border-[#D8CCBC] bg-[#EFE7DA]/80 py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="mb-3 text-center text-sm font-semibold uppercase tracking-widest text-[#B98768]">
-            Equipment
-          </p>
-          <h2 className="mb-10 text-center text-2xl font-bold text-[#3B342F]">
-            구비 비품
-          </h2>
+          <FadeInSection>
+            <p className="mb-3 text-center text-sm font-semibold uppercase tracking-widest text-[#B98768]">
+              One Space · Four Uses
+            </p>
+            <h2 className="mb-2 text-center text-2xl font-bold text-[#3B342F]">
+              15평 단독 공간, 4가지 활용
+            </h2>
+            <p className="mb-10 text-center text-sm text-[#9b9189]">
+              하나의 연습실을 보컬·댄스·연기·뮤지컬 용도로 자유롭게 활용하세요.
+            </p>
+          </FadeInSection>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {AMENITIES.map(({ icon: Icon, label, desc }) => (
-              <div
-                key={label}
-                className="flex flex-col items-center gap-2 rounded-xl border border-[#D8CCBC] bg-[#EFE7DA] p-4 text-center transition-colors hover:border-[#D8CCBC]"
-              >
-                <div className="rounded-full bg-[#B98768]/15 p-3">
-                  <Icon className="h-5 w-5 text-[#B98768]" />
+            {ROOM_USES.map(({ icon: Icon, label, ko, desc }, i) => (
+              <FadeInSection key={label} delay={0.08 + i * 0.1}>
+                <div className="flex h-full flex-col items-center gap-3 rounded-xl border border-[#D8CCBC] bg-[#EFE7DA] p-5 text-center transition-all hover:border-[#B98768]/50 hover:bg-[#EFE7DA]">
+                  <div className="rounded-full bg-[#B98768]/15 p-3">
+                    <Icon className="h-6 w-6 text-[#B98768]" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold tracking-widest text-[#B98768]">{label}</p>
+                    <p className="text-sm font-semibold text-[#3B342F]">{ko}</p>
+                  </div>
+                  <p className="text-xs leading-relaxed text-[#9b9189]">{desc}</p>
                 </div>
-                <p className="text-sm font-semibold text-[#3B342F]">{label}</p>
-                <p className="text-xs text-[#9b9189]">{desc}</p>
-              </div>
+              </FadeInSection>
             ))}
           </div>
         </div>
       </section>
-      </FadeInSection>
+
+      {/* 구비 비품 */}
+      <section className="bg-[#F7F3EB] py-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <FadeInSection>
+            <p className="mb-3 text-center text-sm font-semibold uppercase tracking-widest text-[#B98768]">
+              Equipment
+            </p>
+            <h2 className="mb-10 text-center text-2xl font-bold text-[#3B342F]">
+              구비 비품
+            </h2>
+          </FadeInSection>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {AMENITIES.map(({ icon: Icon, label, desc }, i) => (
+              <FadeInSection key={label} delay={0.08 + i * 0.09}>
+                <div className="flex h-full flex-col items-center gap-2 rounded-xl border border-[#D8CCBC] bg-[#EFE7DA] p-4 text-center transition-colors hover:border-[#D8CCBC]">
+                  <div className="rounded-full bg-[#B98768]/15 p-3">
+                    <Icon className="h-5 w-5 text-[#B98768]" />
+                  </div>
+                  <p className="text-sm font-semibold text-[#3B342F]">{label}</p>
+                  <p className="text-xs text-[#9b9189]">{desc}</p>
+                </div>
+              </FadeInSection>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* 갤러리 */}
       <FadeInSection>
@@ -108,17 +112,18 @@ export default function HomePage() {
       </FadeInSection>
 
       {/* 예약 흐름 안내 */}
-      <FadeInSection>
       <section className="bg-[#F7F3EB] py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-[#B98768]">
-              How to Book
-            </p>
-            <h2 className="mt-1 text-3xl font-bold text-[#3B342F]">
-              3단계로 끝나는 간편 예약
-            </h2>
-          </div>
+          <FadeInSection>
+            <div className="text-center">
+              <p className="text-sm font-semibold uppercase tracking-widest text-[#B98768]">
+                How to Book
+              </p>
+              <h2 className="mt-1 text-3xl font-bold text-[#3B342F]">
+                3단계로 끝나는 간편 예약
+              </h2>
+            </div>
+          </FadeInSection>
           <div className="mt-12 grid gap-6 sm:grid-cols-3">
             {[
               {
@@ -136,15 +141,14 @@ export default function HomePage() {
                 title: "결제 완료",
                 desc: "토스페이·카드 등으로 결제하면 즉시 예약이 확정됩니다.",
               },
-            ].map((item) => (
-              <div
-                key={item.step}
-                className="relative rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6"
-              >
-                <span className="text-6xl font-black text-[#3B342F]">{item.step}</span>
-                <h3 className="mt-2 text-xl font-bold text-[#3B342F]">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-[#6f655d]">{item.desc}</p>
-              </div>
+            ].map((item, i) => (
+              <FadeInSection key={item.step} delay={0.08 + i * 0.12}>
+                <div className="relative rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6">
+                  <span className="text-6xl font-black text-[#3B342F]">{item.step}</span>
+                  <h3 className="mt-2 text-xl font-bold text-[#3B342F]">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-[#6f655d]">{item.desc}</p>
+                </div>
+              </FadeInSection>
             ))}
           </div>
           <div className="mt-10 text-center">
@@ -159,7 +163,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      </FadeInSection>
 
       {/* 요금 요약 */}
       <FadeInSection>

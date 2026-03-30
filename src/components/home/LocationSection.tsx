@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { MapPin, Train, Car, Phone } from "lucide-react";
 import { STUDIO_ADDRESS, STUDIO_ADDRESS_DETAIL, STUDIO_PHONE } from "@/lib/constants";
 
@@ -89,7 +89,7 @@ export default function LocationSection() {
                 >
                   {STUDIO_PHONE}
                 </a>
-                <p className="text-xs text-[#9b9189]">운영시간 09:00 – 24:00</p>
+                <p className="text-xs text-[#9b9189]">운영시간 00:00 – 24:00</p>
               </div>
             </div>
 

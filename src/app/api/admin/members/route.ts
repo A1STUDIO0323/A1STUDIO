@@ -15,14 +15,19 @@ export async function GET(req: NextRequest) {
     });
 
     const emails = users.map((u) => u.email!).filter(Boolean);
-    const reservations = emails.length
-      ? await prisma.reservation.findMany({
+    let reservations: { guestEmail: string | null; guestPhone: string; createdAt: Date }[] = [];
+    try {
+      if (emails.length) {
+        reservations = await prisma.reservation.findMany({
           where: { guestEmail: { in: emails } },
           select: { guestEmail: true, guestPhone: true, createdAt: true },
           orderBy: { createdAt: "desc" },
           take: 2000,
-        })
-      : [];
+        });
+      }
+    } catch {
+      // reservations 테이블 스키마 불일치 시 전화번호 없이 진행
+    }
 
     const phoneMap = new Map<string, string>();
     for (const res of reservations) {

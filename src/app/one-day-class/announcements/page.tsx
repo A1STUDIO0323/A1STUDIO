@@ -378,8 +378,8 @@ function ApplyModal({ cls, onClose, onSuccess }: {
   );
 }
 
-// ── 신청자 목록 모달 (관리자) ──────────────────────────────────
-function ApplicantsModal({ cls, onClose }: { cls: LocalOneDayClass; onClose: () => void }) {
+// ── 신청자 목록 모달 (관리자/CM) ───────────────────────────────
+function ApplicantsModal({ cls, onClose, isAdmin }: { cls: LocalOneDayClass; onClose: () => void; isAdmin: boolean }) {
   const sorted = [...cls.applications].sort((a, b) => a.selectedDate.localeCompare(b.selectedDate));
 
   return (
@@ -387,7 +387,9 @@ function ApplicantsModal({ cls, onClose }: { cls: LocalOneDayClass; onClose: () 
       <div className="w-full max-w-2xl rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 shadow-2xl my-8">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-xs font-bold tracking-widest text-[#B98768] uppercase">관리자 전용</p>
+            <p className="text-xs font-bold tracking-widest text-[#B98768] uppercase">
+              {isAdmin ? "관리자" : "CM(클래스마스터)"}
+            </p>
             <h2 className="text-lg font-bold text-[#3B342F]">{cls.title} · 신청자 목록</h2>
             <p className="text-xs text-[#9b9189] mt-0.5">총 {cls.applications.length}명 신청</p>
           </div>
@@ -663,7 +665,7 @@ export default function AnnouncementsPage() {
                         {statusInfo.label}
                       </span>
                     </div>
-                    {isAdmin && (
+                    {(isAdmin || isCM) && (
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setViewApplicants(cls)}
@@ -671,12 +673,14 @@ export default function AnnouncementsPage() {
                         >
                           <Users className="h-3.5 w-3.5" />신청자
                         </button>
-                        <button
-                          onClick={() => { oneDayClassStore.delete(cls.id); load(); }}
-                          className="rounded-lg p-1.5 text-[#9b9189] hover:bg-red-50 hover:text-red-400 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => { oneDayClassStore.delete(cls.id); load(); }}
+                            className="rounded-lg p-1.5 text-[#9b9189] hover:bg-red-50 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -763,7 +767,7 @@ export default function AnnouncementsPage() {
 
       {showSuccess && <SuccessModal minHeadcount={successMin} onClose={() => setShowSuccess(false)} />}
       {showCreateModal && <AdminCreateModal onClose={() => setShowCreateModal(false)} onSaved={load} />}
-      {viewApplicants && <ApplicantsModal cls={viewApplicants} onClose={() => setViewApplicants(null)} />}
+      {viewApplicants && <ApplicantsModal cls={viewApplicants} onClose={() => setViewApplicants(null)} isAdmin={isAdmin} />}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Star } from "lucide-react";
+import { ArrowRight, Star, PlayCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
 type Review = {
@@ -10,13 +10,14 @@ type Review = {
   content: string;
   created_at: string;
   image_url: string | null;
+  video_url: string | null;
 };
 
 async function getLatestReviews(): Promise<Review[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("reviews")
-    .select("id, author_name, rating, content, created_at, image_url")
+    .select("id, author_name, rating, content, created_at, image_url, video_url")
     .eq("is_visible", true)
     .order("created_at", { ascending: false })
     .limit(3);
@@ -93,6 +94,12 @@ export default async function ReviewsPreview() {
                     unoptimized
                     className="mb-3 w-full rounded-lg object-cover max-h-36"
                   />
+                )}
+                {review.video_url && !review.image_url && (
+                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-[#D8CCBC] bg-[#EFE7DA] px-3 py-2">
+                    <PlayCircle className="h-4 w-4 shrink-0 text-[#B98768]" />
+                    <span className="text-xs text-[#6f655d]">동영상 후기 포함</span>
+                  </div>
                 )}
                 <p className="text-sm leading-relaxed text-[#6f655d] line-clamp-4">
                   {review.content}

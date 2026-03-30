@@ -1,4 +1,4 @@
-﻿import { Metadata } from "next";
+import { Metadata } from "next";
 import { MapPin, Train, Car, Clock, Key } from "lucide-react";
 import { STUDIO_ADDRESS } from "@/lib/constants";
 
@@ -45,15 +45,15 @@ export default function LocationPage() {
               color: "emerald",
               title: "자가용 / 주차",
               lines: [
-                "건물 주차 가능 (예약 시 차량번호 입력)",
-                "인근 공영주차장 이용 가능",
+                "건물 주차 가능 (건물 앞 입구 1대, SUV 이상 불가)",
+                "인근 공영주차장 이용 바랍니다.",
               ],
             },
             {
               icon: Clock,
               color: "orange",
               title: "운영 시간",
-              lines: ["매일 09:00 – 24:00", "공휴일 동일 운영"],
+              lines: ["매일 00:00 – 24:00", "공휴일 동일 운영"],
             },
             {
               icon: Key,

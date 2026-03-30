@@ -3,7 +3,7 @@
 import { useState, useRef, useTransition } from "react";
 import { submitReview, ReviewFormState } from "../actions";
 import { useSession, signIn } from "@/lib/auth-client";
-import { Star, ImagePlus, X, LogIn } from "lucide-react";
+import { Star, ImagePlus, Video, X, LogIn } from "lucide-react";
 
 /** 이미지를 JPEG로 압축 (최대 1200px, quality 0.82) */
 async function compressImage(file: File): Promise<Blob> {
@@ -53,13 +53,22 @@ export default function ReviewForm() {
   const [isPending, startTransition] = useTransition();
   const [hovered, setHovered] = useState(0);
   const [selected, setSelected] = useState(0);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // 이미지
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
   const [compressing, setCompressing] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 동영상
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoName, setVideoName] = useState<string>("");
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -74,8 +83,8 @@ export default function ReviewForm() {
     try {
       const blob = await compressImage(file);
       const url = URL.createObjectURL(blob);
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(url);
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+      setImagePreviewUrl(url);
       setCompressedBlob(blob);
     } catch {
       setState({ error: "이미지 처리에 실패했습니다." });
@@ -85,19 +94,56 @@ export default function ReviewForm() {
   };
 
   const removeImage = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImagePreviewUrl(null);
     setCompressedBlob(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ALLOWED = ["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"];
+    if (!ALLOWED.includes(file.type)) {
+      setState({ error: "MP4, WebM, MOV 형식의 동영상만 첨부 가능합니다." });
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      setState({ error: "동영상은 50MB 이하만 업로드 가능합니다." });
+      return;
+    }
+
+    setState({});
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    const url = URL.createObjectURL(file);
+    setVideoPreviewUrl(url);
+    setVideoFile(file);
+    setVideoName(file.name);
+  };
+
+  const removeVideo = () => {
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoPreviewUrl(null);
+    setVideoFile(null);
+    setVideoName("");
+    if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+
     if (compressedBlob) {
       formData.set("image", compressedBlob, "photo.jpg");
     } else {
       formData.delete("image");
+    }
+
+    if (videoFile) {
+      formData.set("video", videoFile, videoFile.name);
+    } else {
+      formData.delete("video");
     }
 
     startTransition(async () => {
@@ -108,6 +154,7 @@ export default function ReviewForm() {
         setSelected(0);
         setHovered(0);
         removeImage();
+        removeVideo();
       }
     });
   };
@@ -184,22 +231,6 @@ export default function ReviewForm() {
           <input type="hidden" name="rating" value={selected} />
         </div>
 
-        {/* 이름 */}
-        <div>
-          <label htmlFor="author_name" className="block text-sm font-medium text-[#3B342F] mb-1.5">
-            이름 <span className="text-[#B98768]">*</span>
-          </label>
-          <input
-            id="author_name"
-            name="author_name"
-            type="text"
-            maxLength={20}
-            placeholder="홍길동"
-            required
-            className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-2.5 text-sm text-[#3B342F] placeholder-[#b0a89e] focus:border-[#B98768] focus:outline-none focus:ring-1 focus:ring-[#B98768]"
-          />
-        </div>
-
         {/* 내용 */}
         <div>
           <label htmlFor="content" className="block text-sm font-medium text-[#3B342F] mb-1.5">
@@ -217,49 +248,93 @@ export default function ReviewForm() {
           />
         </div>
 
-        {/* 사진 첨부 */}
-        <div>
-          <label className="block text-sm font-medium text-[#3B342F] mb-1.5">
-            사진 첨부 <span className="text-xs text-[#9b9189] font-normal">(선택, 자동 압축 적용)</span>
-          </label>
+        {/* 미디어 첨부 */}
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-[#3B342F]">
+            미디어 첨부 <span className="text-xs text-[#9b9189] font-normal">(선택)</span>
+          </p>
 
-          {previewUrl ? (
-            <div className="relative inline-block">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewUrl}
-                alt="첨부 이미지 미리보기"
-                className="h-32 w-32 rounded-xl object-cover border border-[#D8CCBC]"
-              />
+          <div className="flex flex-wrap gap-3">
+            {/* 사진 */}
+            {!imagePreviewUrl ? (
               <button
                 type="button"
-                onClick={removeImage}
-                className="absolute -top-2 -right-2 rounded-full bg-[#3B342F] p-0.5 text-white hover:bg-red-500 transition-colors"
-                aria-label="이미지 제거"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={compressing}
+                className="flex items-center gap-2 rounded-xl border border-dashed border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-sm text-[#9b9189] hover:border-[#B98768] hover:text-[#B98768] transition-colors disabled:opacity-50"
               >
-                <X className="h-4 w-4" />
+                <ImagePlus className="h-4 w-4" />
+                {compressing ? "압축 중..." : "사진 선택"}
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={compressing}
-              className="flex items-center gap-2 rounded-xl border border-dashed border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-sm text-[#9b9189] hover:border-[#B98768] hover:text-[#B98768] transition-colors disabled:opacity-50"
-            >
-              <ImagePlus className="h-4 w-4" />
-              {compressing ? "압축 중..." : "사진 선택"}
-            </button>
-          )}
+            ) : (
+              <div className="relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imagePreviewUrl}
+                  alt="첨부 이미지 미리보기"
+                  className="h-24 w-24 rounded-xl object-cover border border-[#D8CCBC]"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 rounded-full bg-[#3B342F] p-0.5 text-white hover:bg-red-500 transition-colors"
+                  aria-label="이미지 제거"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
+            {/* 동영상 */}
+            {!videoPreviewUrl ? (
+              <button
+                type="button"
+                onClick={() => videoInputRef.current?.click()}
+                className="flex items-center gap-2 rounded-xl border border-dashed border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-sm text-[#9b9189] hover:border-[#B98768] hover:text-[#B98768] transition-colors"
+              >
+                <Video className="h-4 w-4" />
+                동영상 선택
+              </button>
+            ) : (
+              <div className="relative">
+                <video
+                  src={videoPreviewUrl}
+                  controls
+                  preload="metadata"
+                  className="h-24 max-w-[180px] rounded-xl border border-[#D8CCBC] bg-black object-contain"
+                />
+                <button
+                  type="button"
+                  onClick={removeVideo}
+                  className="absolute -top-2 -right-2 rounded-full bg-[#3B342F] p-0.5 text-white hover:bg-red-500 transition-colors"
+                  aria-label="동영상 제거"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <p className="mt-1 max-w-[180px] truncate text-xs text-[#9b9189]">{videoName}</p>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-[#b0a89e]">
+            사진: JPG·PNG (5MB 이하) &nbsp;·&nbsp; 동영상: MP4·MOV·WebM (50MB 이하)
+          </p>
         </div>
+
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          className="hidden"
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
+          onChange={handleVideoChange}
+          className="hidden"
+        />
 
         <button
           type="submit"
