@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 포인트 환불 처리
-    // 1. user_points 업데이트
+    // 1. user_points 조회
     const { data: userPoints, error: pointsError } = await supabase
       .from("user_points")
-      .select("balance")
+      .select("balance, total_used")
       .eq("user_id", user.id)
       .single();
 
@@ -74,12 +74,14 @@ export async function POST(request: NextRequest) {
     }
 
     const newBalance = (userPoints?.balance || 0) + reservation.points_used;
+    const newTotalUsed = Math.max(0, (userPoints?.total_used || 0) - reservation.points_used);
 
+    // 2. user_points 업데이트
     const { error: balanceUpdateError } = await supabase
       .from("user_points")
       .update({
         balance: newBalance,
-        total_used: supabase.raw(`total_used - ${reservation.points_used}`),
+        total_used: newTotalUsed,
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", user.id);
@@ -88,7 +90,7 @@ export async function POST(request: NextRequest) {
       throw new Error("포인트 환불 실패");
     }
 
-    // 2. point_transactions 추가
+    // 3. point_transactions 추가
     const { error: transactionError } = await supabase
       .from("point_transactions")
       .insert({

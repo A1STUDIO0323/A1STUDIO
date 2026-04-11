@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Calendar, Clock } from "lucide-react";
@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 
-export default function BookingCompletePage() {
+function BookingCompleteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reservationId = searchParams.get("id");
@@ -134,5 +134,17 @@ export default function BookingCompletePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BookingCompletePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F7F3EB] flex items-center justify-center">
+        <p className="text-[#6f655d]">로딩 중...</p>
+      </div>
+    }>
+      <BookingCompleteContent />
+    </Suspense>
   );
 }

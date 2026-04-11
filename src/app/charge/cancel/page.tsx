@@ -1,9 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { XCircle } from "lucide-react";
 
-export default function ChargeCancelPage() {
+function ChargeCancelContent() {
   return (
     <div className="min-h-screen bg-[#F7F3EB] flex items-center justify-center py-20 px-4">
       <div className="max-w-md w-full text-center">
@@ -36,5 +38,17 @@ export default function ChargeCancelPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChargeCancelPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F7F3EB] flex items-center justify-center">
+        <p className="text-[#6f655d]">로딩 중...</p>
+      </div>
+    }>
+      <ChargeCancelContent />
+    </Suspense>
   );
 }

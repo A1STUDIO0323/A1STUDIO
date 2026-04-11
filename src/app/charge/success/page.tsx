@@ -1,10 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle } from "lucide-react";
 
-export default function ChargeSuccessPage() {
+function ChargeSuccessContent() {
   const searchParams = useSearchParams();
   const points = searchParams.get("points") || "0";
 
@@ -54,5 +55,17 @@ export default function ChargeSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChargeSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F7F3EB] flex items-center justify-center">
+        <p className="text-[#6f655d]">로딩 중...</p>
+      </div>
+    }>
+      <ChargeSuccessContent />
+    </Suspense>
   );
 }

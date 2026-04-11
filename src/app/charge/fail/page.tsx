@@ -1,10 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 
-export default function ChargeFailPage() {
+function ChargeFailContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error") || "알 수 없는 오류가 발생했습니다";
 
@@ -44,5 +45,17 @@ export default function ChargeFailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChargeFailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F7F3EB] flex items-center justify-center">
+        <p className="text-[#6f655d]">로딩 중...</p>
+      </div>
+    }>
+      <ChargeFailContent />
+    </Suspense>
   );
 }
