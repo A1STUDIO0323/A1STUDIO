@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberProfileByEmail } from "@/lib/member-profile-db";
 import ProfileOnboardingClient from "@/app/onboarding/profile/ProfileOnboardingClient";
+import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
 
 const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
 
@@ -19,11 +20,13 @@ export default async function ProfileOnboardingPage({
   } = await supabase.auth.getUser();
 
   const resolvedSearchParams = await searchParams;
-  const next = resolvedSearchParams.next ?? "/";
+  const next = sanitizePostAuthRedirect(resolvedSearchParams.next);
   const onboardingEntryPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
 
   if (!user) {
-    redirect(`/login?callbackUrl=${encodeURIComponent(`${onboardingEntryPath}?next=${next}`)}`);
+    redirect(
+      `/login?callbackUrl=${encodeURIComponent(`${onboardingEntryPath}?next=${encodeURIComponent(next)}`)}`
+    );
   }
   if (PHONE_OTP_ENABLED && !user.phone_confirmed_at) {
     redirect(`/onboarding/phone?next=${encodeURIComponent(next)}`);

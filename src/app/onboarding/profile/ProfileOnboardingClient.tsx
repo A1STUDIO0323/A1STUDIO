@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { STUDIO_NAME } from "@/lib/constants";
+import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
 
 const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
 
@@ -22,7 +23,10 @@ export default function ProfileOnboardingClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextUrl = useMemo(() => searchParams.get("next") ?? "/", [searchParams]);
+  const nextUrl = useMemo(
+    () => sanitizePostAuthRedirect(searchParams.get("next")),
+    [searchParams]
+  );
   const onboardingEntryPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
 
   const [email, setEmail] = useState("");
@@ -36,7 +40,7 @@ export default function ProfileOnboardingClient() {
     if (status === "loading") return;
     if (!session?.user?.email) {
       router.replace(
-        `/login?callbackUrl=${encodeURIComponent(`${onboardingEntryPath}?next=${nextUrl}`)}`
+        `/login?callbackUrl=${encodeURIComponent(`${onboardingEntryPath}?next=${encodeURIComponent(nextUrl)}`)}`
       );
       return;
     }

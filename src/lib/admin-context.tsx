@@ -1,19 +1,18 @@
-﻿"use client";
+"use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? "admin1234";
 const SESSION_KEY = "a1studio_admin";
 
 type AdminContextType = {
   isAdmin: boolean;
-  adminLogin: (password: string) => boolean;
+  adminLogin: (password: string) => Promise<boolean>;
   adminLogout: () => void;
 };
 
 const AdminContext = createContext<AdminContextType>({
   isAdmin: false,
-  adminLogin: () => false,
+  adminLogin: async () => false,
   adminLogout: () => {},
 });
 
@@ -26,11 +25,20 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const adminLogin = (password: string): boolean => {
-    if (password === ADMIN_PASSWORD) {
-      setIsAdmin(true);
-      sessionStorage.setItem(SESSION_KEY, "true");
-      return true;
+  const adminLogin = async (password: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setIsAdmin(true);
+        sessionStorage.setItem(SESSION_KEY, "true");
+        return true;
+      }
+    } catch {
+      // 네트워크 오류
     }
     return false;
   };

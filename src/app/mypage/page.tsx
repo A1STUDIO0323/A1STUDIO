@@ -1,316 +1,512 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CalendarCheck, Clock, XCircle, ReceiptText } from "lucide-react";
-import { signOut, useSession } from "@/lib/auth-client";
-import { cn, formatPrice } from "@/lib/utils";
-import { clearMemberBannedLocal, clearMemberRoleLocal, deleteMemberProfileByEmail, markMemberDeletedLocal } from "@/lib/member-role";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
+import { 
+  Wallet, 
+  Calendar, 
+  User, 
+  LogOut, 
+  CreditCard, 
+  TrendingUp, 
+  TrendingDown,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Clock
+} from "lucide-react";
 
-type Status = "PAID" | "CANCELLED" | "EXPIRED";
-const STATUS_LABEL: Record<Status, string> = {
-  PAID: "결제 완료",
-  CANCELLED: "취소됨",
-  EXPIRED: "만료됨",
-};
-const STATUS_COLOR: Record<Status, string> = {
-  PAID: "text-emerald-400 bg-emerald-50",
-  CANCELLED: "text-red-400 bg-red-50",
-  EXPIRED: "text-[#6f655d] bg-[#F7F3EB]",
-};
+type Tab = "points" | "reservations" | "account";
 
-const DUMMY_RESERVATIONS: { id: string; status: Status; date: string; startTime: string; endTime: string; totalAmount: number; roomName: string }[] = [
-  // 예약/결제 백엔드 재연결 전까지 임의 데이터는 노출하지 않습니다.
-];
+interface PointTransaction {
+  id: string;
+  type: "charge" | "bonus" | "use" | "refund";
+  amount: number;
+  balance_after: number;
+  description: string;
+  created_at: string;
+}
 
-type SchoolStatus = "ENROLLED" | "GRADUATED" | "";
-type ProfileResponse = {
-  success?: boolean;
-  profile?: {
-    middleSchool?: string | null;
-    middleSchoolStatus?: "ENROLLED" | "GRADUATED" | null;
-    highSchool?: string | null;
-    highSchoolStatus?: "ENROLLED" | "GRADUATED" | null;
-    university?: string | null;
-    universityStatus?: "ENROLLED" | "GRADUATED" | null;
-    graduateSchool?: string | null;
-    graduateSchoolStatus?: "ENROLLED" | "GRADUATED" | null;
-  };
-  error?: string;
-};
+interface Reservation {
+  id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  duration_hours: number;
+  points_used: number;
+  status: "confirmed" | "cancelled" | "completed";
+  created_at: string;
+}
 
 export default function MyPage() {
-  const { data: session } = useSession();
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [withdrawMessage, setWithdrawMessage] = useState("");
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileMessage, setProfileMessage] = useState("");
-  const [profileError, setProfileError] = useState("");
-
-  const [middleSchool, setMiddleSchool] = useState("");
-  const [middleSchoolStatus, setMiddleSchoolStatus] = useState<SchoolStatus>("");
-  const [highSchool, setHighSchool] = useState("");
-  const [highSchoolStatus, setHighSchoolStatus] = useState<SchoolStatus>("");
-  const [university, setUniversity] = useState("");
-  const [universityStatus, setUniversityStatus] = useState<SchoolStatus>("");
-  const [graduateSchool, setGraduateSchool] = useState("");
-  const [graduateSchoolStatus, setGraduateSchoolStatus] = useState<SchoolStatus>("");
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("points");
+  
+  // 포인트 관련
+  const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState<PointTransaction[]>([]);
+  const [loadingPoints, setLoadingPoints] = useState(true);
+  
+  // 예약 관련
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [loadingReservations, setLoadingReservations] = useState(true);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
 
   useEffect(() => {
-    if (!session?.user?.email) return;
-    void (async () => {
-      try {
-        setLoadingProfile(true);
-        const res = await fetch("/api/members/profile", { cache: "no-store" });
-        const data = (await res.json()) as ProfileResponse;
-        if (!res.ok || !data.success || !data.profile) return;
-
-        setMiddleSchool(data.profile.middleSchool ?? "");
-        setMiddleSchoolStatus(data.profile.middleSchoolStatus ?? "");
-        setHighSchool(data.profile.highSchool ?? "");
-        setHighSchoolStatus(data.profile.highSchoolStatus ?? "");
-        setUniversity(data.profile.university ?? "");
-        setUniversityStatus(data.profile.universityStatus ?? "");
-        setGraduateSchool(data.profile.graduateSchool ?? "");
-        setGraduateSchoolStatus(data.profile.graduateSchoolStatus ?? "");
-      } catch {
-        // ignore
-      } finally {
-        setLoadingProfile(false);
+    const supabase = createClient();
+    
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        router.push("/login?redirect=/mypage");
+      } else {
+        setUser(user);
+        loadPointsData(user.id);
+        loadReservations(user.id);
       }
-    })();
-  }, [session?.user?.email]);
+    });
+  }, [router]);
 
-  const handleSaveSchools = async () => {
+  const loadPointsData = async (userId: string) => {
+    const supabase = createClient();
+    
+    // 포인트 잔액
+    const { data: pointsData } = await supabase
+      .from("user_points")
+      .select("balance")
+      .eq("user_id", userId)
+      .single();
+    
+    setBalance(pointsData?.balance || 0);
+
+    // 거래 내역
+    const { data: transactionsData } = await supabase
+      .from("point_transactions")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    
+    setTransactions(transactionsData || []);
+    setLoadingPoints(false);
+  };
+
+  const loadReservations = async (userId: string) => {
+    const supabase = createClient();
+    
+    const { data } = await supabase
+      .from("reservations")
+      .select("*")
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .order("start_time", { ascending: false });
+    
+    setReservations(data || []);
+    setLoadingReservations(false);
+  };
+
+  const handleCancelReservation = async () => {
+    if (!selectedReservation) return;
+
+    setCancellingId(selectedReservation.id);
+
     try {
-      setSavingProfile(true);
-      setProfileError("");
-      setProfileMessage("");
-      const res = await fetch("/api/members/profile", {
+      const response = await fetch("/api/reservations/cancel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          middleSchool,
-          middleSchoolStatus: middleSchoolStatus || undefined,
-          highSchool,
-          highSchoolStatus: highSchoolStatus || undefined,
-          university,
-          universityStatus: universityStatus || undefined,
-          graduateSchool,
-          graduateSchoolStatus: graduateSchoolStatus || undefined,
-        }),
+        body: JSON.stringify({ reservation_id: selectedReservation.id }),
       });
-      const data = (await res.json()) as ProfileResponse;
-      if (!res.ok || !data.success) {
-        setProfileError(data.error ?? "학력 정보 저장에 실패했습니다.");
-        return;
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "취소에 실패했습니다");
       }
-      setProfileMessage("학력 정보가 저장되었습니다.");
-    } catch {
-      setProfileError("학력 정보 저장 중 오류가 발생했습니다.");
+
+      alert("예약이 취소되었습니다");
+      setShowCancelModal(false);
+      setSelectedReservation(null);
+      
+      // 데이터 새로고침
+      if (user) {
+        loadPointsData(user.id);
+        loadReservations(user.id);
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "취소에 실패했습니다");
     } finally {
-      setSavingProfile(false);
+      setCancellingId(null);
     }
   };
 
-  const handleWithdraw = async () => {
-    if (!session?.user?.email) return;
-    const ok = window.confirm("정말 회원탈퇴 하시겠습니까? 계정 정보가 삭제됩니다.");
-    if (!ok) return;
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/");
+  };
 
-    try {
-      setWithdrawLoading(true);
-      setWithdrawMessage("");
-      const res = await fetch("/api/members/withdraw", {
-        method: "POST",
-      });
-      const data = (await res.json()) as { success?: boolean; error?: string };
-      if (!res.ok || !data.success) {
-        deleteMemberProfileByEmail(session.user.email);
-        clearMemberRoleLocal(session.user.email);
-        clearMemberBannedLocal(session.user.email);
-        markMemberDeletedLocal(session.user.email);
-        setWithdrawMessage("DB 연결 문제로 로컬 탈퇴 처리 후 로그아웃합니다.");
-        await signOut({ callbackUrl: "/" });
-        return;
-      }
-      deleteMemberProfileByEmail(session.user.email);
-      clearMemberRoleLocal(session.user.email);
-      clearMemberBannedLocal(session.user.email);
-      markMemberDeletedLocal(session.user.email);
-      await signOut({ callbackUrl: "/" });
-    } catch {
-      setWithdrawMessage("회원탈퇴 처리 중 오류가 발생했습니다.");
-    } finally {
-      setWithdrawLoading(false);
+  const canCancelReservation = (reservation: Reservation): boolean => {
+    if (reservation.status !== "confirmed") return false;
+    
+    const reservationDateTime = new Date(`${reservation.date}T${reservation.start_time}`);
+    const now = new Date();
+    const hoursUntilReservation = (reservationDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    
+    return hoursUntilReservation >= 2;
+  };
+
+  const getTransactionColor = (type: PointTransaction["type"]) => {
+    switch (type) {
+      case "charge":
+      case "bonus":
+        return "text-green-600";
+      case "use":
+        return "text-[#B98768]";
+      case "refund":
+        return "text-blue-600";
+      default:
+        return "text-[#3B342F]";
     }
   };
+
+  const getTransactionIcon = (type: PointTransaction["type"]) => {
+    switch (type) {
+      case "charge":
+      case "bonus":
+        return <TrendingUp className="w-4 h-4" />;
+      case "use":
+        return <TrendingDown className="w-4 h-4" />;
+      case "refund":
+        return <RefreshCw className="w-4 h-4" />;
+      default:
+        return null;
+    }
+  };
+
+  const getTransactionLabel = (type: PointTransaction["type"]) => {
+    switch (type) {
+      case "charge":
+        return "충전";
+      case "bonus":
+        return "보너스";
+      case "use":
+        return "사용";
+      case "refund":
+        return "환불";
+      default:
+        return type;
+    }
+  };
+
+  const getStatusBadge = (status: Reservation["status"]) => {
+    switch (status) {
+      case "confirmed":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+            <CheckCircle className="w-3 h-3" />
+            확정
+          </span>
+        );
+      case "cancelled":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
+            <XCircle className="w-3 h-3" />
+            취소
+          </span>
+        );
+      case "completed":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+            <CheckCircle className="w-3 h-3" />
+            완료
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#F7F3EB] flex items-center justify-center">
+        <p className="text-[#6f655d]">로딩 중...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F7F3EB] py-20">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-10 text-center">
-          <h1 className="text-3xl font-extrabold text-[#3B342F]">마이페이지</h1>
-          <p className="mt-2 text-[#6f655d]">내 정보와 예약 내역을 확인하세요</p>
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-12">
+          <h1 className="text-4xl font-extrabold text-[#3B342F]">마이페이지</h1>
+          <p className="mt-2 text-[#6f655d]">{user.email}</p>
         </div>
 
-        {session?.user?.email && (
-          <div className="mb-6 rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-5">
-            <h2 className="text-lg font-bold text-[#3B342F]">회원 정보</h2>
-            <p className="mt-2 text-sm text-[#6f655d]">
-              {session.user.name ?? "회원"} ({session.user.email})
-            </p>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="text-xs text-[#9b9189]">회원탈퇴 시 계정으로 다시 로그인해야 이용 가능합니다.</p>
-              <button
-                onClick={handleWithdraw}
-                disabled={withdrawLoading}
-                className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-60"
-              >
-                {withdrawLoading ? "처리 중..." : "회원탈퇴"}
-              </button>
-            </div>
-            {withdrawMessage && <p className="mt-2 text-xs text-red-400">{withdrawMessage}</p>}
+        {/* 탭 네비게이션 */}
+        <div className="mb-8 border-b border-[#D8CCBC]">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setActiveTab("points")}
+              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+                activeTab === "points"
+                  ? "border-b-2 border-[#B98768] text-[#B98768]"
+                  : "text-[#6f655d] hover:text-[#3B342F]"
+              }`}
+            >
+              <Wallet className="w-5 h-5" />
+              포인트 현황
+            </button>
+            <button
+              onClick={() => setActiveTab("reservations")}
+              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+                activeTab === "reservations"
+                  ? "border-b-2 border-[#B98768] text-[#B98768]"
+                  : "text-[#6f655d] hover:text-[#3B342F]"
+              }`}
+            >
+              <Calendar className="w-5 h-5" />
+              예약 내역
+            </button>
+            <button
+              onClick={() => setActiveTab("account")}
+              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+                activeTab === "account"
+                  ? "border-b-2 border-[#B98768] text-[#B98768]"
+                  : "text-[#6f655d] hover:text-[#3B342F]"
+              }`}
+            >
+              <User className="w-5 h-5" />
+              계정 정보
+            </button>
           </div>
-        )}
+        </div>
 
-        {session?.user?.email && (
-          <div className="mb-6 rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-5">
-            <h2 className="text-lg font-bold text-[#3B342F]">학력 정보</h2>
-            <p className="mt-1 text-xs text-[#9b9189]">
-              중/고/대학교/대학원 정보를 재학 또는 졸업 상태로 저장할 수 있습니다.
-            </p>
-
-            <div className="mt-4 space-y-3">
-              <SchoolRow
-                label="중학교"
-                school={middleSchool}
-                setSchool={setMiddleSchool}
-                status={middleSchoolStatus}
-                setStatus={setMiddleSchoolStatus}
-              />
-              <SchoolRow
-                label="고등학교"
-                school={highSchool}
-                setSchool={setHighSchool}
-                status={highSchoolStatus}
-                setStatus={setHighSchoolStatus}
-              />
-              <SchoolRow
-                label="대학교"
-                school={university}
-                setSchool={setUniversity}
-                status={universityStatus}
-                setStatus={setUniversityStatus}
-              />
-              <SchoolRow
-                label="대학원"
-                school={graduateSchool}
-                setSchool={setGraduateSchool}
-                status={graduateSchoolStatus}
-                setStatus={setGraduateSchoolStatus}
-              />
-            </div>
-
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="text-xs text-[#9b9189]">
-                {loadingProfile ? "저장된 정보를 불러오는 중..." : "변경 후 저장 버튼을 눌러주세요."}
+        {/* 탭 1: 포인트 현황 */}
+        {activeTab === "points" && (
+          <div className="space-y-6">
+            {/* 잔액 카드 */}
+            <div className="rounded-2xl border border-[#D8CCBC] bg-white p-8 text-center">
+              <p className="text-sm text-[#9b9189] mb-2">현재 보유 포인트</p>
+              <p className="text-5xl font-bold text-[#B98768] mb-6">
+                {balance.toLocaleString("ko-KR")}
+                <span className="text-2xl ml-1">P</span>
               </p>
-              <button
-                type="button"
-                onClick={handleSaveSchools}
-                disabled={savingProfile || loadingProfile}
-                className="rounded-lg bg-[#B98768] px-3 py-2 text-xs font-semibold text-[#F7F3EB] hover:bg-[#a9785c] disabled:opacity-60"
+              <Link
+                href="/charge"
+                className="inline-flex items-center gap-2 rounded-full bg-[#B98768] px-8 py-3 font-bold text-white transition-all hover:bg-[#a9785c] active:scale-95"
               >
-                {savingProfile ? "저장 중..." : "학력 정보 저장"}
-              </button>
+                <CreditCard className="w-5 h-5" />
+                충전하기
+              </Link>
             </div>
-            {profileMessage && <p className="mt-2 text-xs text-emerald-500">{profileMessage}</p>}
-            {profileError && <p className="mt-2 text-xs text-red-400">{profileError}</p>}
+
+            {/* 거래 내역 */}
+            <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
+              <h2 className="text-xl font-bold text-[#3B342F] mb-4">
+                포인트 거래 내역
+              </h2>
+
+              {loadingPoints ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse h-16 bg-[#EFE7DA] rounded-lg" />
+                  ))}
+                </div>
+              ) : transactions.length === 0 ? (
+                <p className="text-center text-[#9b9189] py-8">거래 내역이 없습니다</p>
+              ) : (
+                <div className="space-y-2">
+                  {transactions.map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="flex items-center justify-between p-4 rounded-lg border border-[#D8CCBC] hover:bg-[#F7F3EB] transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`${getTransactionColor(tx.type)}`}>
+                          {getTransactionIcon(tx.type)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-[#3B342F]">
+                            {tx.description}
+                          </p>
+                          <p className="text-sm text-[#9b9189]">
+                            {format(new Date(tx.created_at), "yyyy.MM.dd HH:mm", { locale: ko })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-lg font-bold ${getTransactionColor(tx.type)}`}>
+                          {tx.type === "use" ? "-" : "+"}{Math.abs(tx.amount).toLocaleString("ko-KR")}P
+                        </p>
+                        <p className="text-sm text-[#9b9189]">
+                          잔액: {tx.balance_after.toLocaleString("ko-KR")}P
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        <div>
-          <h2 className="mb-5 text-xl font-bold text-[#3B342F]">내 예약 내역</h2>
-          {DUMMY_RESERVATIONS.length === 0 ? (
-            <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-sm text-[#6f655d]">
-              예약 내역이 없습니다.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {DUMMY_RESERVATIONS.map((res) => (
-                <div key={res.id} className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-5">
-                  <div className="flex items-start justify-between gap-4">
+        {/* 탭 2: 예약 내역 */}
+        {activeTab === "reservations" && (
+          <div className="space-y-6">
+            {loadingReservations ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse h-32 bg-white rounded-2xl" />
+                ))}
+              </div>
+            ) : reservations.length === 0 ? (
+              <div className="rounded-2xl border border-[#D8CCBC] bg-white p-12 text-center">
+                <Calendar className="w-16 h-16 text-[#D8CCBC] mx-auto mb-4" />
+                <p className="text-[#9b9189] mb-6">예약 내역이 없습니다</p>
+                <Link
+                  href="/booking"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#B98768] px-6 py-3 font-bold text-white transition-all hover:bg-[#a9785c]"
+                >
+                  예약하러 가기
+                </Link>
+              </div>
+            ) : (
+              reservations.map((reservation) => (
+                <div
+                  key={reservation.id}
+                  className="rounded-2xl border border-[#D8CCBC] bg-white p-6"
+                >
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS_COLOR[res.status])}>
-                          {STATUS_LABEL[res.status]}
-                        </span>
-                        <span className="text-xs text-[#b0a89e]">{res.id}</span>
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-xl font-bold text-[#3B342F]">
+                          {format(new Date(reservation.date), "yyyy년 M월 d일 (eee)", { locale: ko })}
+                        </h3>
+                        {getStatusBadge(reservation.status)}
                       </div>
-                      <p className="mt-2 font-semibold text-[#3B342F]">{res.roomName}</p>
-                      <div className="mt-1 flex items-center gap-3 text-sm text-[#6f655d]">
-                        <span className="flex items-center gap-1">
-                          <CalendarCheck className="h-3.5 w-3.5" /> {res.date}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" /> {res.startTime} – {res.endTime}
+                      <div className="flex items-center gap-2 text-[#6f655d]">
+                        <Clock className="w-4 h-4" />
+                        <span>
+                          {reservation.start_time} ~ {reservation.end_time} ({reservation.duration_hours}시간)
                         </span>
                       </div>
                     </div>
-                    <p className="text-lg font-bold text-[#3B342F]">{formatPrice(res.totalAmount)}</p>
+                    <div className="text-right">
+                      <p className="text-sm text-[#9b9189] mb-1">사용 포인트</p>
+                      <p className="text-2xl font-bold text-[#B98768]">
+                        {reservation.points_used.toLocaleString("ko-KR")}P
+                      </p>
+                    </div>
                   </div>
-                  {res.status === "PAID" && (
-                    <div className="mt-4 flex gap-2">
-                      <button className="flex items-center gap-1.5 rounded-lg border border-[#D8CCBC] px-3 py-2 text-xs text-[#6f655d] hover:border-[#D8CCBC] hover:text-[#B98768] transition-colors">
-                        <ReceiptText className="h-3.5 w-3.5" /> 영수증
-                      </button>
-                      <button className="flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-xs text-red-400 hover:border-red-500/50 transition-colors">
-                        <XCircle className="h-3.5 w-3.5" /> 취소 요청
+
+                  {canCancelReservation(reservation) && (
+                    <div className="pt-4 border-t border-[#D8CCBC]">
+                      <button
+                        onClick={() => {
+                          setSelectedReservation(reservation);
+                          setShowCancelModal(true);
+                        }}
+                        disabled={cancellingId === reservation.id}
+                        className="w-full rounded-lg border border-red-300 px-4 py-2 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {cancellingId === reservation.id ? "취소 중..." : "예약 취소"}
                       </button>
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+              ))
+            )}
+          </div>
+        )}
 
-function SchoolRow({
-  label,
-  school,
-  setSchool,
-  status,
-  setStatus,
-}: {
-  label: string;
-  school: string;
-  setSchool: (value: string) => void;
-  status: SchoolStatus;
-  setStatus: (value: SchoolStatus) => void;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px]">
-      <input
-        type="text"
-        value={school}
-        onChange={(e) => setSchool(e.target.value)}
-        placeholder={`${label}명`}
-        className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2 text-sm text-[#3B342F] placeholder:text-[#b0a89e] focus:border-[#B98768] focus:outline-none"
-      />
-      <select
-        value={status}
-        onChange={(e) => setStatus(e.target.value as SchoolStatus)}
-        className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2 text-sm text-[#3B342F] focus:border-[#B98768] focus:outline-none"
-      >
-        <option value="">선택 안함</option>
-        <option value="ENROLLED">재학</option>
-        <option value="GRADUATED">졸업</option>
-      </select>
+        {/* 탭 3: 계정 정보 */}
+        {activeTab === "account" && (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
+              <h2 className="text-xl font-bold text-[#3B342F] mb-4">계정 정보</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-[#9b9189] mb-1">이메일</p>
+                  <p className="text-lg font-semibold text-[#3B342F]">{user.email}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-[#9b9189] mb-1">가입일</p>
+                  <p className="text-lg font-semibold text-[#3B342F]">
+                    {format(new Date(user.created_at), "yyyy년 M월 d일", { locale: ko })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#D8CCBC] px-6 py-4 font-semibold text-[#3B342F] transition-all hover:border-red-300 hover:text-red-600 hover:bg-red-50"
+            >
+              <LogOut className="w-5 h-5" />
+              로그아웃
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 취소 확인 모달 */}
+      {showCancelModal && selectedReservation && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setShowCancelModal(false)}
+        >
+          <div
+            className="max-w-md w-full rounded-2xl border border-[#D8CCBC] bg-white p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <AlertCircle className="w-6 h-6 text-amber-500" />
+              <h3 className="text-xl font-bold text-[#3B342F]">예약 취소</h3>
+            </div>
+
+            <p className="text-[#6f655d] mb-2">
+              다음 예약을 취소하시겠습니까?
+            </p>
+
+            <div className="rounded-lg bg-[#F7F3EB] p-4 mb-6">
+              <p className="text-sm text-[#9b9189] mb-1">예약 날짜 및 시간</p>
+              <p className="font-semibold text-[#3B342F] mb-3">
+                {format(new Date(selectedReservation.date), "yyyy년 M월 d일 (eee)", { locale: ko })}<br />
+                {selectedReservation.start_time} ~ {selectedReservation.end_time}
+              </p>
+              <p className="text-sm text-[#9b9189] mb-1">환불 포인트</p>
+              <p className="text-lg font-bold text-[#B98768]">
+                {selectedReservation.points_used.toLocaleString("ko-KR")}P
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="flex-1 rounded-lg border border-[#D8CCBC] px-4 py-3 font-semibold text-[#3B342F] transition-colors hover:bg-[#F7F3EB]"
+              >
+                닫기
+              </button>
+              <button
+                onClick={handleCancelReservation}
+                disabled={cancellingId !== null}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {cancellingId ? "처리 중..." : "예약 취소"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -7,7 +8,10 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) {
+    const dest = sanitizePostAuthRedirect("/dashboard");
+    redirect(`/login?callbackUrl=${encodeURIComponent(dest)}`);
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16">

@@ -1,38 +1,67 @@
 import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
-import { formatPrice } from "@/lib/utils";
 
 const PLANS = [
   {
-    name: "평일 주간",
-    desc: "월~금 09:00–18:00",
-    pricePerHour: 15000,
-    minHours: 2,
-    highlights: ["최소 2시간", "드럼·앰프 포함", "주차 1대 무료"],
+    name: "평일 비피크",
+    desc: "월~금 00:00 – 18:00",
+    priceOriginal1h: 9000,
+    priceEvent1h: 7000,
+    priceOriginal2h: 14000,
+    priceEvent2h: 13000,
+    highlights: ["조용한 오전·오후 시간대", "최소 1시간부터 예약 가능"],
     badge: null,
   },
   {
-    name: "평일 야간 / 주말",
-    desc: "평일 18:00 이후 · 토·일 종일",
-    pricePerHour: 20000,
-    minHours: 2,
-    highlights: ["최소 2시간", "드럼·앰프 포함", "심야(23시 이후) 가능"],
+    name: "평일 피크타임",
+    desc: "월~금 18:00 – 00:00",
+    priceOriginal1h: 11000,
+    priceEvent1h: 9000,
+    priceOriginal2h: 18000,
+    priceEvent2h: 17000,
+    highlights: ["퇴근 후 저녁 타임", "심야(23시 이후) 이용 가능"],
+    badge: null,
+  },
+  {
+    name: "주말/공휴일 비피크",
+    desc: "토·일·공휴일 00:00 – 13:00",
+    priceOriginal1h: 10000,
+    priceEvent1h: 8000,
+    priceOriginal2h: 16000,
+    priceEvent2h: 15000,
+    highlights: ["여유로운 오전 타임", "드럼·앰프 포함"],
     badge: "인기",
   },
   {
-    name: "패키지 10H",
-    desc: "기간 내 자유롭게 나눠 사용",
-    pricePerHour: 13000,
-    minHours: 10,
-    highlights: ["10시간 묶음", "3개월 유효", "예약 우선권"],
-    badge: "최저가/h",
+    name: "주말/공휴일 피크타임",
+    desc: "토·일·공휴일 13:00 – 00:00",
+    priceOriginal1h: 12000,
+    priceEvent1h: 10000,
+    priceOriginal2h: 20000,
+    priceEvent2h: 19000,
+    highlights: ["주말 오후·저녁 집중 타임", "드럼·앰프 포함"],
+    badge: null,
   },
 ];
 
 export default function PricingSummary() {
+  const today = new Date();
+  const eventStart = new Date("2026-04-08");
+  const eventEnd = new Date("2026-04-30");
+  const isEventActive = today >= eventStart && today <= eventEnd;
+
   return (
     <section className="bg-[#F7F3EB] py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* 오픈 이벤트 배너 */}
+        {isEventActive && (
+          <div className="mb-8 rounded-xl border border-[#B98768]/40 bg-[#f5ede6] py-3 px-4 text-center">
+            <p className="font-semibold text-[#B98768]">
+              🎉 오픈이벤트 진행 중! 4월 30일까지 특별 할인가 적용
+            </p>
+          </div>
+        )}
+
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-widest text-[#B98768]">
             Pricing
@@ -40,10 +69,9 @@ export default function PricingSummary() {
           <h2 className="mt-1 text-3xl font-bold text-[#3B342F]">
             합리적인 요금, 숨겨진 비용 없음
           </h2>
-
         </div>
 
-        <div className="mt-12 grid gap-6 sm:grid-cols-3">
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
@@ -58,17 +86,36 @@ export default function PricingSummary() {
                   {plan.badge}
                 </span>
               )}
-              <p className="text-sm font-medium text-[#6f655d]">{plan.desc}</p>
-              <h3 className="mt-1 text-lg font-bold text-[#3B342F]">{plan.name}</h3>
-              <div className="mt-4 flex items-baseline gap-1">
-                <span className="text-4xl font-extrabold text-[#3B342F]">
-                  {formatPrice(plan.pricePerHour)}
-                </span>
-                <span className="text-sm text-[#9b9189]">/시간</span>
+              <h3 className="text-lg font-bold text-[#3B342F]">{plan.name}</h3>
+              <p className="mt-1 text-sm font-medium text-[#6f655d]">{plan.desc}</p>
+              
+              {/* 1시간 가격 */}
+              <div className="mt-4 space-y-1">
+                <p className="text-xs text-[#9b9189]">1시간</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="line-through text-[#9b9189] text-sm">
+                    {plan.priceOriginal1h.toLocaleString("ko-KR")}원
+                  </span>
+                  <span className="text-[#B98768] font-bold text-2xl">
+                    {plan.priceEvent1h.toLocaleString("ko-KR")}원
+                  </span>
+                  <span className="text-[#6f655d] text-sm">/시간</span>
+                </div>
               </div>
-              <p className="mt-1 text-xs text-[#b0a89e]">
-                (최소 {plan.minHours}시간)
-              </p>
+
+              {/* 2시간 패키지 가격 */}
+              <div className="mt-3 space-y-1">
+                <p className="text-xs text-[#9b9189]">2시간 패키지</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="line-through text-[#9b9189] text-sm">
+                    {plan.priceOriginal2h.toLocaleString("ko-KR")}원
+                  </span>
+                  <span className="text-[#B98768] font-bold text-xl">
+                    {plan.priceEvent2h.toLocaleString("ko-KR")}원
+                  </span>
+                </div>
+              </div>
+
               <ul className="mt-6 space-y-2.5">
                 {plan.highlights.map((item) => (
                   <li key={item} className="flex items-center gap-2 text-sm text-[#3B342F]">
@@ -92,6 +139,11 @@ export default function PricingSummary() {
             </div>
           ))}
         </div>
+
+        {/* 안내 문구 */}
+        <p className="text-center text-sm text-[#9b9189] mt-6">
+          * 이용 시간에는 준비 및 정리 시간이 포함됩니다.
+        </p>
 
         <div className="mt-8 text-center">
           <Link

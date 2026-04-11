@@ -51,9 +51,9 @@ export default function AdminMembersPage() {
               setPassword(e.target.value);
               setLoginError("");
             }}
-            onKeyDown={(e) => {
+            onKeyDown={async (e) => {
               if (e.key === "Enter") {
-                if (adminLogin(password)) {
+                if (await adminLogin(password)) {
                   setPassword("");
                   setLoginError("");
                 } else {
@@ -66,8 +66,8 @@ export default function AdminMembersPage() {
           />
           {loginError && <p className="mt-2 text-xs text-red-400">{loginError}</p>}
           <button
-            onClick={() => {
-              if (adminLogin(password)) {
+            onClick={async () => {
+              if (await adminLogin(password)) {
                 setPassword("");
                 setLoginError("");
               } else {

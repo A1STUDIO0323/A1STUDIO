@@ -111,7 +111,7 @@ export default function HomePage() {
         <GallerySection />
       </FadeInSection>
 
-      {/* 예약 흐름 안내 */}
+      {/* 예약 흐름 안내 — 예약 페이지 완성 후 활성화
       <section className="bg-[#F7F3EB] py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <FadeInSection>
@@ -152,17 +152,16 @@ export default function HomePage() {
             ))}
           </div>
           <div className="mt-10 text-center">
-            {/* 예약 메뉴 임시 숨김 (코드 보관)
             <Link
               href="/booking"
               className="inline-flex items-center gap-2 rounded-full bg-[#B98768] px-8 py-4 text-base font-bold text-[#F7F3EB] shadow-xl shadow-[#B98768]/15 transition-all hover:bg-[#a9785c] active:scale-95"
             >
               지금 바로 예약하기
             </Link>
-            */}
           </div>
         </div>
       </section>
+      */}
 
       {/* 요금 요약 */}
       <FadeInSection>

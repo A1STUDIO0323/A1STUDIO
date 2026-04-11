@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Users,
   Maximize2,
@@ -10,9 +11,9 @@ export const metadata: Metadata = { title: "공간소개" };
 
 const ROOMS = [
   {
-    id: "gray-room",
-    name: "Gray Room",
-    slug: "gray-room",
+    id: "a1-room",
+    name: "A1 Room",
+    slug: "a1-room",
     sizeM2: 50,
     capacity: 6,
     description:
@@ -26,7 +27,6 @@ const ROOMS = [
       "폼롤러",
     ],
     priceFrom: 15000,
-    color: "from-[#B98768]/15 to-[#3B342F]/60",
   },
 ];
 
@@ -51,18 +51,20 @@ export default function SpacesPage() {
               className="overflow-hidden rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA]"
             >
               {/* 이미지 영역 */}
-              <div
-                className={`relative h-56 bg-gradient-to-br ${room.color} sm:h-72`}
-              >
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-sm text-[#9b9189]">공간 사진 (실제 사진으로 교체)</p>
-                </div>
+              <div className="relative h-56 sm:h-72">
+                <Image
+                  src="/연습실.jpg"
+                  alt={room.name}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1280px) 100vw, 1280px"
+                />
                 <div className="absolute bottom-4 left-4 flex gap-2">
-                  <span className="rounded-full bg-[#3B342F]/50 px-3 py-1 text-xs font-semibold text-[#3B342F] backdrop-blur-sm">
+                  <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[#3B342F] backdrop-blur-sm">
                     <Maximize2 className="mr-1 inline h-3 w-3" />
                     {room.sizeM2}㎡
                   </span>
-                  <span className="rounded-full bg-[#3B342F]/50 px-3 py-1 text-xs font-semibold text-[#3B342F] backdrop-blur-sm">
+                  <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[#3B342F] backdrop-blur-sm">
                     <Users className="mr-1 inline h-3 w-3" />
                     최대 {room.capacity}인
                   </span>

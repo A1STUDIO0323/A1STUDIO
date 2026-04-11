@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight, Music2, LogIn, LogOut, User, ShieldCheck, Menu, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Music2, LogIn, LogOut, User, ShieldCheck, Menu, X, Wallet } from "lucide-react";
 import { signIn, signOut, useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { NAV_LINKS, STUDIO_NAME } from "@/lib/constants";
 import { useAdmin } from "@/lib/admin-context";
 import { registerMemberProfile, useMemberRole } from "@/lib/member-role";
+import { isAuthFlowPath, sanitizePostAuthRedirect } from "@/lib/safe-redirect";
+import { createClient } from "@/lib/supabase/client";
 
 const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
 
@@ -28,6 +30,7 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState<string | null>(null);
   const isPhoneVerified = !PHONE_OTP_ENABLED || Boolean(session?.user?.phoneConfirmedAt);
+  const [userPoints, setUserPoints] = useState<number | null>(null);
 
   // 페이지 이동 시 드로어 닫기
   useEffect(() => {
@@ -44,7 +47,8 @@ export default function Header() {
     if (!session?.user?.email) return href;
     if (isPhoneVerified) return href;
     if (href.startsWith("/onboarding/phone")) return href;
-    return `/onboarding/phone?next=${encodeURIComponent(href)}`;
+    const safe = sanitizePostAuthRedirect(href);
+    return `/onboarding/phone?next=${encodeURIComponent(safe)}`;
   };
 
   const getFullyGuardedHref = (href: string) => {
@@ -73,13 +77,33 @@ export default function Header() {
         provider: session.user.provider ?? null,
       }),
     });
+
+    // 포인트 잔액 조회
+    const supabase = createClient();
+    supabase
+      .from("user_points")
+      .select("balance")
+      .eq("user_id", session.user.id)
+      .single()
+      .then(({ data }) => {
+        setUserPoints(data?.balance || 0);
+      });
   }, [session?.user?.email, session?.user?.id, session?.user?.image, session?.user?.name, session?.user?.provider]);
 
   useEffect(() => {
     const email = session?.user?.email;
     if (!email) return;
-    if (!isPhoneVerified && !pathname.startsWith("/onboarding/phone")) {
-      router.replace(`/onboarding/phone?next=${encodeURIComponent(pathname)}`);
+    // /login 등 인증 흐름 경로에서는 next=/login 루프를 만들지 않도록 제외
+    if (
+      !isPhoneVerified &&
+      !pathname.startsWith("/onboarding/phone") &&
+      !isAuthFlowPath(pathname)
+    ) {
+      const safe = sanitizePostAuthRedirect(pathname);
+      router.replace(`/onboarding/phone?next=${encodeURIComponent(safe)}`);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Header] phone required redirect", { safe });
+      }
       return;
     }
     if (pathname.startsWith("/onboarding/profile") || pathname.startsWith("/onboarding/phone")) {
@@ -102,7 +126,8 @@ export default function Header() {
         const complete = Boolean(data.profile?.isComplete);
         setIsProfileComplete(complete);
         if (!complete) {
-          router.push(`/onboarding/profile?next=${encodeURIComponent(pathname)}`);
+          const safe = sanitizePostAuthRedirect(pathname);
+          router.push(`/onboarding/profile?next=${encodeURIComponent(safe)}`);
         }
       } catch {
         setIsProfileComplete(false);
@@ -195,9 +220,9 @@ export default function Header() {
                   type="password"
                   value={adminPw}
                   onChange={(e) => { setAdminPw(e.target.value); setAdminError(""); }}
-                  onKeyDown={(e) => {
+                  onKeyDown={async (e) => {
                     if (e.key === "Enter") {
-                      if (adminLogin(adminPw)) {
+                      if (await adminLogin(adminPw)) {
                         setShowAdminLogin(false);
                         setAdminPw("");
                       } else {
@@ -211,8 +236,8 @@ export default function Header() {
                 {adminError && <p className="mt-1.5 text-xs text-red-400">{adminError}</p>}
                 <div className="mt-3 flex gap-2">
                   <button
-                    onClick={() => {
-                      if (adminLogin(adminPw)) {
+                    onClick={async () => {
+                      if (await adminLogin(adminPw)) {
                         setShowAdminLogin(false);
                         setAdminPw("");
                       } else {
@@ -238,12 +263,23 @@ export default function Header() {
               <div className="h-4 w-16 animate-pulse rounded bg-[#D8CCBC]" />
             ) : session ? (
               <>
+                {/* 포인트 잔액 */}
+                <Link
+                  href={getFullyGuardedHref("/charge")}
+                  className="hidden lg:flex items-center gap-1.5 rounded-full border border-[#D8CCBC] bg-[#EFE7DA] px-3 py-1.5 text-sm font-semibold text-[#B98768] transition-all hover:border-[#B98768] hover:bg-[#B98768]/10"
+                  title="포인트 충전"
+                >
+                  <Wallet className="h-4 w-4" />
+                  <span>{userPoints !== null ? userPoints.toLocaleString("ko-KR") : "..."}</span>
+                  <span className="text-xs">P</span>
+                </Link>
+                
                 <Link
                   href={getFullyGuardedHref("/mypage")}
                   className="flex items-center gap-1.5 text-sm font-medium text-[#6f655d] transition-colors hover:text-[#B98768]"
                 >
                   <User className="h-4 w-4" />
-                  <span className="hidden xl:inline">{session.user?.name?.split(" ")[0] ?? "마이페이지"}</span>
+                  <span className="hidden xl:inline">마이페이지</span>
                 </Link>
                 <span
                   className={cn(
@@ -375,7 +411,7 @@ export default function Header() {
         {/* 유저 정보 영역 */}
         {session && (
           <div className="border-b border-[#D8CCBC] px-5 py-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm font-semibold text-[#3B342F]">
                   {session.user?.name ?? session.user?.email}
@@ -399,6 +435,20 @@ export default function Header() {
                 로그아웃
               </button>
             </div>
+            
+            {/* 포인트 잔액 */}
+            <Link
+              href={getFullyGuardedHref("/charge")}
+              className="flex items-center justify-between rounded-lg border border-[#D8CCBC] bg-[#EFE7DA] px-4 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-[#B98768]" />
+                <span className="text-xs text-[#9b9189]">보유 포인트</span>
+              </div>
+              <span className="text-base font-bold text-[#B98768]">
+                {userPoints !== null ? userPoints.toLocaleString("ko-KR") : "..."}P
+              </span>
+            </Link>
           </div>
         )}
 

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
 
 type AuthUser = {
   id: string;
@@ -114,18 +115,22 @@ export async function signIn(
 ) {
   if (!provider) {
     if (typeof window !== "undefined") {
-      const callbackUrl = options?.callbackUrl ?? window.location.pathname;
+      const callbackUrl = sanitizePostAuthRedirect(
+        options?.callbackUrl ?? window.location.pathname
+      );
       window.location.href = `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`;
     }
     return { ok: true };
   }
 
   const supabase = createSupabaseClient();
-  const callbackUrl =
+  const raw =
     options?.callbackUrl ??
     (typeof window !== "undefined" ? window.location.pathname : "/");
-  const next =
-    callbackUrl.startsWith("/") ? callbackUrl : `/${callbackUrl}`;
+  const next = sanitizePostAuthRedirect(raw);
+  if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+    console.log("[signIn OAuth] post-callback path (sanitized)", next);
+  }
   const redirectTo =
     typeof window !== "undefined"
       ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`

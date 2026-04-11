@@ -1,10 +1,11 @@
 "use client";
 
-import { signIn } from "@/lib/auth-client";
+import { signIn, useSession } from "@/lib/auth-client";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { STUDIO_NAME } from "@/lib/constants";
 import { AlertCircle } from "lucide-react";
+import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
 
 const GOOGLE_CONFIGURED = !!(
   process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED === "true"
@@ -18,10 +19,40 @@ const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
 function LoginContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const { data: session, status } = useSession();
+  const rawCallback = searchParams.get("callbackUrl");
+  const safeCallback = useMemo(
+    () => sanitizePostAuthRedirect(rawCallback ?? "/"),
+    [rawCallback]
+  );
   const error = searchParams.get("error");
   const onboardingPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
-  const onboardingCallbackUrl = `${onboardingPath}?next=${encodeURIComponent(callbackUrl)}`;
+  const onboardingCallbackUrl = `${onboardingPath}?next=${encodeURIComponent(safeCallback)}`;
+
+  // 이미 로그인된 경우: 루프 방지를 위해 callbackUrl 정리 후 휴대폰/프로필 여부에 따라 분기
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user) return;
+    const phoneOk =
+      !PHONE_OTP_ENABLED || Boolean(session.user.phoneConfirmedAt);
+    if (!phoneOk) {
+      const target = `/onboarding/phone?next=${encodeURIComponent(safeCallback)}`;
+      if (process.env.NODE_ENV === "development") {
+        console.log("[login] already signed in, phone pending ->", target);
+      }
+      router.replace(target);
+      return;
+    }
+    if (process.env.NODE_ENV === "development") {
+      console.log("[login] already signed in ->", safeCallback);
+    }
+    router.replace(safeCallback);
+  }, [
+    status,
+    session?.user?.id,
+    session?.user?.phoneConfirmedAt,
+    safeCallback,
+    router,
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#F7F3EB] px-4">
@@ -114,7 +145,7 @@ function LoginContent() {
         {/* 건너뛰기 */}
         <div className="mt-6 text-center">
           <button
-            onClick={() => router.push(callbackUrl)}
+            onClick={() => router.push(safeCallback)}
             className="text-sm text-[#9b9189] underline-offset-2 hover:text-[#3B342F] hover:underline transition-colors"
           >
             로그인 없이 계속하기

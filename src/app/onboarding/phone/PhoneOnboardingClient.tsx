@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { STUDIO_NAME } from "@/lib/constants";
+import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
 
 const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
 
@@ -41,7 +42,10 @@ function PhoneOnboardingContent() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/";
+  const safeNext = useMemo(
+    () => sanitizePostAuthRedirect(searchParams.get("next")),
+    [searchParams]
+  );
 
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -66,7 +70,7 @@ function PhoneOnboardingContent() {
 
   useEffect(() => {
     if (!PHONE_OTP_ENABLED) {
-      router.replace(`/onboarding/profile?next=${encodeURIComponent(next)}`);
+      router.replace(`/onboarding/profile?next=${encodeURIComponent(safeNext)}`);
       return;
     }
 
@@ -75,14 +79,18 @@ function PhoneOnboardingContent() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
-        router.replace(
-          `/login?callbackUrl=${encodeURIComponent(`/onboarding/phone?next=${next}`)}`
-        );
+        const back = `/onboarding/phone?next=${encodeURIComponent(safeNext)}`;
+        if (process.env.NODE_ENV === "development") {
+          console.log("[onboarding/phone] no session -> /login", {
+            nextAfterSanitize: safeNext,
+          });
+        }
+        router.replace(`/login?callbackUrl=${encodeURIComponent(back)}`);
         return;
       }
 
       if (user.phone_confirmed_at) {
-        router.replace(`/onboarding/profile?next=${encodeURIComponent(next)}`);
+        router.replace(`/onboarding/profile?next=${encodeURIComponent(safeNext)}`);
         return;
       }
 
@@ -90,7 +98,7 @@ function PhoneOnboardingContent() {
         setPhone(user.phone);
       }
     })();
-  }, [next, router, supabase]);
+  }, [safeNext, router, supabase]);
 
   async function handleSendOtp() {
     setErrorMessage("");
@@ -103,9 +111,8 @@ function PhoneOnboardingContent() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        router.replace(
-          `/login?callbackUrl=${encodeURIComponent(`/onboarding/phone?next=${next}`)}`
-        );
+        const back = `/onboarding/phone?next=${encodeURIComponent(safeNext)}`;
+        router.replace(`/login?callbackUrl=${encodeURIComponent(back)}`);
         return;
       }
 
@@ -172,7 +179,12 @@ function PhoneOnboardingContent() {
       setErrorMessage("휴대폰 인증 완료 후 다음 단계로 이동할 수 있습니다.");
       return;
     }
-    router.push(`/onboarding/profile?next=${encodeURIComponent(next)}`);
+    if (process.env.NODE_ENV === "development") {
+      console.log("[onboarding/phone] next after verify -> profile", {
+        next: safeNext,
+      });
+    }
+    router.push(`/onboarding/profile?next=${encodeURIComponent(safeNext)}`);
   }
 
   return (
