@@ -55,15 +55,22 @@ export default function ForgotPasswordPage() {
           <p className="mt-2 text-sm text-[#6f655d]">가입한 이메일로 재설정 링크를 보내드립니다.</p>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-3">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="가입 이메일"
-            required
-            className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none"
-          />
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
+              가입한 이메일
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="example@email.com"
+              required
+              className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none"
+            />
+          </div>
+
           {error && <p className="text-xs text-red-500">{error}</p>}
           {message && <p className="text-xs text-emerald-700">{message}</p>}
           {debugUrl && (

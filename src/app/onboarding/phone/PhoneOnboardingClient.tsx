@@ -200,23 +200,29 @@ function PhoneOnboardingContent() {
           </p>
         </div>
 
-        <div className="space-y-3">
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => {
-              setPhone(e.target.value);
-              setIsPhoneVerified(false);
-            }}
-            placeholder="01012345678"
-            disabled={isPhoneVerified}
-            className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none disabled:bg-[#F7F3EB]/60"
-          />
-          {!!phone && (
-            <p className="text-xs text-[#6f655d]">
-              전송 형식: <span className="font-semibold">{normalizedPhone}</span>
-            </p>
-          )}
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="phone" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
+              휴대폰 번호
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setIsPhoneVerified(false);
+              }}
+              placeholder="01012345678"
+              disabled={isPhoneVerified}
+              className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none disabled:bg-[#F7F3EB]/60"
+            />
+            {!!phone && (
+              <p className="mt-1 text-xs text-[#6f655d]">
+                전송 형식: <span className="font-semibold">{normalizedPhone}</span>
+              </p>
+            )}
+          </div>
 
           <button
             type="button"
@@ -229,13 +235,19 @@ function PhoneOnboardingContent() {
 
           {isOtpSent && !isPhoneVerified && (
             <>
-              <input
-                type="text"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                placeholder="6자리 인증번호"
-                className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none"
-              />
+              <div>
+                <label htmlFor="otp" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
+                  인증번호
+                </label>
+                <input
+                  id="otp"
+                  type="text"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="6자리 인증번호"
+                  className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none"
+                />
+              </div>
 
               <button
                 type="button"

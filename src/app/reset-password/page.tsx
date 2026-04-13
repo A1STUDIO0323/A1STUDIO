@@ -78,25 +78,39 @@ function ResetPasswordContent() {
           </p>
         )}
 
-        <form onSubmit={onSubmit} className="space-y-3">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="새 비밀번호 (8자 이상)"
-            required
-            minLength={8}
-            className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none"
-          />
-          <input
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-            placeholder="새 비밀번호 확인"
-            required
-            minLength={8}
-            className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none"
-          />
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
+              새 비밀번호
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="8자 이상 입력"
+              required
+              minLength={8}
+              className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="passwordConfirm" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
+              새 비밀번호 확인
+            </label>
+            <input
+              id="passwordConfirm"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              placeholder="비밀번호 재입력"
+              required
+              minLength={8}
+              className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none"
+            />
+          </div>
+
           {error && <p className="text-xs text-red-500">{error}</p>}
           {success && <p className="text-xs text-emerald-700">{success}</p>}
           <button

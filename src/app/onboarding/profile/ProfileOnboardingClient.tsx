@@ -122,26 +122,46 @@ export default function ProfileOnboardingClient() {
           </p>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-3">
-          <input
-            type="email"
-            value={email}
-            disabled
-            className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB]/70 px-3 py-2.5 text-sm text-[#6f655d]"
-          />
-          <input
-            type="date"
-            value={birthDate}
-            onChange={(e) => setBirthDate(e.target.value)}
-            required
-            className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] focus:border-[#B98768] focus:outline-none"
-          />
-          <input
-            type="tel"
-            value={phone}
-            readOnly
-            className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB]/70 px-3 py-2.5 text-sm text-[#6f655d]"
-          />
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
+              이메일
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              disabled
+              className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB]/70 px-3 py-2.5 text-sm text-[#6f655d]"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="birthDate" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
+              생년월일
+            </label>
+            <input
+              id="birthDate"
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              required
+              className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] focus:border-[#B98768] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="phone" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
+              전화번호
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              value={phone}
+              readOnly
+              className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB]/70 px-3 py-2.5 text-sm text-[#6f655d]"
+            />
+          </div>
 
           {error && <p className="text-xs text-red-500">{error}</p>}
 
