@@ -548,7 +548,7 @@ function BookingContent() {
         )}
 
         {/* Step 3: 확인 및 결제 */}
-        {selectedDate && (
+        {selectedDate && priceInfo && (
           (selectedType === 'room' && startTime && endTime) ||
           (selectedType === 'party-room' && selectedPackage)
         ) && (
