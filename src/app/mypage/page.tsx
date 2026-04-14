@@ -116,22 +116,28 @@ export default function MyPage() {
     const supabase = createClient();
     
     // 포인트 잔액
-    const { data: pointsData } = await supabase
+    const { data: pointsData, error: pointsError } = await supabase
       .from("user_points")
       .select("balance")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
     
+    if (pointsError) {
+      console.warn('[MyPage] 포인트 조회 실패:', pointsError);
+    }
     setBalance(pointsData?.balance || 0);
 
     // 거래 내역
-    const { data: transactionsData } = await supabase
+    const { data: transactionsData, error: transactionsError } = await supabase
       .from("point_transactions")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(50);
     
+    if (transactionsError) {
+      console.warn('[MyPage] 거래내역 조회 실패:', transactionsError);
+    }
     setTransactions(transactionsData || []);
     setLoadingPoints(false);
   };

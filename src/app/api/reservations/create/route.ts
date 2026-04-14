@@ -198,11 +198,15 @@ export async function POST(request: NextRequest) {
       console.log("포인트 환불 시작...");
       
       // 1. 현재 잔액 조회
-      const { data: currentPoints } = await supabase
+      const { data: currentPoints, error: pointsError } = await supabase
         .from('user_points')
         .select('balance')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+      
+      if (pointsError) {
+        console.error('[ReservationCreate] 포인트 조회 실패:', pointsError);
+      }
       
       if (currentPoints) {
         // 2. 잔액 업데이트
@@ -254,11 +258,15 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     // 현재 잔액 조회
-    const { data: userPoints } = await supabase
+    const { data: userPoints, error: pointsQueryError } = await supabase
       .from("user_points")
       .select("balance")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
+
+    if (pointsQueryError) {
+      console.warn('[ReservationCreate] 현재 잔액 조회 실패:', pointsQueryError);
+    }
 
     // 예약 확정 메시지 발송 (전화번호가 유효한 경우만)
     const hasValidPhone = normalizedPhone && isValidPhoneNumber(normalizedPhone);

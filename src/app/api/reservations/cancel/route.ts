@@ -81,10 +81,15 @@ export async function POST(request: NextRequest) {
       .from("user_points")
       .select("balance, total_used")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (pointsError) {
+      console.error('[CancelReservation] 포인트 조회 실패:', pointsError);
       throw new Error("포인트 조회 실패");
+    }
+
+    if (!userPoints) {
+      throw new Error("포인트 정보를 찾을 수 없습니다");
     }
 
     const newBalance = (userPoints?.balance || 0) + refundAmount;

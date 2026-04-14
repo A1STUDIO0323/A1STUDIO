@@ -50,6 +50,12 @@ export async function GET(req: NextRequest) {
     }
 
     const profile = await getMemberProfileByEmail(email);
+    
+    // 전화번호 82 → 0 변환
+    if (profile.phone && profile.phone.startsWith("82")) {
+      profile.phone = "0" + profile.phone.slice(2);
+    }
+    
     return NextResponse.json({ success: true, profile });
   } catch (error) {
     if (isDbConnectionError(error)) {
@@ -82,6 +88,12 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const data = updateSchema.parse(body);
+    
+    // 전화번호 82 → 0 변환
+    if (data.phone && data.phone.startsWith("82")) {
+      data.phone = "0" + data.phone.slice(2);
+    }
+    
     await upsertMemberProfileByEmail({
       email,
       birthDate: data.birthDate,
@@ -97,6 +109,12 @@ export async function POST(req: NextRequest) {
     });
 
     const profile = await getMemberProfileByEmail(email);
+    
+    // 전화번호 82 → 0 변환
+    if (profile.phone && profile.phone.startsWith("82")) {
+      profile.phone = "0" + profile.phone.slice(2);
+    }
+    
     return NextResponse.json({ success: true, profile });
   } catch (error) {
     if (error instanceof z.ZodError) {

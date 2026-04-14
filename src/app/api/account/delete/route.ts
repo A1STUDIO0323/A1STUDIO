@@ -36,11 +36,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. 포인트 소멸 처리 (잔액이 있으면 0으로 변경)
-    const { data: pointsData } = await supabase
+    const { data: pointsData, error: pointsError } = await supabase
       .from("user_points")
       .select("balance")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
+
+    if (pointsError) {
+      console.error('[계정탈퇴] 포인트 조회 실패:', pointsError);
+    }
 
     console.log('[계정탈퇴] 포인트 잔액:', pointsData?.balance || 0);
 

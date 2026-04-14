@@ -54,9 +54,10 @@ export async function GET(request: NextRequest) {
       .from("user_points")
       .select("*")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (pointsError && pointsError.code !== "PGRST116") {
+    if (pointsError) {
+      console.error('[Charge] 포인트 조회 실패:', pointsError);
       throw new Error("포인트 조회 실패");
     }
 

@@ -47,7 +47,13 @@ export default function ProfileOnboardingClient() {
 
     setEmail(session.user.email);
     if (session.user.phone) {
-      setPhone(session.user.phone);
+      let phone = session.user.phone;
+      // 82로 시작하면 → 0으로 교체
+      // 예: "821029940323" → "01029940323"
+      if (phone.startsWith("82")) {
+        phone = "0" + phone.slice(2);
+      }
+      setPhone(phone);
     }
 
     void (async () => {
@@ -63,7 +69,13 @@ export default function ProfileOnboardingClient() {
             return;
           }
           setBirthDate(data.profile.birthDate ?? "");
-          setPhone(data.profile.phone ?? session.user.phone ?? "");
+          let phone = data.profile.phone ?? session.user.phone ?? "";
+          // 82로 시작하면 → 0으로 교체
+          // 예: "821029940323" → "01029940323"
+          if (phone.startsWith("82")) {
+            phone = "0" + phone.slice(2);
+          }
+          setPhone(phone);
         }
       } catch {
         // ignore and show form

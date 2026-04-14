@@ -84,9 +84,18 @@ export default function Header() {
       .from("user_points")
       .select("balance")
       .eq("user_id", session.user.id)
-      .single()
-      .then(({ data }) => {
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[Header] 포인트 조회 실패:', error);
+          setUserPoints(0);
+          return;
+        }
         setUserPoints(data?.balance || 0);
+      })
+      .catch((err) => {
+        console.error('[Header] 포인트 조회 예외:', err);
+        setUserPoints(0);
       });
   }, [session?.user?.email, session?.user?.id, session?.user?.image, session?.user?.name, session?.user?.provider]);
 

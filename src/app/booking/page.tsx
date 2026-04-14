@@ -71,9 +71,17 @@ function BookingContent() {
           .from("user_points")
           .select("balance")
           .eq("user_id", user.id)
-          .single()
-          .then(({ data }) => {
+          .maybeSingle()
+          .then(({ data, error }) => {
+            if (error) {
+              console.warn('[Booking] 포인트 조회 실패:', error);
+            }
             setUserPoints(data?.balance || 0);
+            setLoading(false);
+          })
+          .catch((err) => {
+            console.error('[Booking] 포인트 조회 예외:', err);
+            setUserPoints(0);
             setLoading(false);
           });
       }

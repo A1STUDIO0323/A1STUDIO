@@ -156,11 +156,15 @@ export async function POST(request: NextRequest) {
       console.log("포인트 환불 시작...");
       
       // 1. 현재 잔액 조회
-      const { data: currentPoints } = await supabase
+      const { data: currentPoints, error: pointsError } = await supabase
         .from('user_points')
         .select('balance')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+      
+      if (pointsError) {
+        console.error('[PartyRoomCreate] 포인트 조회 실패:', pointsError);
+      }
       
       if (currentPoints) {
         // 2. 잔액 업데이트

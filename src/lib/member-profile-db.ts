@@ -88,8 +88,15 @@ function normalizeBirthDate(value?: string | null) {
 }
 
 function normalizePhone(value?: string | null) {
-  const raw = (value ?? "").trim();
+  let raw = (value ?? "").trim();
   if (!raw) return null;
+  
+  // 82로 시작하면 → 0으로 교체
+  // 예: "821029940323" → "01029940323"
+  if (raw.startsWith("82")) {
+    raw = "0" + raw.slice(2);
+  }
+  
   const digits = raw.replace(/\D/g, "");
   return digits.length >= 8 ? digits : null;
 }
@@ -135,7 +142,13 @@ export async function getMemberProfileByEmail(email: string): Promise<MemberProf
 
   const row = rows[0];
   const birthDate = toIsoDate(row?.birth_date ?? null);
-  const phone = row?.phone ?? null;
+  let phone = row?.phone ?? null;
+  
+  // 전화번호 82 → 0 변환
+  if (phone && phone.startsWith("82")) {
+    phone = "0" + phone.slice(2);
+  }
+  
   return {
     email: normalized,
     birthDate,
