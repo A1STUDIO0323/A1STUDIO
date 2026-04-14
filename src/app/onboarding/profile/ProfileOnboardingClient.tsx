@@ -106,7 +106,13 @@ export default function ProfileOnboardingClient() {
         setError(data.error ?? "정보 저장에 실패했습니다.");
         return;
       }
-      router.replace(nextUrl);
+      
+      // 생년월일이 없으면 마이페이지 계정정보로 이동
+      if (!birthDate) {
+        router.replace("/mypage?tab=account");
+      } else {
+        router.replace(nextUrl);
+      }
     } catch {
       setError("정보 저장 중 오류가 발생했습니다.");
     } finally {
@@ -176,7 +182,8 @@ export default function ProfileOnboardingClient() {
                   <p className="text-amber-800 leading-relaxed">
                     소셜 로그인 시 생년월일 정보를 제공하지 않으셨습니다.<br/>
                     <strong className="font-semibold">파티룸은 성인(만 19세 이상)만 이용 가능</strong>하므로,
-                    생년월일 정보가 없으면 파티룸 예약이 제한됩니다.
+                    생년월일 정보가 없으면 파티룸 예약이 제한됩니다.<br/>
+                    <span className="text-[#B98768] font-semibold">저장 후 마이페이지에서 생년월일을 입력해주세요.</span>
                   </p>
                 </div>
               </div>

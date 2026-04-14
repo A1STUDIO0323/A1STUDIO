@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
@@ -57,6 +57,7 @@ interface Reservation {
 
 export default function MyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<Tab>("points");
   
@@ -98,6 +99,14 @@ export default function MyPage() {
       }
     });
   }, [router]);
+
+  // URL 파라미터로 탭 설정
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "account" || tab === "points" || tab === "reservations") {
+      setActiveTab(tab as Tab);
+    }
+  }, [searchParams]);
 
   const loadProfile = async () => {
     try {
@@ -709,14 +718,19 @@ export default function MyPage() {
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <p className="text-[#9b9189]">미입력</p>
-                        <button
-                          onClick={() => setEditingBirthDate(true)}
-                          className="text-sm text-[#B98768] hover:underline"
-                        >
-                          입력하기
-                        </button>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[#9b9189]">미입력</p>
+                          <button
+                            onClick={() => setEditingBirthDate(true)}
+                            className="text-sm text-[#B98768] hover:underline font-semibold"
+                          >
+                            입력하기
+                          </button>
+                        </div>
+                        <p className="text-xs text-amber-600 leading-relaxed">
+                          파티룸 예약을 위해서는 생년월일(만 19세 이상) 확인이 필요합니다.
+                        </p>
                       </div>
                     )}
                   </div>
