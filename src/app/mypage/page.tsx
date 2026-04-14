@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -55,9 +55,22 @@ interface Reservation {
   end_date?: string;
 }
 
-export default function MyPage() {
-  const router = useRouter();
+// URL 파라미터를 읽어서 탭을 설정하는 컴포넌트
+function TabSynchronizer({ setActiveTab }: { setActiveTab: (tab: Tab) => void }) {
   const searchParams = useSearchParams();
+  
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "account" || tab === "points" || tab === "reservations") {
+      setActiveTab(tab as Tab);
+    }
+  }, [searchParams, setActiveTab]);
+
+  return null;
+}
+
+function MyPageContent() {
+  const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<Tab>("points");
   
@@ -99,14 +112,6 @@ export default function MyPage() {
       }
     });
   }, [router]);
-
-  // URL 파라미터로 탭 설정
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab === "account" || tab === "points" || tab === "reservations") {
-      setActiveTab(tab as Tab);
-    }
-  }, [searchParams]);
 
   const loadProfile = async () => {
     try {
@@ -435,6 +440,9 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F3EB] py-20">
+      <Suspense fallback={null}>
+        <TabSynchronizer setActiveTab={setActiveTab} />
+      </Suspense>
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div className="mb-12">
           <h1 className="text-4xl font-extrabold text-[#3B342F]">마이페이지</h1>
@@ -1013,4 +1021,8 @@ export default function MyPage() {
       )}
     </div>
   );
+}
+
+export default function MyPage() {
+  return <MyPageContent />;
 }
