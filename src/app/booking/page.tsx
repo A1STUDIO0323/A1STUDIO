@@ -672,10 +672,10 @@ function BookingContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="rounded-2xl bg-white p-6 max-w-md">
             <h3 className="text-xl font-bold text-[#3B342F] mb-4">
-              프로필 완성 필요
+              생년월일 입력 필요
             </h3>
             <p className="text-[#6f655d] mb-6">
-              예약을 위해 생년월일 정보가 필요합니다. 프로필을 완성해 주세요.
+              파티룸 예약을 위해 생년월일 정보가 필요합니다. 마이페이지에서 생년월일을 입력해 주세요.
             </p>
             <div className="flex gap-3">
               <button
@@ -685,10 +685,10 @@ function BookingContent() {
                 취소
               </button>
               <button
-                onClick={() => router.push("/onboarding/profile")}
+                onClick={() => router.push("/mypage?tab=account")}
                 className="flex-1 rounded-xl bg-[#B98768] px-6 py-3 font-bold text-white hover:bg-[#a9785c]"
               >
-                프로필 완성하기
+                생년월일 입력하기
               </button>
             </div>
           </div>
