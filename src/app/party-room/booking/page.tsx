@@ -89,7 +89,7 @@ function PartyRoomBookingContent() {
     
     if (isAdultUser === null) {
       alert("파티룸 예약을 위해 생년월일 정보가 필요합니다.\n마이페이지에서 생년월일을 입력해 주세요.");
-      router.push("/mypage?tab=account");
+      router.push("/mypage?tab=account&returnTo=party-room");
     } else if (isAdultUser === false) {
       alert("파티룸은 만 19세 이상 성인 회원만 예약할 수 있습니다.");
       router.push("/party-room");

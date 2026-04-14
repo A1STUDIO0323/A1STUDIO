@@ -685,7 +685,7 @@ function BookingContent() {
                 취소
               </button>
               <button
-                onClick={() => router.push("/mypage?tab=account")}
+                onClick={() => router.push("/mypage?tab=account&returnTo=party-room")}
                 className="flex-1 rounded-xl bg-[#B98768] px-6 py-3 font-bold text-white hover:bg-[#a9785c]"
               >
                 생년월일 입력하기

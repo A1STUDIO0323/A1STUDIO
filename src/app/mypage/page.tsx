@@ -327,11 +327,18 @@ function MyPageContent() {
         return;
       }
 
-      // 프로필 재로드
-      await loadProfile();
-      setEditingBirthDate(false);
-      setBirthDateInput("");
-      alert("생년월일이 저장되었습니다");
+      // URL에서 리다이렉트 파라미터 확인
+      const urlParams = new URLSearchParams(window.location.search);
+      const returnTo = urlParams.get('returnTo');
+      
+      if (returnTo === 'party-room') {
+        alert("생년월일이 저장되었습니다. 이제 파티룸을 예약하실 수 있습니다.");
+        router.push("/booking?type=party-room");
+      } else {
+        alert("생년월일이 저장되었습니다");
+        // 페이지 새로고침하여 useIsAdult 훅이 업데이트된 정보를 가져오도록 함
+        window.location.reload();
+      }
     } catch (error) {
       console.error("생년월일 저장 오류:", error);
       alert("생년월일 저장 중 오류가 발생했습니다");
