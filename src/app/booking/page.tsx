@@ -78,11 +78,6 @@ function BookingContent() {
             }
             setUserPoints(data?.balance || 0);
             setLoading(false);
-          })
-          .catch((err) => {
-            console.error('[Booking] 포인트 조회 예외:', err);
-            setUserPoints(0);
-            setLoading(false);
           });
       }
     });

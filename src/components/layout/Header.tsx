@@ -92,10 +92,6 @@ export default function Header() {
           return;
         }
         setUserPoints(data?.balance || 0);
-      })
-      .catch((err) => {
-        console.error('[Header] 포인트 조회 예외:', err);
-        setUserPoints(0);
       });
   }, [session?.user?.email, session?.user?.id, session?.user?.image, session?.user?.name, session?.user?.provider]);
 
