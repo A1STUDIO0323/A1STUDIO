@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -64,7 +64,8 @@ function TabSynchronizer({ setActiveTab }: { setActiveTab: (tab: Tab) => void })
     if (tab === "account" || tab === "points" || tab === "reservations") {
       setActiveTab(tab as Tab);
     }
-  }, [searchParams, setActiveTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return null;
 }
