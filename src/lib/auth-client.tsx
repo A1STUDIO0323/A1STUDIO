@@ -141,10 +141,11 @@ export async function signIn(
     (typeof window !== "undefined" ? window.location.pathname : "/");
   const next = sanitizePostAuthRedirect(raw);
   
-  const redirectTo =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-      : "/auth/callback";
+  // window.location.origin 우선 사용 (실제 접속 환경 기준)
+  const siteUrl = typeof window !== "undefined"
+    ? window.location.origin
+    : process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const redirectTo = `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`;
 
   if (typeof window !== "undefined") {
     console.log("[signIn OAuth] Provider:", provider);
