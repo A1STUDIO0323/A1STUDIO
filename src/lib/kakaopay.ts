@@ -88,7 +88,7 @@ const getHeaders = () => ({
  * 결제 준비
  */
 export async function readyPayment(params: ReadyPaymentParams): Promise<ReadyPaymentResponse> {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   
   const body = {
     cid: process.env.KAKAOPAY_CID,

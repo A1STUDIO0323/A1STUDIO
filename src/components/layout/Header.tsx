@@ -32,6 +32,20 @@ export default function Header() {
   const isPhoneVerified = !PHONE_OTP_ENABLED || Boolean(session?.user?.phoneConfirmedAt);
   const [userPoints, setUserPoints] = useState<number | null>(null);
 
+  // OAuth code 파라미터 정리
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const url = new URL(window.location.href);
+    const hasCode = url.searchParams.has('code');
+    
+    if (hasCode) {
+      console.log('[Header] OAuth code 감지, URL 정리 중...');
+      url.searchParams.delete('code');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [pathname]);
+
   // 페이지 이동 시 드로어 닫기
   useEffect(() => {
     setMobileOpen(false);
