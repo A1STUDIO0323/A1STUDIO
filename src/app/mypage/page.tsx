@@ -333,7 +333,10 @@ function MyPageContent() {
       
       if (returnTo === 'party-room') {
         alert("생년월일이 저장되었습니다. 이제 파티룸을 예약하실 수 있습니다.");
-        router.push("/booking?type=party-room");
+        // 잠시 대기 후 리다이렉트 (캐시 무효화를 위해)
+        setTimeout(() => {
+          router.push("/booking?type=party-room&refresh=" + Date.now());
+        }, 500);
       } else {
         alert("생년월일이 저장되었습니다");
         // 페이지 새로고침하여 useIsAdult 훅이 업데이트된 정보를 가져오도록 함

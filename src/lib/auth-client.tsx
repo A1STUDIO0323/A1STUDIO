@@ -198,6 +198,18 @@ export async function signOut(options?: { callbackUrl?: string }) {
 export function useIsAdult(): boolean | null {
   const { data: session } = useSession();
   const [isAdult, setIsAdult] = useState<boolean | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // URL에서 refresh 파라미터 확인
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const refresh = urlParams.get('refresh');
+      if (refresh) {
+        setRefreshKey(Date.now());
+      }
+    }
+  }, []);
   
   useEffect(() => {
     if (!session?.user?.email) {
@@ -206,7 +218,12 @@ export function useIsAdult(): boolean | null {
     }
     
     // 프로필에서 생년월일 가져오기
-    fetch("/api/members/profile")
+    fetch("/api/members/profile", {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
+    })
       .then((res) => res.json())
       .then((data) => {
         if (!data.success || !data.profile?.birthDate) {
@@ -227,7 +244,7 @@ export function useIsAdult(): boolean | null {
       .catch(() => {
         setIsAdult(null);
       });
-  }, [session?.user?.email]);
+  }, [session?.user?.email, refreshKey]);
   
   return isAdult;
 }
