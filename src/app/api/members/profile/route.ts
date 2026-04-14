@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, profile });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('[POST /api/members/profile] Zod 유효성 검사 실패:', error.errors);
+      console.error('[POST /api/members/profile] Zod 유효성 검사 실패:', error.issues);
       return NextResponse.json(
         { success: false, error: "입력값이 올바르지 않습니다" },
         { status: 400 }
