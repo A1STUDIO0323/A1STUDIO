@@ -75,6 +75,9 @@ export default function MyPage() {
   // 계정 정보 관련
   const [profileData, setProfileData] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [editingBirthDate, setEditingBirthDate] = useState(false);
+  const [birthDateInput, setBirthDateInput] = useState("");
+  const [savingBirthDate, setSavingBirthDate] = useState(false);
 
   // 계정 탈퇴 관련
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -285,6 +288,40 @@ export default function MyPage() {
       console.error("계정 탈퇴 오류:", error);
       alert("계정 탈퇴 처리 중 오류가 발생했습니다");
       setIsDeleting(false);
+    }
+  };
+
+  const handleSaveBirthDate = async () => {
+    if (!birthDateInput) {
+      alert("생년월일을 입력해주세요");
+      return;
+    }
+
+    try {
+      setSavingBirthDate(true);
+      const res = await fetch("/api/members/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ birthDate: birthDateInput }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok || !data.success) {
+        alert(data.error || "생년월일 저장에 실패했습니다");
+        return;
+      }
+
+      // 프로필 재로드
+      await loadProfile();
+      setEditingBirthDate(false);
+      setBirthDateInput("");
+      alert("생년월일이 저장되었습니다");
+    } catch (error) {
+      console.error("생년월일 저장 오류:", error);
+      alert("생년월일 저장 중 오류가 발생했습니다");
+    } finally {
+      setSavingBirthDate(false);
     }
   };
 
@@ -628,19 +665,58 @@ export default function MyPage() {
 
                   <div>
                     <p className="text-sm text-[#9b9189] mb-1">생년월일</p>
-                    {profileData?.birthDate ? (
-                      <p className="text-lg font-semibold text-[#3B342F]">
-                        {format(new Date(profileData.birthDate), "yyyy년 M월 d일", { locale: ko })}
-                      </p>
+                    {editingBirthDate ? (
+                      <div className="space-y-2">
+                        <input
+                          type="date"
+                          value={birthDateInput}
+                          onChange={(e) => setBirthDateInput(e.target.value)}
+                          className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2 text-[#3B342F] focus:border-[#B98768] focus:outline-none"
+                          max={format(new Date(), "yyyy-MM-dd")}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveBirthDate}
+                            disabled={savingBirthDate}
+                            className="flex-1 rounded-lg bg-[#B98768] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a9785c] disabled:opacity-50"
+                          >
+                            {savingBirthDate ? "저장 중..." : "저장"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingBirthDate(false);
+                              setBirthDateInput("");
+                            }}
+                            className="flex-1 rounded-lg border border-[#D8CCBC] px-4 py-2 text-sm font-semibold text-[#6f655d] hover:bg-[#EFE7DA]"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    ) : profileData?.birthDate ? (
+                      <div className="flex items-center justify-between">
+                        <p className="text-lg font-semibold text-[#3B342F]">
+                          {format(new Date(profileData.birthDate), "yyyy년 M월 d일", { locale: ko })}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setBirthDateInput(profileData.birthDate);
+                            setEditingBirthDate(true);
+                          }}
+                          className="text-sm text-[#B98768] hover:underline"
+                        >
+                          수정
+                        </button>
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2">
                         <p className="text-[#9b9189]">미입력</p>
-                        <Link
-                          href="/onboarding/profile?next=/mypage"
+                        <button
+                          onClick={() => setEditingBirthDate(true)}
                           className="text-sm text-[#B98768] hover:underline"
                         >
                           입력하기
-                        </Link>
+                        </button>
                       </div>
                     )}
                   </div>
