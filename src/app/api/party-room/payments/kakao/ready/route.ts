@@ -54,11 +54,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '최대 10명까지 이용 가능' }, { status: 400 });
     }
 
-    // 3. 중복 예약 확인
+    // 3. 중복 예약 확인 (PAID, HOLD, CONFIRMED 상태 모두 포함)
     const { data: existingReservations } = await supabase
       .from("party_reservations")
       .select("id")
-      .eq("status", "confirmed")
+      .in("status", ["PAID", "HOLD", "CONFIRMED"])
       .or(`date.eq.${date},end_date.eq.${date}`);
 
     if (existingReservations && existingReservations.length > 0) {

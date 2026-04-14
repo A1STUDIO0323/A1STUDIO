@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import Link from "next/link";
 import { Info, Sparkles } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { REFUND_POLICY } from "@/lib/constants";
@@ -67,9 +68,8 @@ const PARTY_ROOM_PACKAGES = [
 ];
 
 const ROOM_SIZE_PYEONG = 15;
-const PYEONG_PER_PERSON = 2.5;
-const EXTRA_PERSON_FEE_PER_HOUR = 5000;
-const BASE_MAX_HEADCOUNT = Math.max(1, Math.floor(ROOM_SIZE_PYEONG / PYEONG_PER_PERSON));
+const BASE_MAX_HEADCOUNT = 8; // 기본 최대 인원
+const EXTRA_PERSON_FEE_PER_HOUR = 3000; // 추가 인원 요금 (1인당/시간)
 
 export default function PricingPage() {
   return (
@@ -153,50 +153,210 @@ export default function PricingPage() {
             </p>
             <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#B98768]/20 px-4 py-2 text-sm font-semibold text-[#B98768]">
               <Sparkles className="w-4 h-4" />
-              현재 오픈 이벤트 기간 - 특별 할인가 적용 중
+              오픈 이벤트 진행 중! 특별 할인가 적용
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {PARTY_ROOM_PACKAGES.map((pkg) => (
-              <div key={pkg.name} className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
-                <h3 className="text-xl font-bold text-[#3B342F] mb-2">{pkg.name}</h3>
-                <p className="text-sm text-[#6f655d] mb-1">{pkg.time}</p>
-                <p className="text-xs text-[#9b9189] mb-4">({pkg.hours}시간)</p>
-                
-                <div className="space-y-3">
-                  {/* 비피크 */}
-                  <div className="rounded-lg bg-[#F7F3EB] p-3">
-                    <p className="text-xs text-[#9b9189] mb-1">비피크</p>
-                    <p className="text-sm text-[#9b9189] line-through">
-                      {pkg.priceOffPeak.regular.toLocaleString("ko-KR")}원
-                    </p>
-                    <p className="text-2xl font-bold text-[#B98768]">
-                      {pkg.priceOffPeak.event.toLocaleString("ko-KR")}원
-                    </p>
-                  </div>
-                  
-                  {/* 피크 */}
-                  <div className="rounded-lg bg-[#F7F3EB] p-3">
-                    <p className="text-xs text-[#9b9189] mb-1">피크</p>
-                    <p className="text-sm text-[#9b9189] line-through">
-                      {pkg.pricePeak.regular.toLocaleString("ko-KR")}원
-                    </p>
-                    <p className="text-2xl font-bold text-[#B98768]">
-                      {pkg.pricePeak.event.toLocaleString("ko-KR")}원
-                    </p>
-                  </div>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* 낮 패키지 - 비피크 */}
+            <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
+              <h3 className="text-xl font-bold text-[#3B342F] mb-1">낮 패키지</h3>
+              <p className="text-sm text-[#6f655d] mb-1">10:00 ~ 17:00</p>
+              <p className="text-xs text-[#9b9189] mb-4">7시간</p>
+              
+              <div className="mb-3">
+                <span className="inline-block rounded-full bg-[#EFE7DA] px-3 py-1 text-xs font-semibold text-[#3B342F]">
+                  비피크
+                </span>
               </div>
-            ))}
+              
+              <div className="space-y-2">
+                <p className="text-sm text-[#9b9189] line-through">
+                  100,000원
+                </p>
+                <p className="text-3xl font-bold text-[#B98768]">
+                  70,000원
+                </p>
+                <p className="text-xs text-[#9b9189]">
+                  최소 1시간부터
+                </p>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-[#D8CCBC]">
+                <p className="text-xs text-[#6f655d]">
+                  ✓ 주말 오전 시간대<br/>
+                  ✓ 1인당 약 7,000원
+                </p>
+              </div>
+            </div>
+
+            {/* 낮 패키지 - 피크 */}
+            <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
+              <h3 className="text-xl font-bold text-[#3B342F] mb-1">낮 패키지</h3>
+              <p className="text-sm text-[#6f655d] mb-1">10:00 ~ 17:00</p>
+              <p className="text-xs text-[#9b9189] mb-4">7시간</p>
+              
+              <div className="mb-3">
+                <span className="inline-block rounded-full bg-[#B98768]/20 px-3 py-1 text-xs font-semibold text-[#B98768]">
+                  피크
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-sm text-[#9b9189] line-through">
+                  130,000원
+                </p>
+                <p className="text-3xl font-bold text-[#B98768]">
+                  90,000원
+                </p>
+                <p className="text-xs text-[#9b9189]">
+                  최소 1시간부터
+                </p>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-[#D8CCBC]">
+                <p className="text-xs text-[#6f655d]">
+                  ✓ 주말 낮 시간대<br/>
+                  ✓ 1인당 약 9,000원
+                </p>
+              </div>
+            </div>
+
+            {/* 야간 패키지 - 비피크 */}
+            <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
+              <h3 className="text-xl font-bold text-[#3B342F] mb-1">야간 패키지</h3>
+              <p className="text-sm text-[#6f655d] mb-1">19:00 ~ 익일 07:00</p>
+              <p className="text-xs text-[#9b9189] mb-4">12시간</p>
+              
+              <div className="mb-3">
+                <span className="inline-block rounded-full bg-[#EFE7DA] px-3 py-1 text-xs font-semibold text-[#3B342F]">
+                  비피크
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-sm text-[#9b9189] line-through">
+                  140,000원
+                </p>
+                <p className="text-3xl font-bold text-[#B98768]">
+                  100,000원
+                </p>
+                <p className="text-xs text-[#9b9189]">
+                  최소 1시간부터
+                </p>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-[#D8CCBC]">
+                <p className="text-xs text-[#6f655d]">
+                  ✓ 야간 시간대 장시간 이용<br/>
+                  ✓ 1인당 약 10,000원
+                </p>
+              </div>
+            </div>
+
+            {/* 야간 패키지 - 피크 */}
+            <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
+              <h3 className="text-xl font-bold text-[#3B342F] mb-1">야간 패키지</h3>
+              <p className="text-sm text-[#6f655d] mb-1">19:00 ~ 익일 07:00</p>
+              <p className="text-xs text-[#9b9189] mb-4">12시간</p>
+              
+              <div className="mb-3">
+                <span className="inline-block rounded-full bg-[#B98768]/20 px-3 py-1 text-xs font-semibold text-[#B98768]">
+                  피크
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-sm text-[#9b9189] line-through">
+                  160,000원
+                </p>
+                <p className="text-3xl font-bold text-[#B98768]">
+                  120,000원
+                </p>
+                <p className="text-xs text-[#9b9189]">
+                  최소 1시간부터
+                </p>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-[#D8CCBC]">
+                <p className="text-xs text-[#6f655d]">
+                  ✓ 주말 저녁~야간<br/>
+                  ✓ 1인당 약 12,000원
+                </p>
+              </div>
+            </div>
+
+            {/* 종일권 - 비피크 */}
+            <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
+              <h3 className="text-xl font-bold text-[#3B342F] mb-1">종일권</h3>
+              <p className="text-sm text-[#6f655d] mb-1">10:00 ~ 익일 07:00</p>
+              <p className="text-xs text-[#9b9189] mb-4">21시간</p>
+              
+              <div className="mb-3">
+                <span className="inline-block rounded-full bg-[#EFE7DA] px-3 py-1 text-xs font-semibold text-[#3B342F]">
+                  비피크
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-sm text-[#9b9189] line-through">
+                  210,000원
+                </p>
+                <p className="text-3xl font-bold text-[#B98768]">
+                  150,000원
+                </p>
+                <p className="text-xs text-[#9b9189]">
+                  최소 1시간부터
+                </p>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-[#D8CCBC]">
+                <p className="text-xs text-[#6f655d]">
+                  ✓ 하루 종일 이용<br/>
+                  ✓ 1인당 약 15,000원
+                </p>
+              </div>
+            </div>
+
+            {/* 종일권 - 피크 */}
+            <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
+              <h3 className="text-xl font-bold text-[#3B342F] mb-1">종일권</h3>
+              <p className="text-sm text-[#6f655d] mb-1">10:00 ~ 익일 07:00</p>
+              <p className="text-xs text-[#9b9189] mb-4">21시간</p>
+              
+              <div className="mb-3">
+                <span className="inline-block rounded-full bg-[#B98768]/20 px-3 py-1 text-xs font-semibold text-[#B98768]">
+                  피크
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-sm text-[#9b9189] line-through">
+                  250,000원
+                </p>
+                <p className="text-3xl font-bold text-[#B98768]">
+                  180,000원
+                </p>
+                <p className="text-xs text-[#9b9189]">
+                  최소 1시간부터
+                </p>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-[#D8CCBC]">
+                <p className="text-xs text-[#6f655d]">
+                  ✓ 주말 하루 종일<br/>
+                  ✓ 1인당 약 18,000원
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* 파티룸 안내사항 */}
           <div className="mt-6 rounded-xl bg-[#EFE7DA] p-6 text-sm text-[#6f655d] space-y-2">
-            <p>• 낮 패키지와 야간 패키지 사이 17:00~19:00은 청소·환기 시간으로 예약 불가</p>
+            <p>• 이용 시간은 준비 및 정리 시간을 포함합니다</p>
+            <p>• 낮 패키지(10~17시)와 야간 패키지(19시~익일 7시) 사이 17~19시는 예약이 불가합니다</p>
             <p>• 최대 10인 기준이며 추가 인원 요금은 없습니다</p>
-            <p>• 만 19세 이상 성인 전용 공간입니다</p>
-            <p>• 10인 기준 1인당: 낮 패키지 7,000원부터 / 야간 패키지 10,000원부터</p>
+            <p>• 만 19세 이상 성인 전용입니다</p>
             <p>• 피크/비피크 구분은 예약 날짜의 요일에 따라 자동 적용됩니다</p>
           </div>
         </div>
@@ -204,7 +364,7 @@ export default function PricingPage() {
         {/* 추가 요금 (연습실만 해당) */}
         <h2 className="mt-14 text-2xl font-bold text-[#3B342F]">추가 요금 (연습실)</h2>
         <p className="mt-1 text-sm text-[#6f655d]">
-          최대 인원은 평수 기준으로 계산되며, 초과 인원은 시간당 추가 요금이 적용됩니다.
+          기본 최대 인원을 초과하는 경우 시간당 추가 요금이 적용됩니다.
         </p>
         <div className="mt-4 overflow-hidden rounded-2xl border border-[#D8CCBC]">
           <table className="w-full text-sm">
@@ -226,9 +386,6 @@ export default function PricingPage() {
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-xs text-[#9b9189]">
-          계산식: 최대 인원 = 평수 ÷ {PYEONG_PER_PERSON} (소수점 버림)
-        </p>
 
         {/* 환불규정 요약 */}
         <h2 className="mt-14 text-2xl font-bold text-[#3B342F]">환불 규정</h2>
@@ -265,20 +422,12 @@ export default function PricingPage() {
             실시간 예약현황을 확인하고 원하는 시간을 선택하세요
           </p>
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            {/* 예약 메뉴 임시 숨김 (코드 보관)
             <Link
               href="/booking"
-              className="rounded-full bg-[#B98768] px-8 py-3 text-sm font-bold text-[#F7F3EB] transition-all hover:bg-[#a9785c]"
+              className="rounded-full bg-[#B98768] px-8 py-3 text-sm font-bold text-[#F7F3EB] transition-all hover:bg-[#a9785c] active:scale-95"
             >
               예약하기
             </Link>
-            <Link
-              href="/availability"
-              className="rounded-full border border-[#D8CCBC] px-8 py-3 text-sm font-medium text-[#3B342F] transition-all hover:border-[#D8CCBC]"
-            >
-              예약현황 확인
-            </Link>
-            */}
           </div>
         </div>
       </div>

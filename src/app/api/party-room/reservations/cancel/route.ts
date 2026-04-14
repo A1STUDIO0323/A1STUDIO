@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cancelPartyRoomPayment } from "@/lib/kakaopay";
+import { calculatePartyRoomRefundRate, canCancelReservation } from "@/lib/refund-policy";
 
 /**
  * 파티룸 예약 취소 + 환불 처리
@@ -41,32 +42,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. 이미 취소된 예약인지 확인
-    if (reservation.status === 'cancelled') {
+    // 2. 취소 가능한 상태인지 확인
+    const cancellableStatuses = ["PAID", "CONFIRMED", "confirmed"];
+    if (!cancellableStatuses.includes(reservation.status)) {
       return NextResponse.json(
-        { error: '이미 취소된 예약입니다' },
+        { error: reservation.status === 'CANCELLED' || reservation.status === 'cancelled' ? '이미 취소된 예약입니다' : '취소할 수 없는 예약입니다' },
         { status: 400 }
       );
     }
 
-    // 3. 취소 정책 판별
+    // 3. 취소 가능 시간 확인 및 환불율 계산
     const startDateTime = new Date(`${reservation.date}T${reservation.start_time}`);
-    const now = new Date();
-    const diffMs = startDateTime.getTime() - now.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-    let refundRate = 0;
-    if (diffDays >= 7) {
-      refundRate = 1.0; // 전액 환불
-    } else if (diffDays >= 3) {
-      refundRate = 0.5; // 50% 환불
-    } else {
+    
+    const cancelCheck = canCancelReservation(startDateTime, 'party');
+    if (!cancelCheck.canCancel) {
       return NextResponse.json(
-        { error: '취소 불가 기간입니다. (이용 시작 3일 이내)' },
+        { error: cancelCheck.message },
         { status: 400 }
       );
     }
 
+    const { refundRate, description } = calculatePartyRoomRefundRate(startDateTime);
     const refundAmount = Math.floor(reservation.total_amount * refundRate);
     let refundMethod = '';
     let refundPoints = 0;
@@ -130,7 +126,7 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from("party_reservations")
       .update({
-        status: 'cancelled',
+        status: 'CANCELLED',
         cancelled_at: new Date().toISOString(),
         refund_method: refundMethod,
         refund_amount: refundAmount,
@@ -155,6 +151,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      refund_policy: description,
       refund_rate: refundRate,
       refund_amount: refundAmount,
       refund_method: refundMethod,

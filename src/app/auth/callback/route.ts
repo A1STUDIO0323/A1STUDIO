@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
 
 export async function GET(request: Request) {
@@ -7,16 +6,21 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const nextPath = sanitizePostAuthRedirect(searchParams.get("next") ?? "/");
 
-  if (code) {
-    const supabase = await createClient();
-    await supabase.auth.exchangeCodeForSession(code);
+  if (process.env.NODE_ENV === "development") {
+    console.log("[auth/callback] Received code:", code ? "YES" : "NO");
+    console.log("[auth/callback] Next path:", nextPath);
   }
 
-  const target = `${origin}${nextPath.startsWith("/") ? nextPath : `/${nextPath}`}`;
-  if (process.env.NODE_ENV === "development") {
-    console.log("[auth/callback] redirect target (path only logged)", {
-      pathPreview: nextPath.length > 80 ? `${nextPath.slice(0, 80)}…` : nextPath,
-    });
+  // code 파라미터를 유지하면서 리다이렉트
+  // 클라이언트의 Supabase가 자동으로 code를 감지하고 세션을 생성합니다
+  const target = new URL(nextPath, origin);
+  if (code) {
+    target.searchParams.set("code", code);
   }
-  return NextResponse.redirect(target);
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[auth/callback] Redirecting to:", target.toString());
+  }
+  
+  return NextResponse.redirect(target.toString());
 }

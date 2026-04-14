@@ -34,12 +34,12 @@ export const NAV_LINKS = [
     label: "소개",
     href: "/#about",
     children: [
-      { label: "회사소개", href: "/#about" },
-      { label: "대표소개", href: "/#director" },
+      { label: "회사 소개", href: "/#about" },
+      { label: "대표 소개", href: "/#director" },
+      { label: "공간 소개", href: "/spaces" },
     ],
   },
-  { label: "연습실 소개", href: "/spaces" },
-  { label: "파티룸", href: "/party-room", isNew: true },
+  { label: "예약하기", href: "/booking" },
   {
     label: "원데이클래스",
     href: "/one-day-class",

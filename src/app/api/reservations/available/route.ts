@@ -12,12 +12,12 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // 해당 날짜의 확정된 예약 조회
+    // 해당 날짜의 확정된 예약 조회 (PAID, HOLD, CONFIRMED 상태 모두 포함)
     const { data: reservations, error } = await supabase
       .from("reservations")
       .select("start_time, end_time")
       .eq("date", dateStr)
-      .eq("status", "confirmed")
+      .in("status", ["PAID", "HOLD", "CONFIRMED"])
       .order("start_time", { ascending: true });
 
     if (error) {

@@ -80,7 +80,7 @@ interface CancelPaymentResponse {
 }
 
 const getHeaders = () => ({
-  "Authorization": `SECRET_KEY ${process.env.KAKAO_PAY_SECRET_KEY}`,
+  "Authorization": `SECRET_KEY ${process.env.KAKAOPAY_SECRET_KEY}`,
   "Content-Type": "application/json",
 });
 
@@ -91,7 +91,7 @@ export async function readyPayment(params: ReadyPaymentParams): Promise<ReadyPay
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
   
   const body = {
-    cid: process.env.KAKAO_PAY_CID,
+    cid: process.env.KAKAOPAY_CID,
     partner_order_id: params.partner_order_id,
     partner_user_id: params.partner_user_id,
     item_name: params.item_name,
@@ -111,7 +111,14 @@ export async function readyPayment(params: ReadyPaymentParams): Promise<ReadyPay
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`카카오페이 결제 준비 실패: ${error.msg || response.statusText}`);
+    console.error("[KakaoPay] Ready payment failed:");
+    console.error("[KakaoPay] Status:", response.status);
+    console.error("[KakaoPay] Error:", error);
+    console.error("[KakaoPay] Request body:", body);
+    console.error("[KakaoPay] CID:", process.env.KAKAOPAY_CID);
+    console.error("[KakaoPay] Secret Key exists:", !!process.env.KAKAOPAY_SECRET_KEY);
+    console.error("[KakaoPay] Secret Key length:", process.env.KAKAOPAY_SECRET_KEY?.length);
+    throw new Error(`카카오페이 결제 준비 실패: ${JSON.stringify(error)}`);
   }
 
   return response.json();
@@ -122,7 +129,7 @@ export async function readyPayment(params: ReadyPaymentParams): Promise<ReadyPay
  */
 export async function approvePayment(params: ApprovePaymentParams): Promise<ApprovePaymentResponse> {
   const body = {
-    cid: process.env.KAKAO_PAY_CID,
+    cid: process.env.KAKAOPAY_CID,
     tid: params.tid,
     partner_order_id: params.partner_order_id,
     partner_user_id: params.partner_user_id,
@@ -148,7 +155,7 @@ export async function approvePayment(params: ApprovePaymentParams): Promise<Appr
  */
 export async function cancelPayment(params: CancelPaymentParams): Promise<CancelPaymentResponse> {
   const body = {
-    cid: process.env.KAKAO_PAY_CID,
+    cid: process.env.KAKAOPAY_CID,
     tid: params.tid,
     cancel_amount: params.cancel_amount,
     cancel_tax_free_amount: params.cancel_tax_free_amount || 0,

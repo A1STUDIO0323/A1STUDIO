@@ -174,6 +174,7 @@ model PricingRule {
 enum ReservationStatus {
   HOLD
   PAID
+  CONFIRMED
   CANCELLED
   EXPIRED
   REFUNDED
@@ -319,4 +320,61 @@ model BlockedSlot {
 
   @@index([roomId, date])
   @@map("blocked_slots")
+}
+
+// 외부 플랫폼 예약 (스페이스클라우드, 네이버 플레이스 등)
+model ExternalReservation {
+  id         String   @id @default(cuid())
+  platform   String   // 'spacecloud', 'naver', etc.
+  externalId String?  @map("external_id") // 외부 플랫폼의 예약 ID
+  roomType   String   @map("room_type") // 'practice-room' or 'party-room'
+  date       String   // "YYYY-MM-DD"
+  startTime  String   @map("start_time") // "HH:MM"
+  endTime    String   @map("end_time") // "HH:MM"
+  guestName  String   @map("guest_name")
+  guestPhone String   @map("guest_phone")
+  amount     Int      @default(0)
+  status     String   @default("confirmed")
+  memo       String?
+  syncedAt   DateTime @default(now()) @map("synced_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([platform, date])
+  @@index([date])
+  @@map("external_reservations")
+}
+
+// 결제 중복 방지를 위한 락 테이블
+model PaymentLock {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id") @db.Uuid
+  lockType  String   @map("lock_type") // 'charge', 'reservation', 'party-room'
+  lockKey   String   @map("lock_key") // 주문 ID 또는 예약 날짜+시간
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, lockType, lockKey])
+  @@index([userId, lockType])
+  @@index([expiresAt])
+  @@map("payment_locks")
+}
+
+// 메시지 발송 로그
+model MessageLog {
+  id            String   @id @default(cuid())
+  userId        String?  @map("user_id") @db.Uuid
+  reservationId String?  @map("reservation_id")
+  phoneNumber   String   @map("phone_number")
+  messageType   String   @map("message_type") // 'reservation_confirm', 'reservation_cancel', 'reminder'
+  content       String   @db.Text
+  status        String   // 'success', 'failed'
+  errorMessage  String?  @map("error_message") @db.Text
+  messageId     String?  @map("message_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([reservationId])
+  @@index([createdAt(sort: Desc)])
+  @@map("message_logs")
 }

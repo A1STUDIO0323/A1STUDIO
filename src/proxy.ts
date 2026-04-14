@@ -27,33 +27,11 @@ function isProtectedPath(pathname: string): boolean {
 }
 
 /** 보호 경로: 리디렉트 또는 세션 쿠키가 반영된 NextResponse */
-async function authGuardResponse(req: NextRequest): Promise<NextResponse | null> {
+async function authGuardResponse(
+  req: NextRequest,
+  user: any | null
+): Promise<NextResponse | null> {
   if (!isProtectedPath(req.nextUrl.pathname)) return null;
-
-  let supabaseResponse = NextResponse.next({ request: req });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request: req });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const dest = sanitizePostAuthRedirect(
     `${req.nextUrl.pathname}${req.nextUrl.search}`
@@ -85,12 +63,52 @@ async function authGuardResponse(req: NextRequest): Promise<NextResponse | null>
     return NextResponse.redirect(url);
   }
 
-  return supabaseResponse;
+  return null;
 }
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Supabase 세션 쿠키 갱신 (모든 요청에 대해)
+  let response = NextResponse.next({
+    request: {
+      headers: req.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            req.cookies.set(name, value)
+          );
+          response = NextResponse.next({
+            request: req,
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  // 세션 갱신 (중요!)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (process.env.NODE_ENV === "development" && pathname !== "/api/debug/auth-config") {
+    console.log("[proxy]", pathname, "- User:", user ? user.id.substring(0, 8) + "..." : "None");
+  }
+
+  // 예약 기능 비활성화 처리
   if (!isBookingEnabled) {
     if (isBookingApiPath(pathname)) {
       return NextResponse.json(
@@ -110,19 +128,22 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  const authResult = await authGuardResponse(req);
+  // 보호된 경로 인증 체크
+  const authResult = await authGuardResponse(req, user);
   if (authResult) return authResult;
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
   matcher: [
-    "/booking/:path*",
-    "/availability",
-    "/api/payments/:path*",
-    "/api/reservations/:path*",
-    "/dashboard/:path*",
-    "/mypage/:path*",
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

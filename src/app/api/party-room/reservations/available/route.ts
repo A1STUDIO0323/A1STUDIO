@@ -24,11 +24,11 @@ export async function GET(request: NextRequest) {
     const startDate = `${year}-${monthNum}-01`;
     const endDate = `${year}-${monthNum}-${new Date(parseInt(year), parseInt(monthNum), 0).getDate()}`;
 
-    // party_reservations에서 confirmed 상태의 예약 조회
+    // party_reservations에서 PAID, HOLD, CONFIRMED 상태의 예약 조회
     const { data: reservations, error } = await supabase
       .from("party_reservations")
       .select("package_type, date, end_date, status")
-      .eq("status", "confirmed")
+      .in("status", ["PAID", "HOLD", "CONFIRMED"])
       .gte("date", startDate)
       .lte("date", endDate);
 

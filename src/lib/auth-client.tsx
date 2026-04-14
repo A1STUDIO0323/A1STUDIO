@@ -74,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true;
 
     void (async () => {
+      // 세션 확인
       const { data } = await supabase.auth.getSession();
       if (!active) return;
       const mapped = mapSession(data.session ?? null);
@@ -139,21 +140,42 @@ export async function signIn(
     options?.callbackUrl ??
     (typeof window !== "undefined" ? window.location.pathname : "/");
   const next = sanitizePostAuthRedirect(raw);
-  if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-    console.log("[signIn OAuth] post-callback path (sanitized)", next);
-    console.log("[signIn OAuth] remember me:", rememberMe);
-  }
+  
   const redirectTo =
     typeof window !== "undefined"
       ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
       : "/auth/callback";
 
-  const { error } = await supabase.auth.signInWithOAuth({
+  if (typeof window !== "undefined") {
+    console.log("[signIn OAuth] Provider:", provider);
+    console.log("[signIn OAuth] Redirect URL:", redirectTo);
+    console.log("[signIn OAuth] Post-callback path:", next);
+    console.log("[signIn OAuth] Remember me:", rememberMe);
+    console.log("[signIn OAuth] Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log("[signIn OAuth] Supabase Key configured:", !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  }
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo },
+    options: { 
+      redirectTo,
+      skipBrowserRedirect: false, // Supabase가 자동 리다이렉트하도록 변경
+    },
   });
 
-  return error ? { ok: false, error: error.message } : { ok: true };
+  if (error) {
+    if (typeof window !== "undefined") {
+      console.error("[signIn OAuth] Error:", error);
+    }
+    return { ok: false, error: error.message };
+  }
+
+  if (typeof window !== "undefined") {
+    console.log("[signIn OAuth] Response data:", data);
+    console.log("%c[signIn OAuth] 카카오 로그인 페이지로 리다이렉트 중...", "color: green; font-weight: bold");
+  }
+
+  return { ok: true };
 }
 
 export async function signOut(options?: { callbackUrl?: string }) {
@@ -174,17 +196,37 @@ export async function signOut(options?: { callbackUrl?: string }) {
  */
 export function useIsAdult(): boolean | null {
   const { data: session } = useSession();
-  const user = session?.user;
+  const [isAdult, setIsAdult] = useState<boolean | null>(null);
   
-  if (!user?.birthdate) return null;
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setIsAdult(null);
+      return;
+    }
+    
+    // 프로필에서 생년월일 가져오기
+    fetch("/api/members/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.success || !data.profile?.birthDate) {
+          setIsAdult(null);
+          return;
+        }
+        
+        // 나이 계산
+        const birth = new Date(data.profile.birthDate);
+        const today = new Date();
+        const age = today.getFullYear() - birth.getFullYear();
+        const isBirthdayPassed =
+          today.getMonth() > birth.getMonth() ||
+          (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+        
+        setIsAdult(age - (isBirthdayPassed ? 0 : 1) >= 19);
+      })
+      .catch(() => {
+        setIsAdult(null);
+      });
+  }, [session?.user?.email]);
   
-  // isAdult 함수 사용
-  const birth = new Date(user.birthdate);
-  const today = new Date();
-  const age = today.getFullYear() - birth.getFullYear();
-  const isBirthdayPassed =
-    today.getMonth() > birth.getMonth() ||
-    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
-  
-  return age - (isBirthdayPassed ? 0 : 1) >= 19;
+  return isAdult;
 }

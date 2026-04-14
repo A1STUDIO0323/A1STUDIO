@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight, Sparkles } from "lucide-react";
 
 const PLANS = [
   {
@@ -41,6 +41,31 @@ const PLANS = [
     priceEvent2h: 19000,
     highlights: ["주말 오후·저녁 집중 타임"],
     badge: null,
+  },
+];
+
+// 파티룸 패키지
+const PARTY_PACKAGES = [
+  {
+    name: "낮 패키지",
+    time: "10:00 ~ 17:00",
+    hours: 7,
+    priceOffPeak: { regular: 100000, event: 70000 },
+    pricePeak: { regular: 130000, event: 90000 },
+  },
+  {
+    name: "야간 패키지",
+    time: "19:00 ~ 익일 07:00",
+    hours: 12,
+    priceOffPeak: { regular: 140000, event: 100000 },
+    pricePeak: { regular: 160000, event: 120000 },
+  },
+  {
+    name: "종일권",
+    time: "10:00 ~ 익일 07:00",
+    hours: 21,
+    priceOffPeak: { regular: 210000, event: 150000 },
+    pricePeak: { regular: 250000, event: 180000 },
   },
 ];
 
@@ -144,6 +169,70 @@ export default function PricingSummary() {
         <p className="text-center text-sm text-[#9b9189] mt-6">
           * 이용 시간에는 준비 및 정리 시간이 포함됩니다.
         </p>
+
+        {/* 파티룸 섹션 */}
+        <div className="mt-20">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <h2 className="text-2xl font-bold text-[#3B342F]">파티룸 요금</h2>
+              <span className="rounded-full bg-[#B98768] px-3 py-1 text-xs font-bold text-white">
+                성인 전용
+              </span>
+            </div>
+            <p className="text-sm text-[#6f655d]">
+              패키지 단위로 예약 · 최대 10인 이용 가능
+            </p>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#B98768]/20 px-4 py-2 text-sm font-semibold text-[#B98768]">
+              <Sparkles className="w-4 h-4" />
+              오픈 이벤트 진행 중
+            </div>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {PARTY_PACKAGES.map((pkg) => (
+              <div
+                key={pkg.name}
+                className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6"
+              >
+                <h3 className="text-xl font-bold text-[#3B342F]">{pkg.name}</h3>
+                <p className="text-sm text-[#6f655d] mt-1">{pkg.time}</p>
+                <p className="text-xs text-[#9b9189] mb-4">({pkg.hours}시간)</p>
+
+                <div className="space-y-4">
+                  {/* 비피크 */}
+                  <div className="rounded-lg bg-[#F7F3EB] p-3">
+                    <p className="text-xs text-[#9b9189] mb-1">비피크</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="line-through text-[#9b9189] text-sm">
+                        {pkg.priceOffPeak.regular.toLocaleString("ko-KR")}원
+                      </span>
+                    </div>
+                    <div className="text-2xl font-bold text-[#B98768]">
+                      {pkg.priceOffPeak.event.toLocaleString("ko-KR")}원
+                    </div>
+                  </div>
+
+                  {/* 피크 */}
+                  <div className="rounded-lg bg-[#F7F3EB] p-3">
+                    <p className="text-xs text-[#9b9189] mb-1">피크</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="line-through text-[#9b9189] text-sm">
+                        {pkg.pricePeak.regular.toLocaleString("ko-KR")}원
+                      </span>
+                    </div>
+                    <div className="text-2xl font-bold text-[#B98768]">
+                      {pkg.pricePeak.event.toLocaleString("ko-KR")}원
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-sm text-[#9b9189] mt-6">
+            * 1인당: 낮 패키지 7,000원부터 / 야간 패키지 10,000원부터 / 종일권 15,000원부터
+          </p>
+        </div>
 
         <div className="mt-8 text-center">
           <Link

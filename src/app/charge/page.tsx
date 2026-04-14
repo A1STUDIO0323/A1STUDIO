@@ -185,12 +185,45 @@ export default function ChargePage() {
           ))}
         </div>
 
-        <div className="mt-12 text-center space-y-3">
-          <p className="text-sm text-[#9b9189]">
-            * 결제는 카카오페이로 안전하게 처리됩니다
-          </p>
-          <p className="text-sm text-[#9b9189]">
-            * 충전된 포인트는 환불이 불가능합니다
+        {/* 환불 불가 안내 */}
+        <div className="mt-12 max-w-2xl mx-auto">
+          <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-amber-900 mb-2">
+                  ⚠️ 포인트 충전 전 꼭 확인하세요
+                </h3>
+                <ul className="space-y-2 text-sm text-amber-800">
+                  <li className="flex items-start gap-2">
+                    <span className="font-bold">•</span>
+                    <span><strong className="font-bold">충전된 포인트는 환불이 불가능합니다.</strong></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="font-bold">•</span>
+                    <span>회원 탈퇴 시 남은 포인트는 모두 소멸됩니다.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="font-bold">•</span>
+                    <span>포인트 유효기간은 무제한이지만, 법적 요구 시 조정될 수 있습니다.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="font-bold">•</span>
+                    <span>결제는 카카오페이로 안전하게 처리됩니다.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 text-center">
+          <p className="text-xs text-[#9b9189]">
+            충전 버튼을 클릭하면 위 사항에 동의한 것으로 간주됩니다
           </p>
         </div>
       </div>

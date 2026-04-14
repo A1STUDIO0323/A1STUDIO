@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { readyPayment } from "@/lib/kakaopay";
+import { acquirePaymentLock } from "@/lib/payment-lock";
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +31,17 @@ export async function POST(request: NextRequest) {
 
     if (packageError || !chargePackage) {
       return NextResponse.json({ error: "유효하지 않은 패키지입니다" }, { status: 404 });
+    }
+
+    // 결제 중복 방지 락 획득
+    const lockKey = `charge_${package_id}`;
+    const lockAcquired = await acquirePaymentLock(user.id, "charge", lockKey, 600); // 10분
+    
+    if (!lockAcquired) {
+      return NextResponse.json(
+        { error: "이미 진행 중인 결제가 있습니다. 잠시 후 다시 시도해주세요." },
+        { status: 409 }
+      );
     }
 
     // 주문 고유번호 생성

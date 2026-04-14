@@ -48,10 +48,26 @@ function LoginContent() {
 
   // OAuth 로그인 핸들러
   const handleOAuthLogin = async (provider: "google" | "kakao") => {
-    // remember me 설정 저장
-    localStorage.setItem('rememberMe', String(rememberMe));
-    
-    await signIn(provider, { callbackUrl: onboardingCallbackUrl });
+    try {
+      // remember me 설정 저장
+      localStorage.setItem('rememberMe', String(rememberMe));
+      
+      console.log(`%c[handleOAuthLogin] Starting ${provider} login`, 'color: blue; font-weight: bold');
+      console.log('Callback URL:', onboardingCallbackUrl);
+      
+      const result = await signIn(provider, { callbackUrl: onboardingCallbackUrl });
+      
+      console.log(`%c[handleOAuthLogin] ${provider} login result:`, 'color: green; font-weight: bold', result);
+      
+      if (!result.ok) {
+        console.error(`%c[handleOAuthLogin] ${provider} login failed:`, 'color: red; font-weight: bold', result.error);
+        alert(`로그인 실패: ${result.error || '알 수 없는 오류'}`);
+      }
+      // 성공하면 리다이렉트가 이미 진행되므로 여기는 실행되지 않음
+    } catch (error) {
+      console.error(`%c[handleOAuthLogin] ${provider} login exception:`, 'color: red; font-weight: bold', error);
+      alert(`로그인 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    }
   };
 
   // 이미 로그인된 경우: 루프 방지를 위해 callbackUrl 정리 후 휴대폰/프로필 여부에 따라 분기
@@ -123,7 +139,12 @@ function LoginContent() {
           {/* 구글 로그인 */}
           {GOOGLE_CONFIGURED ? (
             <button
-              onClick={() => handleOAuthLogin("google")}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleOAuthLogin("google");
+              }}
               className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-sm font-semibold text-[#3B342F] transition-all hover:bg-[#EFE7DA] active:scale-95"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -149,7 +170,12 @@ function LoginContent() {
           {/* 카카오 로그인 */}
           {KAKAO_CONFIGURED ? (
             <button
-              onClick={() => handleOAuthLogin("kakao")}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleOAuthLogin("kakao");
+              }}
               className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#3B342F] transition-all hover:bg-[#F5DC00] active:scale-95"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" fill="currentColor">

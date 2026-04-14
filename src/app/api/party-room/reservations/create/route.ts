@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { calcPartyRoomPoints, PartyRoomPackage, PARTY_ROOM_MAX_HEADCOUNT, PARTY_ROOM_PACKAGES } from "@/lib/pricing";
 import { isAdult } from "@/lib/age-check";
+import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
+import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
 
 /**
  * 파티룸 예약 생성 (포인트 결제)
  * POST /api/party-room/reservations/create
  */
 export async function POST(request: NextRequest) {
+  let lockKey: string | null = null;
+  let userId: string | null = null;
+  
   try {
     const supabase = await createClient();
 
@@ -16,6 +21,8 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
     }
+    
+    userId = user.id;
 
     // 요청 body 파싱
     const body = await request.json();
@@ -23,10 +30,13 @@ export async function POST(request: NextRequest) {
       package_type,
       date,
       guest_name,
-      guest_phone,
+      guest_phone: rawGuestPhone,
       memo,
       headcount = 10,
     } = body;
+
+    // 전화번호 정규화 (82XXXXXXXXXX → 010XXXXXXXX)
+    const guest_phone = normalizePhoneNumber(rawGuestPhone) || rawGuestPhone;
 
     if (!package_type || !date) {
       return NextResponse.json(
@@ -39,6 +49,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "유효하지 않은 패키지 타입입니다" },
         { status: 400 }
+      );
+    }
+
+    // 결제 중복 방지 락 획득
+    lockKey = `party_${date}_${package_type}`;
+    const lockAcquired = await acquirePaymentLock(user.id, "party-room", lockKey, 300); // 5분
+    
+    if (!lockAcquired) {
+      return NextResponse.json(
+        { error: "이미 진행 중인 예약이 있습니다. 잠시 후 다시 시도해주세요." },
+        { status: 409 }
       );
     }
 
@@ -60,7 +81,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '최대 10명까지 이용 가능' }, { status: 400 });
     }
 
-    // 3. 중복 예약 확인
+    // 3. 중복 예약 확인 (PAID, HOLD, CONFIRMED 상태 모두 포함)
     const packageInfo = PARTY_ROOM_PACKAGES[package_type as PartyRoomPackage];
     const reservationDate = new Date(date);
     
@@ -75,7 +96,7 @@ export async function POST(request: NextRequest) {
     const { data: existingReservations } = await supabase
       .from("party_reservations")
       .select("id")
-      .eq("status", "confirmed")
+      .in("status", ["PAID", "HOLD", "CONFIRMED"])
       .or(`date.eq.${date},end_date.eq.${date}`);
 
     if (existingReservations && existingReservations.length > 0) {
@@ -119,7 +140,7 @@ export async function POST(request: NextRequest) {
         total_amount: pointsToUse,
         payment_method: 'points',
         points_used: pointsToUse,
-        status: 'confirmed',
+        status: 'PAID',
         headcount,
         guest_name,
         guest_phone,
@@ -130,7 +151,41 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error("파티룸 예약 생성 실패:", insertError);
-      throw new Error("예약 생성에 실패했습니다");
+      
+      // 포인트 환불 처리
+      console.log("포인트 환불 시작...");
+      
+      // 1. 현재 잔액 조회
+      const { data: currentPoints } = await supabase
+        .from('user_points')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (currentPoints) {
+        // 2. 잔액 업데이트
+        await supabase
+          .from('user_points')
+          .update({ 
+            balance: currentPoints.balance + pointsToUse,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+        
+        // 3. 환불 거래 기록
+        await supabase
+          .from('point_transactions')
+          .insert({
+            user_id: user.id,
+            type: 'refund',
+            amount: pointsToUse,
+            balance_after: currentPoints.balance + pointsToUse,
+            description: `파티룸 예약 실패로 인한 환불 (${date})`,
+            reservation_id: null,
+          });
+      }
+      
+      throw new Error(`예약 생성에 실패했습니다: ${insertError.message}`);
     }
 
     // 7. 낮 패키지인 경우 17:00~19:00 BlockedSlot 자동 생성
@@ -156,12 +211,70 @@ export async function POST(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(1);
 
+    // 9. 예약 확정 메시지 발송 (전화번호가 유효한 경우만)
+    const hasValidPhone = isValidPhoneNumber(guest_phone);
+    
+    if (hasValidPhone) {
+      try {
+        const { sendMessage, logMessage } = await import('@/lib/sms');
+        const { getPartyRoomConfirmMessage } = await import('@/lib/message-templates');
+        
+        const messageContent = getPartyRoomConfirmMessage({
+          guestName: guest_name,
+          guestPhone: guest_phone,
+          date,
+          startTime: packageInfo.start,
+          endTime: packageInfo.end,
+          roomType: 'party',
+          packageType: package_type as 'day' | 'night' | 'allday',
+        });
+
+        const smsResult = await sendMessage({
+          to: guest_phone,
+          message: messageContent,
+        });
+
+        // 로그 저장
+        await logMessage({
+          userId: user.id,
+          reservationId: reservation.id,
+          phoneNumber: guest_phone,
+          messageType: 'reservation_confirm',
+          content: messageContent,
+          status: smsResult.success ? 'success' : 'failed',
+          errorMessage: smsResult.error,
+          messageId: smsResult.messageId,
+        });
+
+        if (smsResult.success) {
+          console.log('[파티룸 예약] 확정 메시지 발송 성공:', smsResult.messageId);
+        } else {
+          console.warn('[파티룸 예약] 확정 메시지 발송 실패:', smsResult.error);
+        }
+      } catch (smsError) {
+        // 메시지 발송 실패는 예약을 취소하지 않음
+        console.error('[파티룸 예약] 메시지 발송 오류:', smsError);
+      }
+    } else {
+      console.log('[파티룸 예약] 전화번호 미등록으로 SMS 발송 건너뜀:', guest_phone);
+    }
+
+    // 예약 성공 시 락 해제
+    if (lockKey && userId) {
+      await releasePaymentLock(userId, "party-room", lockKey);
+    }
+
     return NextResponse.json({
       reservation_id: reservation.id,
       points_used: pointsToUse,
       reservation,
     });
   } catch (error) {
+    // 에러 발생 시 락 해제
+    if (lockKey && userId) {
+      await releasePaymentLock(userId, "party-room", lockKey);
+    }
+    
     console.error("파티룸 예약 생성 오류:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "예약 생성에 실패했습니다" },

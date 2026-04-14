@@ -92,9 +92,13 @@ function BookingContent() {
     }
   }, [selectedType, isAdultUser]);
 
-  // 날짜 선택 시 예약된 시간 조회
+  // 날짜 선택 시 예약된 시간 조회 및 시간 초기화
   useEffect(() => {
     if (!selectedDate) return;
+
+    // 날짜가 변경되면 시간 선택 초기화
+    setStartTime("");
+    setEndTime("");
 
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     fetch(`/api/reservations/available?date=${dateStr}`)
@@ -156,23 +160,39 @@ function BookingContent() {
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  
+  // 첫 날의 요일 (0: 일요일 ~ 6: 토요일)
+  const firstDayOfWeek = monthStart.getDay();
+  
+  // 빈 칸 배열 생성 (첫 날 이전)
+  const emptyDays = Array(firstDayOfWeek).fill(null);
 
-  // 시간 슬롯 생성 (30분 단위)
+  // 시간 슬롯 생성 (1시간 단위)
   const generateTimeSlots = (): TimeSlot[] => {
     const slots: TimeSlot[] = [];
+    const now = new Date();
+    const isSelectedToday = selectedDate && format(selectedDate, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
+    const currentHour = now.getHours();
+    
     for (let hour = 0; hour < 24; hour++) {
-      for (let min of [0, 30]) {
-        const time = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
-        
-        // 예약된 시간인지 체크
-        const isReserved = reservedSlots.some((slot) => {
-          const slotStart = slot.start_time;
-          const slotEnd = slot.end_time;
-          return time >= slotStart && time < slotEnd;
-        });
-        
-        slots.push({ time, disabled: isReserved });
+      const time = `${hour.toString().padStart(2, "0")}:00`;
+      
+      // 예약된 시간인지 체크
+      const isReserved = reservedSlots.some((slot) => {
+        const slotStart = slot.start_time;
+        const slotEnd = slot.end_time;
+        return time >= slotStart && time < slotEnd;
+      });
+      
+      // 과거 시간인지 체크 (오늘 날짜인 경우만)
+      let isPastTime = false;
+      if (isSelectedToday) {
+        if (hour <= currentHour) {
+          isPastTime = true;
+        }
       }
+      
+      slots.push({ time, disabled: isReserved || isPastTime });
     }
     return slots;
   };
@@ -338,6 +358,11 @@ function BookingContent() {
                 {day}
               </div>
             ))}
+            {/* 첫 날 이전 빈 칸 */}
+            {emptyDays.map((_, index) => (
+              <div key={`empty-${index}`} className="aspect-square" />
+            ))}
+            {/* 실제 날짜 */}
             {days.map((day) => {
               const isDisabled = isBefore(day, today) || day > maxDate;
               const isSelected = selectedDate && format(day, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd");
@@ -394,7 +419,7 @@ function BookingContent() {
                       <option value="">선택하세요</option>
                       {timeSlots.map((slot) => (
                         <option key={slot.time} value={slot.time} disabled={slot.disabled}>
-                          {slot.time} {slot.disabled ? "(예약됨)" : ""}
+                          {slot.time} {slot.disabled ? "(예약됨 또는 지난 시간)" : ""}
                         </option>
                       ))}
                     </select>
@@ -415,7 +440,7 @@ function BookingContent() {
                         .filter((slot) => slot.time > startTime)
                         .map((slot) => (
                           <option key={slot.time} value={slot.time} disabled={slot.disabled}>
-                            {slot.time} {slot.disabled ? "(예약됨)" : ""}
+                            {slot.time} {slot.disabled ? "(예약됨 또는 지난 시간)" : ""}
                           </option>
                         ))}
                     </select>

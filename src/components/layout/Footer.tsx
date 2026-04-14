@@ -109,6 +109,10 @@ export default function Footer() {
         <div className="mt-10 border-t border-[#D8CCBC] pt-6 text-center text-xs text-[#b0a89e]">
           © {new Date().getFullYear()} {STUDIO_NAME}. All rights reserved.
           <span className="mx-2">|</span>
+          <Link href="/privacy" className="hover:text-[#6f655d] transition-colors">
+            개인정보처리방침
+          </Link>
+          <span className="mx-2">|</span>
           <Link href="/admin" className="hover:text-[#6f655d] transition-colors">
             관리자
           </Link>

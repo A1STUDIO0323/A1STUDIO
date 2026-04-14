@@ -83,15 +83,16 @@ export default function ProfileOnboardingClient() {
       const res = await fetch("/api/members/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ birthDate, phone }),
+        body: JSON.stringify({ 
+          // birthDate는 소셜 로그인에서 가져온 경우만 전송 (사용자 입력 불가)
+          birthDate: birthDate || null,
+          phone 
+        }),
       });
       const data = (await res.json()) as ProfileResponse;
       if (!res.ok || !data.success) {
         setError(data.error ?? "정보 저장에 실패했습니다.");
         return;
-      }
-      if (data.profile) {
-        setBirthDate(data.profile.birthDate ?? "");
       }
       router.replace(nextUrl);
     } catch {
@@ -136,19 +137,39 @@ export default function ProfileOnboardingClient() {
             />
           </div>
 
-          <div>
-            <label htmlFor="birthDate" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
-              생년월일
-            </label>
-            <input
-              id="birthDate"
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              required
-              className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2.5 text-sm text-[#3B342F] focus:border-[#B98768] focus:outline-none"
-            />
-          </div>
+          {/* 생년월일 - 소셜 로그인에서 제공된 경우만 표시 */}
+          {birthDate && (
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-[#6f655d]">
+                생년월일
+              </label>
+              <div className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB]/70 px-3 py-2.5 text-sm text-[#6f655d]">
+                {new Date(birthDate).toLocaleDateString('ko-KR')}
+              </div>
+              <p className="mt-1 text-xs text-[#9b9189]">
+                소셜 로그인에서 가져온 인증된 정보입니다
+              </p>
+            </div>
+          )}
+
+          {/* 생년월일이 없는 경우 안내 */}
+          {!birthDate && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-xs text-amber-900">
+                  <p className="font-semibold mb-1">생년월일 정보 없음</p>
+                  <p className="text-amber-800 leading-relaxed">
+                    소셜 로그인 시 생년월일 정보를 제공하지 않으셨습니다.<br/>
+                    <strong className="font-semibold">파티룸은 성인(만 19세 이상)만 이용 가능</strong>하므로,
+                    생년월일 정보가 없으면 파티룸 예약이 제한됩니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <label htmlFor="phone" className="mb-1.5 block text-xs font-semibold text-[#6f655d]">

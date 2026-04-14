@@ -6,6 +6,8 @@ import Footer from "@/components/layout/Footer";
 import StickyBookingCTA from "@/components/layout/StickyBookingCTA";
 import Providers from "@/components/layout/Providers";
 import { STUDIO_NAME, STUDIO_DESCRIPTION } from "@/lib/constants";
+import { Suspense } from "react";
+import OAuthCallbackHandler from "@/components/OAuthCallbackHandler";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -48,6 +50,10 @@ export default function RootLayout({
     <html lang="ko" className="scroll-smooth">
       <body className={`${geist.variable} ${cormorant.variable} ${notoSerifKR.variable} bg-[#F7F3EB] font-sans text-[#3B342F] antialiased`}>
         <Providers>
+          {/* OAuth 코드 파라미터 정리 */}
+          <Suspense fallback={null}>
+            <OAuthCallbackHandler />
+          </Suspense>
           <Header />
           <main>{children}</main>
           <Footer />

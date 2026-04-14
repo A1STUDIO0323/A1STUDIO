@@ -6,6 +6,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { formatPhoneNumber } from "@/lib/phone-utils";
+import { 
+  calculatePracticeRoomRefundRate, 
+  calculatePartyRoomRefundRate 
+} from "@/lib/refund-policy";
 import { 
   Wallet, 
   Calendar, 
@@ -67,6 +72,15 @@ export default function MyPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
 
+  // 계정 정보 관련
+  const [profileData, setProfileData] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  // 계정 탈퇴 관련
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
   useEffect(() => {
     const supabase = createClient();
     
@@ -77,9 +91,26 @@ export default function MyPage() {
         setUser(user);
         loadPointsData(user.id);
         loadReservations(user.id);
+        loadProfile(); // 프로필 정보 로드
       }
     });
   }, [router]);
+
+  const loadProfile = async () => {
+    try {
+      const res = await fetch("/api/members/profile");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setProfileData(data.profile);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load profile:", error);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
 
   const loadPointsData = async (userId: string) => {
     const supabase = createClient();
@@ -125,7 +156,11 @@ export default function MyPage() {
 
     // 두 예약을 합쳐서 날짜순 정렬
     const allReservations = [
-      ...(roomReservations || []).map((r: any) => ({ ...r, reservation_type: 'room' })),
+      ...(roomReservations || []).map((r: any) => ({ 
+        ...r, 
+        reservation_type: 'room',
+        points_used: r.total_amount, // total_amount를 points_used로 매핑
+      })),
       ...(partyReservations || []).map((r: any) => ({ 
         ...r, 
         reservation_type: 'party-room',
@@ -193,14 +228,75 @@ export default function MyPage() {
     router.push("/");
   };
 
+  const handleDeleteAccount = async () => {
+    if (isDeleting) return;
+
+    // 확인 텍스트 검증
+    if (deleteConfirmText !== "모든 유의사항을 읽었으며 탈퇴합니다") {
+      alert("정확한 문구를 입력해주세요:\n모든 유의사항을 읽었으며 탈퇴합니다");
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.detail || data.error || "계정 탈퇴에 실패했습니다");
+        setIsDeleting(false);
+        return;
+      }
+
+      // 탈퇴 성공 - 클라이언트 측 로그아웃 처리
+      const supabase = createClient();
+      await supabase.auth.signOut();
+
+      // 성공 메시지 (상세 정보 포함)
+      let message = "회원 탈퇴가 완료되었습니다.\n\n";
+      
+      if (data.deleted) {
+        if (data.deleted.points_forfeited > 0) {
+          message += `• 소멸된 포인트: ${data.deleted.points_forfeited.toLocaleString()}P\n`;
+        }
+        if (data.deleted.cancelled_reservations > 0) {
+          message += `• 취소된 예약: ${data.deleted.cancelled_reservations}건\n`;
+        }
+        message += "\n";
+      }
+      
+      message += "그동안 이용해주셔서 감사합니다.";
+      
+      alert(message);
+      
+      // 메인 페이지로 이동 후 새로고침 (완전한 세션 정리)
+      window.location.href = "/";
+    } catch (error) {
+      console.error("계정 탈퇴 오류:", error);
+      alert("계정 탈퇴 처리 중 오류가 발생했습니다");
+      setIsDeleting(false);
+    }
+  };
+
   const canCancelReservation = (reservation: Reservation): boolean => {
-    if (reservation.status !== "confirmed") return false;
+    // PAID, CONFIRMED, confirmed 상태의 예약만 취소 가능
+    const cancellableStatuses = ["PAID", "CONFIRMED", "confirmed"];
+    if (!cancellableStatuses.includes(reservation.status)) return false;
     
     const reservationDateTime = new Date(`${reservation.date}T${reservation.start_time}`);
     const now = new Date();
-    const hoursUntilReservation = (reservationDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const diffMs = reservationDateTime.getTime() - now.getTime();
     
-    return hoursUntilReservation >= 2;
+    // 연습실: 2일 전까지, 파티룸: 3일 전까지 취소 가능
+    const isPartyRoom = reservation.reservation_type === 'party-room';
+    const daysUntilReservation = diffMs / (1000 * 60 * 60 * 24);
+    const minDays = isPartyRoom ? 3 : 2;
+    
+    return daysUntilReservation >= minDays;
   };
 
   const getTransactionColor = (type: PointTransaction["type"]) => {
@@ -248,6 +344,8 @@ export default function MyPage() {
 
   const getStatusBadge = (status: Reservation["status"]) => {
     switch (status) {
+      case "PAID":
+      case "CONFIRMED":
       case "confirmed":
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
@@ -255,6 +353,7 @@ export default function MyPage() {
             확정
           </span>
         );
+      case "CANCELLED":
       case "cancelled":
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
@@ -421,9 +520,8 @@ export default function MyPage() {
             ) : (
               reservations.map((reservation) => {
                 const isPartyRoom = reservation.reservation_type === 'party-room';
-                const displayAmount = isPartyRoom 
-                  ? (reservation.payment_method === 'points' ? reservation.total_amount : reservation.total_amount)
-                  : reservation.points_used;
+                // 표시할 금액 및 레이블 결정
+                const displayAmount = reservation.total_amount || 0;
                 const displayLabel = isPartyRoom && reservation.payment_method === 'kakaopay' 
                   ? '결제금액' 
                   : '사용 포인트';
@@ -509,19 +607,57 @@ export default function MyPage() {
             <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
               <h2 className="text-xl font-bold text-[#3B342F] mb-4">계정 정보</h2>
               
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-[#9b9189] mb-1">이메일</p>
-                  <p className="text-lg font-semibold text-[#3B342F]">{user.email}</p>
+              {loadingProfile ? (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="animate-pulse h-14 bg-[#EFE7DA] rounded-lg" />
+                  ))}
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-[#9b9189] mb-1">이메일</p>
+                    <p className="text-lg font-semibold text-[#3B342F]">{user.email}</p>
+                  </div>
 
-                <div>
-                  <p className="text-sm text-[#9b9189] mb-1">가입일</p>
-                  <p className="text-lg font-semibold text-[#3B342F]">
-                    {format(new Date(user.created_at), "yyyy년 M월 d일", { locale: ko })}
-                  </p>
+                  <div>
+                    <p className="text-sm text-[#9b9189] mb-1">생년월일</p>
+                    {profileData?.birthDate ? (
+                      <p className="text-lg font-semibold text-[#3B342F]">
+                        {format(new Date(profileData.birthDate), "yyyy년 M월 d일", { locale: ko })}
+                      </p>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="text-[#9b9189]">미입력</p>
+                        <Link
+                          href="/onboarding/profile?next=/mypage"
+                          className="text-sm text-[#B98768] hover:underline"
+                        >
+                          입력하기
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-[#9b9189] mb-1">휴대폰 번호</p>
+                    {user.phone || profileData?.phone ? (
+                      <p className="text-lg font-semibold text-[#3B342F]">
+                        {formatPhoneNumber(user.phone || profileData?.phone) || user.phone || profileData?.phone}
+                      </p>
+                    ) : (
+                      <p className="text-[#9b9189]">미입력</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-[#9b9189] mb-1">가입일</p>
+                    <p className="text-lg font-semibold text-[#3B342F]">
+                      {format(new Date(user.created_at), "yyyy년 M월 d일", { locale: ko })}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <button
@@ -530,6 +666,14 @@ export default function MyPage() {
             >
               <LogOut className="w-5 h-5" />
               로그아웃
+            </button>
+
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-red-200 px-6 py-4 font-semibold text-red-600 transition-all hover:border-red-400 hover:bg-red-50"
+            >
+              <AlertCircle className="w-5 h-5" />
+              계정 탈퇴
             </button>
           </div>
         )}
@@ -561,46 +705,76 @@ export default function MyPage() {
                 {selectedReservation.start_time} ~ {selectedReservation.end_time}
               </p>
 
-              {selectedReservation.reservation_type === 'party-room' && selectedReservation.payment_method === 'kakaopay' && (
-                <>
-                  <p className="text-sm text-[#9b9189] mb-1">결제금액</p>
-                  <p className="font-semibold text-[#3B342F] mb-3">
-                    {selectedReservation.total_amount?.toLocaleString("ko-KR")}원
-                  </p>
-                  
-                  {/* 파티룸 카드 결제 취소 안내 (3/3) */}
-                  {(() => {
-                    const startDateTime = new Date(`${selectedReservation.date}T${selectedReservation.start_time}`);
-                    const now = new Date();
-                    const diffMs = startDateTime.getTime() - now.getTime();
-                    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-                    
-                    if (diffDays >= 7) {
-                      return (
-                        <div className="mb-3 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
-                          전액 환불: 카드로 {selectedReservation.total_amount?.toLocaleString("ko-KR")}원 환불
-                        </div>
-                      );
-                    } else if (diffDays >= 3) {
-                      const halfAmount = Math.floor((selectedReservation.total_amount || 0) * 0.5);
-                      return (
-                        <div className="mb-3 rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-xs text-yellow-800">
-                          ⚠️ 50% 환불 정책: 카드 전액 취소 후 {halfAmount.toLocaleString("ko-KR")}원이 포인트로 적립됩니다.
-                        </div>
-                      );
-                    }
-                  })()}
-                </>
-              )}
+              {/* 환불 정책 안내 */}
+              {(() => {
+                const startDateTime = new Date(`${selectedReservation.date}T${selectedReservation.start_time}`);
+                const isPartyRoom = selectedReservation.reservation_type === 'party-room';
+                const isKakaoPay = selectedReservation.payment_method === 'kakaopay';
+                
+                // 환불율 계산
+                const refundPolicy = isPartyRoom 
+                  ? calculatePartyRoomRefundRate(startDateTime)
+                  : calculatePracticeRoomRefundRate(startDateTime);
+                
+                const originalAmount = selectedReservation.total_amount || 0;
+                const refundAmount = Math.floor(originalAmount * refundPolicy.refundRate);
 
-              {(selectedReservation.reservation_type !== 'party-room' || selectedReservation.payment_method === 'points') && (
-                <>
-                  <p className="text-sm text-[#9b9189] mb-1">환불 포인트</p>
-                  <p className="text-lg font-bold text-[#B98768]">
-                    {(selectedReservation.points_used || selectedReservation.total_amount || 0).toLocaleString("ko-KR")}P
-                  </p>
-                </>
-              )}
+                // 결제 금액 표시
+                if (isPartyRoom && isKakaoPay) {
+                  return (
+                    <>
+                      <p className="text-sm text-[#9b9189] mb-1">결제금액</p>
+                      <p className="font-semibold text-[#3B342F] mb-3">
+                        {originalAmount.toLocaleString("ko-KR")}원
+                      </p>
+                      
+                      {/* 환불 안내 */}
+                      <div className={`mb-3 rounded-lg border p-3 text-sm ${
+                        refundPolicy.refundRate === 1.0 
+                          ? 'bg-green-50 border-green-200 text-green-700'
+                          : refundPolicy.refundRate === 0.5
+                          ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                          : 'bg-red-50 border-red-200 text-red-700'
+                      }`}>
+                        <p className="font-semibold mb-1">{refundPolicy.description}</p>
+                        {refundPolicy.refundRate === 1.0 ? (
+                          <p>카드로 {refundAmount.toLocaleString("ko-KR")}원 환불</p>
+                        ) : refundPolicy.refundRate === 0.5 ? (
+                          <p className="text-xs">⚠️ 카드 전액 취소 후 {refundAmount.toLocaleString("ko-KR")}원이 포인트로 적립됩니다.</p>
+                        ) : (
+                          <p>환불 불가</p>
+                        )}
+                      </div>
+                    </>
+                  );
+                } else {
+                  // 포인트 결제
+                  return (
+                    <>
+                      <p className="text-sm text-[#9b9189] mb-1">환불 포인트</p>
+                      <div className={`rounded-lg border p-3 ${
+                        refundPolicy.refundRate === 1.0 
+                          ? 'bg-green-50 border-green-200'
+                          : refundPolicy.refundRate === 0.5
+                          ? 'bg-yellow-50 border-yellow-200'
+                          : 'bg-red-50 border-red-200'
+                      }`}>
+                        <p className="text-sm font-semibold text-[#3B342F] mb-1">
+                          {refundPolicy.description}
+                        </p>
+                        <p className="text-lg font-bold text-[#B98768]">
+                          {refundAmount.toLocaleString("ko-KR")}P
+                        </p>
+                        {refundPolicy.refundRate < 1.0 && (
+                          <p className="text-xs text-[#9b9189] mt-1">
+                            원금: {originalAmount.toLocaleString("ko-KR")}P
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  );
+                }
+              })()}
             </div>
 
             <div className="flex gap-3">
@@ -616,6 +790,126 @@ export default function MyPage() {
                 className="flex-1 rounded-lg bg-red-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {cancellingId ? "처리 중..." : "예약 취소"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 계정 탈퇴 확인 모달 */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => {
+            if (!isDeleting) {
+              setShowDeleteModal(false);
+              setDeleteConfirmText("");
+            }
+          }}
+        >
+          <div
+            className="max-w-md w-full rounded-2xl border border-red-300 bg-white p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <AlertCircle className="w-6 h-6 text-red-600" />
+              <h3 className="text-xl font-bold text-[#3B342F]">계정 탈퇴</h3>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <p className="text-[#3B342F] font-semibold">
+                정말로 계정을 탈퇴하시겠습니까?
+              </p>
+
+              <div className="rounded-lg bg-red-50 border border-red-200 p-4 space-y-2">
+                <p className="text-sm font-semibold text-red-900">⚠️ 탈퇴 시 유의사항</p>
+                <ul className="text-sm text-red-800 space-y-1.5 list-disc list-inside">
+                  <li>모든 개인정보가 삭제되며 복구할 수 없습니다</li>
+                  <li className={balance > 0 ? 'font-bold text-red-900' : ''}>
+                    <strong>남은 포인트({balance.toLocaleString()}P)는 모두 소멸됩니다</strong>
+                    {balance > 0 && ' ← 환불 불가!'}
+                  </li>
+                  <li className={reservations.filter(r => 
+                    (r.status === "PAID" || r.status === "CONFIRMED") && 
+                    new Date(r.date) >= new Date()
+                  ).length > 0 ? 'font-bold text-orange-900' : ''}>
+                    활성화된 예약({reservations.filter(r => 
+                      (r.status === "PAID" || r.status === "CONFIRMED") && 
+                      new Date(r.date) >= new Date()
+                    ).length}건)은 자동으로 취소됩니다
+                  </li>
+                  <li>예약 내역은 비식별화되어 보관됩니다</li>
+                  <li>동일한 계정으로 재가입할 수 없습니다</li>
+                </ul>
+              </div>
+
+              <div className="rounded-lg bg-[#F7F3EB] p-4">
+                <p className="text-sm text-[#6f655d] mb-2">현재 상태</p>
+                <div className="space-y-1 text-sm">
+                  <p className="text-[#3B342F]">
+                    <span className="text-[#9b9189]">포인트:</span>{" "}
+                    <span className={`font-semibold ${balance > 0 ? 'text-red-600' : ''}`}>
+                      {balance.toLocaleString()}P
+                      {balance > 0 && ' (소멸 예정)'}
+                    </span>
+                  </p>
+                  <p className="text-[#3B342F]">
+                    <span className="text-[#9b9189]">활성 예약:</span>{" "}
+                    <span className={`font-semibold ${
+                      reservations.filter(r => 
+                        (r.status === "PAID" || r.status === "CONFIRMED") && 
+                        new Date(r.date) >= new Date()
+                      ).length > 0 ? 'text-orange-600' : ''
+                    }`}>
+                      {reservations.filter(r => 
+                        (r.status === "PAID" || r.status === "CONFIRMED") && 
+                        new Date(r.date) >= new Date()
+                      ).length}건
+                      {reservations.filter(r => 
+                        (r.status === "PAID" || r.status === "CONFIRMED") && 
+                        new Date(r.date) >= new Date()
+                      ).length > 0 && ' (자동 취소 예정)'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-[#9b9189]">
+                아래에 정확히 입력하여 탈퇴를 확인해주세요:
+              </p>
+              
+              <div className="rounded-lg bg-white border-2 border-[#D8CCBC] p-4">
+                <p className="text-sm font-mono text-center text-[#3B342F] mb-3">
+                  "모든 유의사항을 읽었으며 탈퇴합니다"
+                </p>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="위 문구를 정확히 입력해주세요"
+                  disabled={isDeleting}
+                  className="w-full px-4 py-3 rounded-lg border-2 border-[#D8CCBC] focus:border-red-400 focus:outline-none text-center disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmText("");
+                }}
+                disabled={isDeleting}
+                className="flex-1 rounded-lg border border-[#D8CCBC] px-4 py-3 font-semibold text-[#3B342F] transition-colors hover:bg-[#F7F3EB] disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting || deleteConfirmText !== "모든 유의사항을 읽었으며 탈퇴합니다"}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? "처리 중..." : "계정 탈퇴"}
               </button>
             </div>
           </div>

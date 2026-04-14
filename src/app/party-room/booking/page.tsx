@@ -123,6 +123,12 @@ function PartyRoomBookingContent() {
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const today = startOfToday();
   const maxDate = addDays(today, 60);
+  
+  // 첫 날의 요일 (0: 일요일 ~ 6: 토요일)
+  const firstDayOfWeek = monthStart.getDay();
+  
+  // 빈 칸 배열 생성 (첫 날 이전)
+  const emptyDays = Array(firstDayOfWeek).fill(null);
 
   // 날짜가 예약 불가능한지 확인
   const isDateUnavailable = (date: Date): boolean => {
@@ -219,7 +225,29 @@ function PartyRoomBookingContent() {
 
   const totalAmount = priceInfo ? (priceInfo.isEvent ? priceInfo.eventPrice : priceInfo.originalPrice) : 0;
   const canProceedToStep2 = selectedPackage !== null;
-  const canProceedToStep3 = selectedDate !== null && priceInfo !== null;
+  
+  // 선택한 날짜와 패키지가 유효한지 체크 (과거 시간 체크)
+  const isValidDateTime = () => {
+    if (!selectedDate || !selectedPackage) return true;
+    
+    const now = new Date();
+    const isToday = format(selectedDate, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
+    
+    if (isToday) {
+      const currentHour = now.getHours();
+      const packageInfo = PARTY_ROOM_PACKAGES[selectedPackage];
+      const startHour = parseInt(packageInfo.start.split(':')[0]);
+      
+      // 오늘 날짜인데 패키지 시작 시간이 이미 지났으면 false
+      if (currentHour >= startHour) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
+  
+  const canProceedToStep3 = selectedDate !== null && priceInfo !== null && isValidDateTime();
   const canProceedToStep4 = policyConfirmed && adultConfirmed;
 
   return (
@@ -393,6 +421,11 @@ function PartyRoomBookingContent() {
                   {day}
                 </div>
               ))}
+              {/* 첫 날 이전 빈 칸 */}
+              {emptyDays.map((_, index) => (
+                <div key={`empty-${index}`} className="aspect-square" />
+              ))}
+              {/* 실제 날짜 */}
               {days.map((day) => {
                 const isDisabled = isBefore(day, today) || day > maxDate || isDateUnavailable(day);
                 const isSelected = selectedDate && format(day, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd");
@@ -446,6 +479,21 @@ function PartyRoomBookingContent() {
                   <Users className="w-3 h-3" />
                   최대 10인 이용 가능 (추가 요금 없음)
                 </p>
+              </div>
+            )}
+
+            {/* 과거 시간 경고 */}
+            {selectedDate && selectedPackage && !isValidDateTime() && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-4 mb-6 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-700 mb-1">
+                    예약 불가능한 시간입니다
+                  </p>
+                  <p className="text-sm text-red-600">
+                    선택한 패키지의 시작 시간이 이미 지났습니다. 다른 날짜를 선택해주세요.
+                  </p>
+                </div>
               </div>
             )}
 

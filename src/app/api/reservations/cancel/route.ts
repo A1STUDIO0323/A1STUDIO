@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { calculatePracticeRoomRefundRate, canCancelReservation } from "@/lib/refund-policy";
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,34 +32,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "예약을 찾을 수 없습니다" }, { status: 404 });
     }
 
-    if (reservation.status !== "confirmed") {
+    // PAID, CONFIRMED, confirmed 상태만 취소 가능
+    const cancellableStatuses = ["PAID", "CONFIRMED", "confirmed"];
+    if (!cancellableStatuses.includes(reservation.status)) {
       return NextResponse.json({ error: "취소할 수 없는 예약입니다" }, { status: 400 });
     }
 
-    // 예약 시작 2시간 전까지만 취소 가능
+    // 취소 가능 시간 확인 (연습실: 2시간 전까지)
     const reservationDateTime = new Date(`${reservation.date}T${reservation.start_time}`);
-    const now = new Date();
-    const hoursUntilReservation = (reservationDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    if (hoursUntilReservation < 2) {
+    const cancelCheck = canCancelReservation(reservationDateTime, 'practice');
+    
+    if (!cancelCheck.canCancel) {
       return NextResponse.json(
-        { error: "예약 시작 2시간 전까지만 취소 가능합니다" },
+        { error: cancelCheck.message },
         { status: 400 }
       );
     }
 
-    // 예약 취소 처리
+    // 환불율 계산
+    const { refundRate, description } = calculatePracticeRoomRefundRate(reservationDateTime);
+    const originalAmount = reservation.total_amount || 0;
+    const refundAmount = Math.floor(originalAmount * refundRate);
+    
+    console.log('[예약취소] 예약 정보:', { 
+      id: reservation.id, 
+      status: reservation.status,
+      originalAmount,
+      refundRate,
+      refundAmount,
+      description
+    });
+    
     const { error: updateError } = await supabase
       .from("reservations")
       .update({
-        status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-        refund_points: reservation.points_used,
+        status: "CANCELLED",
       })
       .eq("id", reservation_id);
 
     if (updateError) {
-      throw new Error("예약 취소 처리 실패");
+      console.error('[예약취소] 상태 업데이트 실패:', updateError);
+      throw new Error(`예약 취소 처리 실패: ${updateError.message}`);
     }
 
     // 포인트 환불 처리
@@ -73,8 +87,8 @@ export async function POST(request: NextRequest) {
       throw new Error("포인트 조회 실패");
     }
 
-    const newBalance = (userPoints?.balance || 0) + reservation.points_used;
-    const newTotalUsed = Math.max(0, (userPoints?.total_used || 0) - reservation.points_used);
+    const newBalance = (userPoints?.balance || 0) + refundAmount;
+    const newTotalUsed = Math.max(0, (userPoints?.total_used || 0) - refundAmount);
 
     // 2. user_points 업데이트
     const { error: balanceUpdateError } = await supabase
@@ -96,7 +110,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         type: "refund",
-        amount: reservation.points_used,
+        amount: refundAmount,
         balance_after: newBalance,
         description: `${reservation.date} ${reservation.start_time}~${reservation.end_time} 예약 취소 환불`,
         reservation_id: reservation_id,
@@ -108,7 +122,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       message: "예약이 취소되었습니다",
-      refund_points: reservation.points_used,
+      refund_policy: description,
+      original_amount: originalAmount,
+      refund_rate: refundRate,
+      refund_points: refundAmount,
       balance_after: newBalance,
     });
   } catch (error) {
