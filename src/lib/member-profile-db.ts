@@ -161,9 +161,9 @@ export async function getMemberProfileByEmail(email: string): Promise<MemberProf
     universityStatus: normalizeSchoolStatus(row?.university_status),
     graduateSchool: row?.graduate_school ?? null,
     graduateSchoolStatus: normalizeSchoolStatus(row?.graduate_school_status),
-    // 휴대폰은 Supabase Auth(phone_confirmed_at)로 검증하므로,
-    // 온보딩 필수 여부는 birthDate 입력 여부로 판단합니다.
-    isComplete: Boolean(birthDate),
+    // 휴대폰은 Supabase Auth(phone_confirmed_at)로 검증되므로,
+    // 전화번호가 있으면 프로필 완료로 처리 (생년월일은 선택사항)
+    isComplete: Boolean(phone),
   };
 }
 

@@ -10,16 +10,16 @@ import { createClient } from "@/lib/supabase/server";
 const schoolStatusSchema = z.enum(["ENROLLED", "GRADUATED"]);
 
 const updateSchema = z.object({
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  phone: z.string().min(8).optional(),
-  middleSchool: z.string().trim().max(100).optional(),
-  middleSchoolStatus: schoolStatusSchema.optional(),
-  highSchool: z.string().trim().max(100).optional(),
-  highSchoolStatus: schoolStatusSchema.optional(),
-  university: z.string().trim().max(100).optional(),
-  universityStatus: schoolStatusSchema.optional(),
-  graduateSchool: z.string().trim().max(100).optional(),
-  graduateSchoolStatus: schoolStatusSchema.optional(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  phone: z.string().min(8).optional().nullable(),
+  middleSchool: z.string().trim().max(100).optional().nullable(),
+  middleSchoolStatus: schoolStatusSchema.optional().nullable(),
+  highSchool: z.string().trim().max(100).optional().nullable(),
+  highSchoolStatus: schoolStatusSchema.optional().nullable(),
+  university: z.string().trim().max(100).optional().nullable(),
+  universityStatus: schoolStatusSchema.optional().nullable(),
+  graduateSchool: z.string().trim().max(100).optional().nullable(),
+  graduateSchoolStatus: schoolStatusSchema.optional().nullable(),
 });
 
 function isDbConnectionError(error: unknown) {
@@ -87,6 +87,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    
+    // 디버깅: 받은 데이터 로깅
+    console.log('[POST /api/members/profile] 받은 데이터:', {
+      birthDate: body.birthDate,
+      phone: body.phone,
+    });
+    
     const data = updateSchema.parse(body);
     
     // 전화번호 82 → 0 변환
@@ -118,6 +125,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, profile });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error('[POST /api/members/profile] Zod 유효성 검사 실패:', error.errors);
       return NextResponse.json(
         { success: false, error: "입력값이 올바르지 않습니다" },
         { status: 400 }
