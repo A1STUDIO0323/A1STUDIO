@@ -44,7 +44,7 @@ interface Reservation {
   end_time: string;
   duration_hours?: number;
   points_used: number;
-  status: "confirmed" | "cancelled" | "completed";
+  status: "HOLD" | "PAID" | "CANCELLED" | "EXPIRED" | "REFUNDED" | "CONFIRMED" | "confirmed" | "cancelled" | "completed";
   created_at: string;
   reservation_type?: string;
   package_type?: string;
