@@ -22,6 +22,8 @@ export const STUDIO_AMENITIES = [
   "삼각대",
   "촬영용 조명",
   "전자피아노",
+  "보면대",
+  "무선마이크",
   "요가매트",
   "폼롤러",
 ];
@@ -37,6 +39,7 @@ export const NAV_LINKS = [
     ],
   },
   { label: "연습실 소개", href: "/spaces" },
+  { label: "파티룸", href: "/party-room", isNew: true },
   {
     label: "원데이클래스",
     href: "/one-day-class",

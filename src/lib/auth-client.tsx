@@ -13,6 +13,7 @@ type AuthUser = {
   provider?: string | null;
   phone?: string | null;
   phoneConfirmedAt?: string | null;
+  birthdate?: string | null;
 };
 
 type AuthSession = {
@@ -57,6 +58,7 @@ function mapSession(session: Session | null): AuthSession | null {
           : null,
       phone: user.phone ?? null,
       phoneConfirmedAt: user.phone_confirmed_at ?? null,
+      birthdate: typeof meta.birthdate === "string" ? meta.birthdate : null,
     },
   };
 }
@@ -66,7 +68,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
 
   useEffect(() => {
-    const supabase = createSupabaseClient();
+    // remember me 설정 확인 (기본값: true)
+    const rememberMe = localStorage.getItem('rememberMe') !== 'false';
+    const supabase = createSupabaseClient(rememberMe);
     let active = true;
 
     void (async () => {
@@ -104,7 +108,10 @@ export function useSession() {
 }
 
 export async function getAccessToken() {
-  const supabase = createSupabaseClient();
+  const rememberMe = typeof window !== 'undefined' 
+    ? localStorage.getItem('rememberMe') !== 'false' 
+    : true;
+  const supabase = createSupabaseClient(rememberMe);
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
 }
@@ -123,13 +130,18 @@ export async function signIn(
     return { ok: true };
   }
 
-  const supabase = createSupabaseClient();
+  // remember me 설정에 따라 적절한 storage 사용
+  const rememberMe = typeof window !== 'undefined' 
+    ? localStorage.getItem('rememberMe') !== 'false' 
+    : true;
+  const supabase = createSupabaseClient(rememberMe);
   const raw =
     options?.callbackUrl ??
     (typeof window !== "undefined" ? window.location.pathname : "/");
   const next = sanitizePostAuthRedirect(raw);
   if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
     console.log("[signIn OAuth] post-callback path (sanitized)", next);
+    console.log("[signIn OAuth] remember me:", rememberMe);
   }
   const redirectTo =
     typeof window !== "undefined"
@@ -145,10 +157,34 @@ export async function signIn(
 }
 
 export async function signOut(options?: { callbackUrl?: string }) {
-  const supabase = createSupabaseClient();
+  const rememberMe = typeof window !== 'undefined' 
+    ? localStorage.getItem('rememberMe') !== 'false' 
+    : true;
+  const supabase = createSupabaseClient(rememberMe);
   await supabase.auth.signOut();
   if (typeof window !== "undefined") {
     window.location.href = options?.callbackUrl ?? "/";
   }
   return { ok: true };
+}
+
+/**
+ * 현재 로그인 유저의 성인 여부 반환
+ * @returns true: 만 19세 이상 / false: 미성년 / null: 생년월일 정보 없음
+ */
+export function useIsAdult(): boolean | null {
+  const { data: session } = useSession();
+  const user = session?.user;
+  
+  if (!user?.birthdate) return null;
+  
+  // isAdult 함수 사용
+  const birth = new Date(user.birthdate);
+  const today = new Date();
+  const age = today.getFullYear() - birth.getFullYear();
+  const isBirthdayPassed =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  
+  return age - (isBirthdayPassed ? 0 : 1) >= 19;
 }

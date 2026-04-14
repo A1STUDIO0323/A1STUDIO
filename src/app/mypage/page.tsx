@@ -37,10 +37,17 @@ interface Reservation {
   date: string;
   start_time: string;
   end_time: string;
-  duration_hours: number;
+  duration_hours?: number;
   points_used: number;
   status: "confirmed" | "cancelled" | "completed";
   created_at: string;
+  reservation_type?: string;
+  package_type?: string;
+  // 파티룸 전용 필드
+  total_amount?: number;
+  payment_method?: string;
+  price_type?: string;
+  end_date?: string;
 }
 
 export default function MyPage() {
@@ -101,14 +108,36 @@ export default function MyPage() {
   const loadReservations = async (userId: string) => {
     const supabase = createClient();
     
-    const { data } = await supabase
+    // 연습실 예약
+    const { data: roomReservations } = await supabase
       .from("reservations")
       .select("*")
       .eq("user_id", userId)
       .order("date", { ascending: false })
       .order("start_time", { ascending: false });
+
+    // 파티룸 예약
+    const { data: partyReservations } = await supabase
+      .from("party_reservations")
+      .select("*")
+      .eq("user_id", userId)
+      .order("date", { ascending: false });
+
+    // 두 예약을 합쳐서 날짜순 정렬
+    const allReservations = [
+      ...(roomReservations || []).map((r: any) => ({ ...r, reservation_type: 'room' })),
+      ...(partyReservations || []).map((r: any) => ({ 
+        ...r, 
+        reservation_type: 'party-room',
+        points_used: r.payment_method === 'points' ? r.total_amount : 0,
+      })),
+    ].sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateB.getTime() - dateA.getTime();
+    });
     
-    setReservations(data || []);
+    setReservations(allReservations);
     setLoadingReservations(false);
   };
 
@@ -118,7 +147,13 @@ export default function MyPage() {
     setCancellingId(selectedReservation.id);
 
     try {
-      const response = await fetch("/api/reservations/cancel", {
+      // 파티룸 예약인지 연습실 예약인지 확인
+      const isPartyRoom = selectedReservation.reservation_type === 'party-room';
+      const apiUrl = isPartyRoom 
+        ? "/api/party-room/reservations/cancel" 
+        : "/api/reservations/cancel";
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reservation_id: selectedReservation.id }),
@@ -130,7 +165,13 @@ export default function MyPage() {
         throw new Error(data.error || "취소에 실패했습니다");
       }
 
-      alert("예약이 취소되었습니다");
+      // 파티룸이고 50% 환불인 경우 추가 안내
+      if (isPartyRoom && data.refund_rate === 0.5 && data.payment_method === 'kakaopay') {
+        alert(`예약이 취소되었습니다.\n\n카드 전액 취소 후 ${data.refund_points.toLocaleString("ko-KR")}P가 포인트로 적립되었습니다.\n포인트는 마이페이지에서 확인하실 수 있습니다.`);
+      } else {
+        alert("예약이 취소되었습니다");
+      }
+      
       setShowCancelModal(false);
       setSelectedReservation(null);
       
@@ -378,50 +419,86 @@ export default function MyPage() {
                 </Link>
               </div>
             ) : (
-              reservations.map((reservation) => (
-                <div
-                  key={reservation.id}
-                  className="rounded-2xl border border-[#D8CCBC] bg-white p-6"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-xl font-bold text-[#3B342F]">
-                          {format(new Date(reservation.date), "yyyy년 M월 d일 (eee)", { locale: ko })}
-                        </h3>
-                        {getStatusBadge(reservation.status)}
-                      </div>
-                      <div className="flex items-center gap-2 text-[#6f655d]">
-                        <Clock className="w-4 h-4" />
-                        <span>
-                          {reservation.start_time} ~ {reservation.end_time} ({reservation.duration_hours}시간)
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-[#9b9189] mb-1">사용 포인트</p>
-                      <p className="text-2xl font-bold text-[#B98768]">
-                        {reservation.points_used.toLocaleString("ko-KR")}P
-                      </p>
-                    </div>
-                  </div>
+              reservations.map((reservation) => {
+                const isPartyRoom = reservation.reservation_type === 'party-room';
+                const displayAmount = isPartyRoom 
+                  ? (reservation.payment_method === 'points' ? reservation.total_amount : reservation.total_amount)
+                  : reservation.points_used;
+                const displayLabel = isPartyRoom && reservation.payment_method === 'kakaopay' 
+                  ? '결제금액' 
+                  : '사용 포인트';
+                const displayUnit = isPartyRoom && reservation.payment_method === 'kakaopay' ? '원' : 'P';
 
-                  {canCancelReservation(reservation) && (
-                    <div className="pt-4 border-t border-[#D8CCBC]">
-                      <button
-                        onClick={() => {
-                          setSelectedReservation(reservation);
-                          setShowCancelModal(true);
-                        }}
-                        disabled={cancellingId === reservation.id}
-                        className="w-full rounded-lg border border-red-300 px-4 py-2 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {cancellingId === reservation.id ? "취소 중..." : "예약 취소"}
-                      </button>
+                return (
+                  <div
+                    key={reservation.id}
+                    className="rounded-2xl border border-[#D8CCBC] bg-white p-6"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <h3 className="text-xl font-bold text-[#3B342F]">
+                            {format(new Date(reservation.date), "yyyy년 M월 d일 (eee)", { locale: ko })}
+                          </h3>
+                          {getStatusBadge(reservation.status)}
+                          {/* 예약 타입 배지 */}
+                          {isPartyRoom ? (
+                            <span className="rounded-full bg-[#B98768] px-3 py-1 text-xs font-semibold text-white">
+                              파티룸
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-[#EFE7DA] px-3 py-1 text-xs font-semibold text-[#3B342F]">
+                              연습실
+                            </span>
+                          )}
+                          {/* 패키지 타입 배지 */}
+                          {reservation.package_type && (
+                            <span className="rounded-full bg-[#f5ede6] border border-[#B98768]/30 px-3 py-1 text-xs font-semibold text-[#B98768]">
+                              {reservation.package_type === 'day' && '낮 패키지'}
+                              {reservation.package_type === 'night' && '야간 패키지'}
+                              {reservation.package_type === 'allday' && '종일권'}
+                            </span>
+                          )}
+                          {/* 결제수단 배지 (파티룸만) */}
+                          {isPartyRoom && reservation.payment_method === 'kakaopay' && (
+                            <span className="rounded-full bg-[#FEE500] px-3 py-1 text-xs font-semibold text-[#3B342F]">
+                              카카오페이
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-[#6f655d]">
+                          <Clock className="w-4 h-4" />
+                          <span>
+                            {reservation.start_time} ~ {reservation.end_time}
+                            {reservation.duration_hours && ` (${reservation.duration_hours}시간)`}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-[#9b9189] mb-1">{displayLabel}</p>
+                        <p className="text-2xl font-bold text-[#B98768]">
+                          {(displayAmount || 0).toLocaleString("ko-KR")}{displayUnit}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))
+
+                    {canCancelReservation(reservation) && (
+                      <div className="pt-4 border-t border-[#D8CCBC]">
+                        <button
+                          onClick={() => {
+                            setSelectedReservation(reservation);
+                            setShowCancelModal(true);
+                          }}
+                          disabled={cancellingId === reservation.id}
+                          className="w-full rounded-lg border border-red-300 px-4 py-2 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {cancellingId === reservation.id ? "취소 중..." : "예약 취소"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         )}
@@ -458,7 +535,7 @@ export default function MyPage() {
         )}
       </div>
 
-      {/* 취소 확인 모달 */}
+      {/* 취소 확인 모달 (2/3: 카드 50% 환불 안내) */}
       {showCancelModal && selectedReservation && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -483,10 +560,47 @@ export default function MyPage() {
                 {format(new Date(selectedReservation.date), "yyyy년 M월 d일 (eee)", { locale: ko })}<br />
                 {selectedReservation.start_time} ~ {selectedReservation.end_time}
               </p>
-              <p className="text-sm text-[#9b9189] mb-1">환불 포인트</p>
-              <p className="text-lg font-bold text-[#B98768]">
-                {selectedReservation.points_used.toLocaleString("ko-KR")}P
-              </p>
+
+              {selectedReservation.reservation_type === 'party-room' && selectedReservation.payment_method === 'kakaopay' && (
+                <>
+                  <p className="text-sm text-[#9b9189] mb-1">결제금액</p>
+                  <p className="font-semibold text-[#3B342F] mb-3">
+                    {selectedReservation.total_amount?.toLocaleString("ko-KR")}원
+                  </p>
+                  
+                  {/* 파티룸 카드 결제 취소 안내 (3/3) */}
+                  {(() => {
+                    const startDateTime = new Date(`${selectedReservation.date}T${selectedReservation.start_time}`);
+                    const now = new Date();
+                    const diffMs = startDateTime.getTime() - now.getTime();
+                    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+                    
+                    if (diffDays >= 7) {
+                      return (
+                        <div className="mb-3 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                          전액 환불: 카드로 {selectedReservation.total_amount?.toLocaleString("ko-KR")}원 환불
+                        </div>
+                      );
+                    } else if (diffDays >= 3) {
+                      const halfAmount = Math.floor((selectedReservation.total_amount || 0) * 0.5);
+                      return (
+                        <div className="mb-3 rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-xs text-yellow-800">
+                          ⚠️ 50% 환불 정책: 카드 전액 취소 후 {halfAmount.toLocaleString("ko-KR")}원이 포인트로 적립됩니다.
+                        </div>
+                      );
+                    }
+                  })()}
+                </>
+              )}
+
+              {(selectedReservation.reservation_type !== 'party-room' || selectedReservation.payment_method === 'points') && (
+                <>
+                  <p className="text-sm text-[#9b9189] mb-1">환불 포인트</p>
+                  <p className="text-lg font-bold text-[#B98768]">
+                    {(selectedReservation.points_used || selectedReservation.total_amount || 0).toLocaleString("ko-KR")}P
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="flex gap-3">

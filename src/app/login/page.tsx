@@ -2,7 +2,7 @@
 
 import { signIn, useSession } from "@/lib/auth-client";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { STUDIO_NAME } from "@/lib/constants";
 import { AlertCircle } from "lucide-react";
 import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
@@ -28,6 +28,31 @@ function LoginContent() {
   const error = searchParams.get("error");
   const onboardingPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
   const onboardingCallbackUrl = `${onboardingPath}?next=${encodeURIComponent(safeCallback)}`;
+
+  // 로그인 상태 유지 체크박스
+  const [rememberMe, setRememberMe] = useState(true); // 기본값: 체크됨
+
+  // 컴포넌트 마운트 시 저장된 설정 불러오기
+  useEffect(() => {
+    const saved = localStorage.getItem('rememberMe');
+    if (saved !== null) {
+      setRememberMe(saved === 'true');
+    }
+  }, []);
+
+  // remember me 설정 저장
+  const handleRememberMeChange = (checked: boolean) => {
+    setRememberMe(checked);
+    localStorage.setItem('rememberMe', String(checked));
+  };
+
+  // OAuth 로그인 핸들러
+  const handleOAuthLogin = async (provider: "google" | "kakao") => {
+    // remember me 설정 저장
+    localStorage.setItem('rememberMe', String(rememberMe));
+    
+    await signIn(provider, { callbackUrl: onboardingCallbackUrl });
+  };
 
   // 이미 로그인된 경우: 루프 방지를 위해 callbackUrl 정리 후 휴대폰/프로필 여부에 따라 분기
   useEffect(() => {
@@ -98,7 +123,7 @@ function LoginContent() {
           {/* 구글 로그인 */}
           {GOOGLE_CONFIGURED ? (
             <button
-              onClick={() => signIn("google", { callbackUrl: onboardingCallbackUrl })}
+              onClick={() => handleOAuthLogin("google")}
               className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-sm font-semibold text-[#3B342F] transition-all hover:bg-[#EFE7DA] active:scale-95"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -124,7 +149,7 @@ function LoginContent() {
           {/* 카카오 로그인 */}
           {KAKAO_CONFIGURED ? (
             <button
-              onClick={() => signIn("kakao", { callbackUrl: onboardingCallbackUrl })}
+              onClick={() => handleOAuthLogin("kakao")}
               className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#3B342F] transition-all hover:bg-[#F5DC00] active:scale-95"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" fill="currentColor">
@@ -140,6 +165,26 @@ function LoginContent() {
               카카오 로그인 (준비 중)
             </div>
           )}
+        </div>
+
+        {/* 로그인 상태 유지 체크박스 */}
+        <div className="mt-5">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => handleRememberMeChange(e.target.checked)}
+              className="w-4 h-4 rounded border-[#D8CCBC] text-[#B98768] focus:ring-[#B98768] focus:ring-offset-0"
+            />
+            <span className="text-sm text-[#6f655d]">
+              로그인 상태 유지
+            </span>
+          </label>
+          <p className="mt-1 ml-6 text-xs text-[#9b9189]">
+            {rememberMe 
+              ? "브라우저를 닫아도 로그인 상태가 유지됩니다." 
+              : "브라우저를 닫으면 자동으로 로그아웃됩니다."}
+          </p>
         </div>
 
         {/* 건너뛰기 */}

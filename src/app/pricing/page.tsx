@@ -1,40 +1,70 @@
 import { Metadata } from "next";
-import { Info } from "lucide-react";
+import { Info, Sparkles } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { REFUND_POLICY } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "요금안내" };
 
-const PRICING_TABLE = [
+// 연습실 시간당 요금
+const ROOM_PRICING_TABLE = [
   {
-    category: "평일 주간",
-    desc: "월~금 09:00 – 18:00",
-    pricePerHour: 15000,
-    minHours: 2,
+    category: "평일 비피크",
+    desc: "월~금 00:00~18:00",
+    priceOriginal: 9000,
+    priceEvent: 7000,
+    minHours: 1,
     highlight: false,
   },
   {
-    category: "평일 야간",
-    desc: "월~금 18:00 – 24:00",
-    pricePerHour: 20000,
-    minHours: 2,
+    category: "평일 피크타임",
+    desc: "월~금 18:00~00:00",
+    priceOriginal: 11000,
+    priceEvent: 9000,
+    minHours: 1,
     highlight: false,
   },
   {
-    category: "주말 종일",
-    desc: "토·일 09:00 – 24:00",
-    pricePerHour: 20000,
-    minHours: 2,
+    category: "주말/공휴일 비피크",
+    desc: "토·일·공휴일 00:00~13:00",
+    priceOriginal: 10000,
+    priceEvent: 8000,
+    minHours: 1,
     highlight: true,
+  },
+  {
+    category: "주말/공휴일 피크타임",
+    desc: "토·일·공휴일 13:00~00:00",
+    priceOriginal: 12000,
+    priceEvent: 10000,
+    minHours: 1,
+    highlight: false,
   },
 ];
 
-// 시간 패키지 임시 보관 (미구현)
-// const PACKAGES = [
-//   { name: "패키지 10H", hours: 10, price: 130000, perHour: 13000, validMonths: 3 },
-//   { name: "패키지 20H", hours: 20, price: 240000, perHour: 12000, validMonths: 3 },
-//   { name: "패키지 30H", hours: 30, price: 330000, perHour: 11000, validMonths: 6 },
-// ];
+// 파티룸 패키지 요금
+const PARTY_ROOM_PACKAGES = [
+  {
+    name: "낮 패키지",
+    time: "10:00 ~ 17:00",
+    hours: 7,
+    priceOffPeak: { regular: 100000, event: 70000 },
+    pricePeak: { regular: 130000, event: 90000 },
+  },
+  {
+    name: "야간 패키지",
+    time: "19:00 ~ 익일 07:00",
+    hours: 12,
+    priceOffPeak: { regular: 140000, event: 100000 },
+    pricePeak: { regular: 160000, event: 120000 },
+  },
+  {
+    name: "종일권",
+    time: "10:00 ~ 익일 07:00",
+    hours: 21,
+    priceOffPeak: { regular: 210000, event: 150000 },
+    pricePeak: { regular: 250000, event: 180000 },
+  },
+];
 
 const ROOM_SIZE_PYEONG = 15;
 const PYEONG_PER_PERSON = 2.5;
@@ -55,70 +85,124 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* 기본 요금표 */}
-        <div className="overflow-hidden rounded-2xl border border-[#D8CCBC]">
-          <table className="w-full text-sm">
-            <thead className="border-b border-[#D8CCBC] bg-[#EFE7DA]">
-              <tr>
-                <th className="px-6 py-4 text-left font-semibold text-[#3B342F]">구분</th>
-                <th className="px-6 py-4 text-left font-semibold text-[#3B342F]">시간대</th>
-                <th className="px-6 py-4 text-right font-semibold text-[#3B342F]">시간당</th>
-                <th className="px-6 py-4 text-right font-semibold text-[#3B342F]">최소</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 bg-[#F7F3EB]">
-              {PRICING_TABLE.map((row) => (
-                <tr
-                  key={row.category}
-                  className={row.highlight ? "bg-[#B98768]/8" : ""}
-                >
-                  <td className="px-6 py-4 font-medium text-[#3B342F]">
-                    {row.category}
-                    {row.highlight && (
-                      <span className="ml-2 rounded-full bg-[#B98768]/20 px-2 py-0.5 text-xs text-[#B98768]">
-                        인기
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-[#6f655d]">{row.desc}</td>
-                  <td className="px-6 py-4 text-right font-bold text-[#3B342F]">
-                    {formatPrice(row.pricePerHour)}
-                  </td>
-                  <td className="px-6 py-4 text-right text-[#6f655d]">
-                    {row.minHours}시간
-                  </td>
+        {/* 연습실 요금표 */}
+        <div className="mb-16">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-[#3B342F]">연습실 요금</h2>
+            <p className="mt-1 text-sm text-[#6f655d]">
+              시간 단위로 자유롭게 예약 가능
+            </p>
+          </div>
+          
+          <div className="overflow-hidden rounded-2xl border border-[#D8CCBC]">
+            <table className="w-full text-sm">
+              <thead className="border-b border-[#D8CCBC] bg-[#EFE7DA]">
+                <tr>
+                  <th className="px-6 py-4 text-left font-semibold text-[#3B342F]">구분</th>
+                  <th className="px-6 py-4 text-left font-semibold text-[#3B342F]">시간대</th>
+                  <th className="px-6 py-4 text-right font-semibold text-[#3B342F]">시간당</th>
+                  <th className="px-6 py-4 text-right font-semibold text-[#3B342F]">최소</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/5 bg-[#F7F3EB]">
+                {ROOM_PRICING_TABLE.map((row) => (
+                  <tr
+                    key={row.category}
+                    className={row.highlight ? "bg-[#B98768]/8" : ""}
+                  >
+                    <td className="px-6 py-4 font-medium text-[#3B342F]">
+                      {row.category}
+                      {row.highlight && (
+                        <span className="ml-2 rounded-full bg-[#B98768]/20 px-2 py-0.5 text-xs text-[#B98768]">
+                          인기
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-[#6f655d]">{row.desc}</td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="line-through text-[#9b9189] text-sm">
+                          {formatPrice(row.priceOriginal)}
+                        </span>
+                        <span className="font-bold text-[#B98768]">
+                          {formatPrice(row.priceEvent)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right text-[#6f655d]">
+                      {row.minHours}시간
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* 시간 패키지 임시 숨김 (코드 보관)
-        <h2 className="mt-14 text-2xl font-bold text-[#3B342F]">시간 패키지</h2>
-        <p className="mt-1 text-sm text-[#6f655d]">
-          미리 구매해 두고 기간 내 자유롭게 나눠 사용
-        </p>
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          {PACKAGES.map((pkg) => (
-            <div
-              key={pkg.name}
-              className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-5"
-            >
-              <h3 className="font-bold text-[#3B342F]">{pkg.name}</h3>
-              <p className="mt-1 text-sm text-[#9b9189]">{pkg.validMonths}개월 유효</p>
-              <p className="mt-4 text-3xl font-extrabold text-[#3B342F]">
-                {formatPrice(pkg.price)}
-              </p>
-              <p className="mt-0.5 text-xs text-[#B98768]">
-                {formatPrice(pkg.perHour)}/시간
-              </p>
+        {/* 파티룸 요금표 */}
+        <div className="mb-16">
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-2">
+              <h2 className="text-2xl font-bold text-[#3B342F]">파티룸 요금</h2>
+              <span className="rounded-full bg-[#B98768] px-3 py-1 text-xs font-bold text-white">
+                성인 전용
+              </span>
             </div>
-          ))}
-        </div>
-        */}
+            <p className="text-sm text-[#6f655d]">
+              패키지 단위로 예약 (최대 10인, 추가 인원 요금 없음)
+            </p>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#B98768]/20 px-4 py-2 text-sm font-semibold text-[#B98768]">
+              <Sparkles className="w-4 h-4" />
+              현재 오픈 이벤트 기간 - 특별 할인가 적용 중
+            </div>
+          </div>
 
-        {/* 추가 요금 */}
-        <h2 className="mt-14 text-2xl font-bold text-[#3B342F]">추가 요금</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {PARTY_ROOM_PACKAGES.map((pkg) => (
+              <div key={pkg.name} className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
+                <h3 className="text-xl font-bold text-[#3B342F] mb-2">{pkg.name}</h3>
+                <p className="text-sm text-[#6f655d] mb-1">{pkg.time}</p>
+                <p className="text-xs text-[#9b9189] mb-4">({pkg.hours}시간)</p>
+                
+                <div className="space-y-3">
+                  {/* 비피크 */}
+                  <div className="rounded-lg bg-[#F7F3EB] p-3">
+                    <p className="text-xs text-[#9b9189] mb-1">비피크</p>
+                    <p className="text-sm text-[#9b9189] line-through">
+                      {pkg.priceOffPeak.regular.toLocaleString("ko-KR")}원
+                    </p>
+                    <p className="text-2xl font-bold text-[#B98768]">
+                      {pkg.priceOffPeak.event.toLocaleString("ko-KR")}원
+                    </p>
+                  </div>
+                  
+                  {/* 피크 */}
+                  <div className="rounded-lg bg-[#F7F3EB] p-3">
+                    <p className="text-xs text-[#9b9189] mb-1">피크</p>
+                    <p className="text-sm text-[#9b9189] line-through">
+                      {pkg.pricePeak.regular.toLocaleString("ko-KR")}원
+                    </p>
+                    <p className="text-2xl font-bold text-[#B98768]">
+                      {pkg.pricePeak.event.toLocaleString("ko-KR")}원
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 파티룸 안내사항 */}
+          <div className="mt-6 rounded-xl bg-[#EFE7DA] p-6 text-sm text-[#6f655d] space-y-2">
+            <p>• 낮 패키지와 야간 패키지 사이 17:00~19:00은 청소·환기 시간으로 예약 불가</p>
+            <p>• 최대 10인 기준이며 추가 인원 요금은 없습니다</p>
+            <p>• 만 19세 이상 성인 전용 공간입니다</p>
+            <p>• 10인 기준 1인당: 낮 패키지 7,000원부터 / 야간 패키지 10,000원부터</p>
+            <p>• 피크/비피크 구분은 예약 날짜의 요일에 따라 자동 적용됩니다</p>
+          </div>
+        </div>
+
+        {/* 추가 요금 (연습실만 해당) */}
+        <h2 className="mt-14 text-2xl font-bold text-[#3B342F]">추가 요금 (연습실)</h2>
         <p className="mt-1 text-sm text-[#6f655d]">
           최대 인원은 평수 기준으로 계산되며, 초과 인원은 시간당 추가 요금이 적용됩니다.
         </p>

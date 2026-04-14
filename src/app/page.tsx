@@ -9,7 +9,7 @@ import ReviewsPreview from "@/components/home/ReviewsPreview";
 import LocationSection from "@/components/home/LocationSection";
 import { STUDIO_NAME, STUDIO_DESCRIPTION } from "@/lib/constants";
 import Link from "next/link";
-import { Mic2, Music2, Clapperboard, Star, ScanFace, Camera, Piano, Dumbbell } from "lucide-react";
+import { Mic2, Music2, Clapperboard, Star, ScanFace, Camera, Piano, Dumbbell, BookOpen, Mic } from "lucide-react";
 
 export const metadata: Metadata = {
   title: STUDIO_NAME,
@@ -28,6 +28,8 @@ const AMENITIES = [
   { icon: Camera,   label: "촬영용 조명", desc: "영상·사진 촬영 가능" },
   { icon: Camera,   label: "삼각대",      desc: "스마트폰·카메라 거치" },
   { icon: Piano,    label: "전자피아노",  desc: "보컬·뮤지컬 반주 연습" },
+  { icon: BookOpen, label: "보면대",      desc: "악보·대본 거치" },
+  { icon: Mic,      label: "무선마이크",  desc: "보컬 연습·녹음" },
   { icon: Dumbbell, label: "요가매트",    desc: "몸풀기·스트레칭" },
   { icon: Dumbbell, label: "폼롤러",      desc: "근막이완·근육 회복" },
 ];

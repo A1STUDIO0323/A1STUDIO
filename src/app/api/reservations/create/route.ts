@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getPriceType, calcPoints, calcDuration } from "@/lib/pricing";
+import { 
+  getPriceType, 
+  calcPoints, 
+  calcDuration,
+  calcPartyRoomPoints,
+  PARTY_ROOM_MAX_HEADCOUNT,
+  PartyRoomPackage,
+} from "@/lib/pricing";
+import { isAdult } from "@/lib/age-check";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,13 +22,53 @@ export async function POST(request: NextRequest) {
 
     // 요청 body 파싱
     const body = await request.json();
-    const { date, start_time, end_time } = body;
+    const { 
+      date, 
+      start_time, 
+      end_time,
+      reservation_type = 'room', // 기본값: 연습실
+      package_type, // 파티룸일 때만 사용
+      headcount, // 파티룸일 때 인원 수
+    } = body;
 
     if (!date || !start_time || !end_time) {
       return NextResponse.json(
         { error: "date, start_time, end_time이 필요합니다" },
         { status: 400 }
       );
+    }
+
+    // 파티룸 예약인 경우 추가 검증
+    if (reservation_type === 'party-room') {
+      // 1. 성인 여부 서버사이드 재검증
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('birthdate')
+        .eq('id', user.id)
+        .single();
+
+      // user_metadata에서 birthdate 확인 (onboarding에서 저장됨)
+      const birthdate = userProfile?.birthdate || user.user_metadata?.birthdate;
+      
+      if (!birthdate || !isAdult(birthdate)) {
+        return NextResponse.json({ error: '성인 인증 필요' }, { status: 403 });
+      }
+
+      // 2. 패키지 타입 검증
+      if (!package_type || !['day', 'night', 'allday'].includes(package_type)) {
+        return NextResponse.json({ error: '패키지 선택 필요' }, { status: 400 });
+      }
+
+      // 3. 최대 인원 검증
+      if (headcount && headcount > PARTY_ROOM_MAX_HEADCOUNT) {
+        return NextResponse.json({ error: '최대 10명까지 이용 가능' }, { status: 400 });
+      }
+
+      // 4. 17:00~19:00 시작 시간 차단 (야간 패키지는 19:00부터만)
+      const startHour = parseInt(start_time.split(":")[0]);
+      if (startHour >= 17 && startHour < 19 && package_type !== 'day') {
+        return NextResponse.json({ error: '야간 패키지는 19:00부터 시작 가능합니다' }, { status: 400 });
+      }
     }
 
     // 중복 예약 체크
@@ -42,14 +90,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 요금 계산
-    const reservationDate = new Date(date);
-    const startHour = parseInt(start_time.split(":")[0]);
-    const priceType = getPriceType(reservationDate, startHour);
-    const duration = calcDuration(start_time, end_time);
-    const pricing = calcPoints(priceType, duration, reservationDate);
+    // 요금 계산 (예약 타입에 따라 분기)
+    let pointsToUse: number;
+    let priceType: string;
+    let duration: number;
     
-    const pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+    if (reservation_type === 'party-room' && package_type) {
+      // 파티룸: 패키지 기반 가격 계산
+      const reservationDate = new Date(date);
+      const pricing = calcPartyRoomPoints(reservationDate, package_type as PartyRoomPackage);
+      pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+      priceType = pricing.priceType;
+      duration = 0; // 패키지는 시간이 고정되어 있음
+    } else {
+      // 연습실: 기존 시간당 가격 계산
+      const reservationDate = new Date(date);
+      const startHour = parseInt(start_time.split(":")[0]);
+      priceType = getPriceType(reservationDate, startHour);
+      duration = calcDuration(start_time, end_time);
+      const pricing = calcPoints(priceType as any, duration, reservationDate);
+      pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+    }
 
     // 포인트 잔액 확인 및 차감 (use_points 함수 호출)
     const { data: usePointsResult, error: usePointsError } = await supabase.rpc("use_points", {
@@ -67,18 +128,26 @@ export async function POST(request: NextRequest) {
     }
 
     // 예약 생성
+    const reservationData: any = {
+      user_id: user.id,
+      date,
+      start_time,
+      end_time,
+      duration_hours: duration,
+      price_type: priceType,
+      points_used: pointsToUse,
+      status: "confirmed",
+      reservation_type,
+    };
+
+    // 파티룸일 경우 추가 필드
+    if (reservation_type === 'party-room') {
+      reservationData.package_type = package_type;
+    }
+
     const { data: reservation, error: insertError } = await supabase
       .from("reservations")
-      .insert({
-        user_id: user.id,
-        date,
-        start_time,
-        end_time,
-        duration_hours: duration,
-        price_type: priceType,
-        points_used: pointsToUse,
-        status: "confirmed",
-      })
+      .insert(reservationData)
       .select()
       .single();
 
@@ -86,6 +155,18 @@ export async function POST(request: NextRequest) {
       // 예약 생성 실패 시 포인트 환불 처리 필요
       console.error("예약 생성 실패:", insertError);
       throw new Error("예약 생성에 실패했습니다");
+    }
+
+    // 17:00~19:00 버퍼 슬롯 자동 생성 (낮 패키지 예약 시)
+    if (reservation_type === 'party-room' && package_type === 'day') {
+      await supabase
+        .from("blocked_slots")
+        .insert({
+          date,
+          start_time: '17:00',
+          end_time: '19:00',
+          reason: '청소 및 환기 시간',
+        });
     }
 
     // 생성된 예약 ID를 거래 내역에 업데이트

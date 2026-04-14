@@ -46,7 +46,7 @@ export default function ClassRequestsPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [form, setForm] = useState({
     genre: "",
-    preferredTime: "",
+    preferredTime: [] as string[],
     preferredDays: [] as string[],
     dateFrom: "",
     dateTo: "",
@@ -67,6 +67,15 @@ export default function ClassRequestsPage() {
     }));
   };
 
+  const toggleTime = (slot: string) => {
+    setForm((prev) => ({
+      ...prev,
+      preferredTime: prev.preferredTime.includes(slot)
+        ? prev.preferredTime.filter((t) => t !== slot)
+        : [...prev.preferredTime, slot],
+    }));
+  };
+
   const toYYMMDD = (iso: string) => iso.replace(/-/g, "").slice(2);
 
   const preferredDatesFormatted = () => {
@@ -78,7 +87,7 @@ export default function ClassRequestsPage() {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.genre.trim()) e.genre = "원하는 장르를 입력해주세요.";
-    if (!form.preferredTime) e.preferredTime = "원하는 시간대를 선택해주세요.";
+    if (form.preferredTime.length === 0) e.preferredTime = "원하는 시간대를 선택해주세요.";
     if (form.preferredDays.length === 0 && !form.dateFrom) {
       e.preferredDays = "원하는 요일 또는 날짜를 입력해주세요.";
     }
@@ -102,13 +111,13 @@ export default function ClassRequestsPage() {
       userName: session?.user?.name ?? "알 수 없음",
       userEmail: session?.user?.email ?? "",
       genre: form.genre.trim(),
-      preferredTime: form.preferredTime,
+      preferredTime: form.preferredTime.join(", "),
       preferredDays: form.preferredDays,
       preferredDates: preferredDatesFormatted(),
       message: form.message.trim(),
     });
 
-    setForm({ genre: "", preferredTime: "", preferredDays: [], dateFrom: "", dateTo: "", message: "" });
+    setForm({ genre: "", preferredTime: [], preferredDays: [], dateFrom: "", dateTo: "", message: "" });
     setShowSuccess(true);
   };
 
@@ -190,17 +199,17 @@ export default function ClassRequestsPage() {
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold text-[#3B342F] mb-2">
               <Clock className="h-4 w-4 text-emerald-400" />
-              원하는 시간대 *
+              원하는 시간대 <span className="text-[#9b9189] font-normal text-xs ml-1">(복수 선택 가능) *</span>
             </label>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {TIME_SLOTS.map((slot) => (
                 <button
                   key={slot}
                   type="button"
-                  onClick={() => { setForm({ ...form, preferredTime: slot }); setErrors({ ...errors, preferredTime: "" }); }}
+                  onClick={() => { toggleTime(slot); setErrors({ ...errors, preferredTime: "" }); }}
                   className={cn(
                     "rounded-lg border py-2 text-xs font-medium transition-all",
-                    form.preferredTime === slot
+                    form.preferredTime.includes(slot)
                       ? "border-emerald-500 bg-emerald-600 text-[#F7F3EB]"
                       : "border-[#D8CCBC] bg-[#F7F3EB] text-[#6f655d] hover:border-[#D8CCBC] hover:text-[#B98768]"
                   )}

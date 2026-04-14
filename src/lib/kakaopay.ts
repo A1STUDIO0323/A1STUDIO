@@ -167,3 +167,109 @@ export async function cancelPayment(params: CancelPaymentParams): Promise<Cancel
 
   return response.json();
 }
+
+// =============================================
+// 파티룸 직접 결제용 (포인트 충전과 별개)
+// =============================================
+
+interface PartyRoomPaymentParams {
+  userId: string;
+  orderId: string;
+  packageType: string;
+  packageDate: string;
+  amount: number;
+}
+
+/**
+ * 카카오페이 결제 준비 (파티룸용)
+ */
+export async function readyPartyRoomPayment(params: PartyRoomPaymentParams): Promise<ReadyPaymentResponse> {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const packageNames = {
+    day: '낮 패키지',
+    night: '야간 패키지',
+    allday: '종일권'
+  };
+  
+  const body = {
+    cid: process.env.KAKAOPAY_PARTY_CID || process.env.KAKAOPAY_CID,
+    partner_order_id: params.orderId,
+    partner_user_id: params.userId,
+    item_name: `A1 파티룸 ${packageNames[params.packageType as keyof typeof packageNames]} (${params.packageDate})`,
+    quantity: 1,
+    total_amount: params.amount,
+    tax_free_amount: 0,
+    approval_url: `${baseUrl}/api/party-room/payments/kakao/approve`,
+    cancel_url: `${baseUrl}/party-room/booking?cancelled=true`,
+    fail_url: `${baseUrl}/party-room/booking?failed=true`,
+  };
+
+  const response = await fetch(`${KAKAO_PAY_BASE_URL}/online/v1/payment/ready`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`카카오페이 결제 준비 실패: ${error.msg || response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * 카카오페이 결제 승인 (파티룸용)
+ */
+export async function approvePartyRoomPayment(params: ApprovePaymentParams): Promise<ApprovePaymentResponse> {
+  const body = {
+    cid: process.env.KAKAOPAY_PARTY_CID || process.env.KAKAOPAY_CID,
+    tid: params.tid,
+    partner_order_id: params.partner_order_id,
+    partner_user_id: params.partner_user_id,
+    pg_token: params.pg_token,
+  };
+
+  const response = await fetch(`${KAKAO_PAY_BASE_URL}/online/v1/payment/approve`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`카카오페이 결제 승인 실패: ${error.msg || response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * 카카오페이 결제 취소 (파티룸 환불용)
+ */
+export async function cancelPartyRoomPayment(params: {
+  tid: string;
+  cancelAmount: number;
+  cancelTaxFreeAmount?: number;
+  reason: string;
+}): Promise<CancelPaymentResponse> {
+  const body = {
+    cid: process.env.KAKAOPAY_PARTY_CID || process.env.KAKAOPAY_CID,
+    tid: params.tid,
+    cancel_amount: params.cancelAmount,
+    cancel_tax_free_amount: params.cancelTaxFreeAmount || 0,
+  };
+
+  const response = await fetch(`${KAKAO_PAY_BASE_URL}/online/v1/payment/cancel`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`카카오페이 결제 취소 실패: ${error.msg || response.statusText}`);
+  }
+
+  return response.json();
+}

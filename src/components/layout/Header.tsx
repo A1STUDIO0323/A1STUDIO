@@ -173,6 +173,11 @@ export default function Header() {
                     )}
                   >
                     {link.label}
+                    {link.isNew && (
+                      <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                        NEW
+                      </span>
+                    )}
                     <ChevronDown className="h-3.5 w-3.5" />
                   </button>
                   {openDropdown === link.href && (
@@ -205,6 +210,11 @@ export default function Header() {
                   )}
                 >
                   {link.label}
+                  {link.isNew && (
+                    <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      NEW
+                    </span>
+                  )}
                 </Link>
               )
             )}
@@ -471,6 +481,11 @@ export default function Header() {
                   )}
                 >
                   {link.label}
+                  {link.isNew && (
+                    <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      NEW
+                    </span>
+                  )}
                   <ChevronRight
                     className={cn(
                       "h-4 w-4 transition-transform text-[#9b9189]",
@@ -509,6 +524,11 @@ export default function Header() {
                 )}
               >
                 {link.label}
+                {link.isNew && (
+                  <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    NEW
+                  </span>
+                )}
               </Link>
             )
           )}

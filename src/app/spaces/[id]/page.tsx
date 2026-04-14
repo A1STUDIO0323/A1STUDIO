@@ -51,7 +51,7 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
     id: id,
     name: "A1 Room",
     description:
-      "보컬·댄스·연기·뮤지컬 연습이 모두 가능한 15평 단독 공간입니다. 전신거울, 전자피아노, 촬영용 조명, 삼각대, 요가매트, 폼롤러가 구비되어 있습니다.",
+      "보컬·댄스·연기·뮤지컬 연습이 모두 가능한 15평 단독 공간입니다. 전신거울, 전자피아노, 촬영용 조명, 삼각대, 보면대, 무선마이크, 요가매트, 폼롤러가 구비되어 있습니다.",
     capacity: 6,
     sizeM2: 50,
     amenities: [
@@ -59,6 +59,8 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
       "전자피아노",
       "촬영용 조명",
       "삼각대",
+      "보면대",
+      "무선마이크",
       "요가매트",
       "폼롤러",
     ],
@@ -67,9 +69,9 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
       "음식물 반입 금지 (음료 페트병 가능)",
       "추가 장비 반입 전 사전 문의",
     ],
-    priceWeekdayDay: 15000,
-    priceWeekdayNight: 20000,
-    priceWeekend: 20000,
+    priceWeekdayDay: 7000,
+    priceWeekdayNight: 9000,
+    priceWeekend: 8000,
   };
 
   return (

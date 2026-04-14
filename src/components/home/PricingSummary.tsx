@@ -4,7 +4,7 @@ import { Check, ArrowRight } from "lucide-react";
 const PLANS = [
   {
     name: "평일 비피크",
-    desc: "월~금 00:00 – 18:00",
+    desc: "월~금 00:00~18:00",
     priceOriginal1h: 9000,
     priceEvent1h: 7000,
     priceOriginal2h: 14000,
@@ -14,7 +14,7 @@ const PLANS = [
   },
   {
     name: "평일 피크타임",
-    desc: "월~금 18:00 – 00:00",
+    desc: "월~금 18:00~00:00",
     priceOriginal1h: 11000,
     priceEvent1h: 9000,
     priceOriginal2h: 18000,
@@ -24,22 +24,22 @@ const PLANS = [
   },
   {
     name: "주말/공휴일 비피크",
-    desc: "토·일·공휴일 00:00 – 13:00",
+    desc: "토·일·공휴일 00:00~13:00",
     priceOriginal1h: 10000,
     priceEvent1h: 8000,
     priceOriginal2h: 16000,
     priceEvent2h: 15000,
-    highlights: ["여유로운 오전 타임", "드럼·앰프 포함"],
+    highlights: ["여유로운 오전 타임"],
     badge: "인기",
   },
   {
     name: "주말/공휴일 피크타임",
-    desc: "토·일·공휴일 13:00 – 00:00",
+    desc: "토·일·공휴일 13:00~00:00",
     priceOriginal1h: 12000,
     priceEvent1h: 10000,
     priceOriginal2h: 20000,
     priceEvent2h: 19000,
-    highlights: ["주말 오후·저녁 집중 타임", "드럼·앰프 포함"],
+    highlights: ["주말 오후·저녁 집중 타임"],
     badge: null,
   },
 ];
@@ -47,8 +47,8 @@ const PLANS = [
 export default function PricingSummary() {
   const today = new Date();
   const eventStart = new Date("2026-04-08");
-  const eventEnd = new Date("2026-04-30");
-  const isEventActive = today >= eventStart && today <= eventEnd;
+  // 이벤트 종료일 하드코딩 제거 - 항상 이벤트 배너 표시
+  const isEventActive = today >= eventStart;
 
   return (
     <section className="bg-[#F7F3EB] py-20">
@@ -57,7 +57,7 @@ export default function PricingSummary() {
         {isEventActive && (
           <div className="mb-8 rounded-xl border border-[#B98768]/40 bg-[#f5ede6] py-3 px-4 text-center">
             <p className="font-semibold text-[#B98768]">
-              🎉 오픈이벤트 진행 중! 4월 30일까지 특별 할인가 적용
+              🎉 오픈이벤트 진행 중! 특별 할인가 적용
             </p>
           </div>
         )}
