@@ -173,7 +173,7 @@ export default function Header() {
                     )}
                   >
                     {link.label}
-                    {link.isNew && (
+                    {(link as any).isNew && (
                       <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
                         NEW
                       </span>
@@ -210,7 +210,7 @@ export default function Header() {
                   )}
                 >
                   {link.label}
-                  {link.isNew && (
+                  {(link as any).isNew && (
                     <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
                       NEW
                     </span>
@@ -481,7 +481,7 @@ export default function Header() {
                   )}
                 >
                   {link.label}
-                  {link.isNew && (
+                  {(link as any).isNew && (
                     <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
                       NEW
                     </span>
@@ -524,7 +524,7 @@ export default function Header() {
                 )}
               >
                 {link.label}
-                {link.isNew && (
+                {(link as any).isNew && (
                   <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
                     NEW
                   </span>
