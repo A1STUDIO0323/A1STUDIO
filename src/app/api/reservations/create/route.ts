@@ -147,7 +147,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     // 전화번호 정규화 (82XXXXXXXXXX → 010XXXXXXXX)
-    const normalizedPhone = normalizePhoneNumber(memberProfile?.phone);
+    // 우선순위: 1) member_profiles 테이블, 2) Supabase Auth
+    const normalizedPhone = normalizePhoneNumber(memberProfile?.phone || user.phone);
 
     // 포인트 잔액 확인 및 차감 (use_points 함수 호출)
     const { data: usePointsResult, error: usePointsError } = await supabase.rpc("use_points", {

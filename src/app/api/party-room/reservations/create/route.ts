@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // 전화번호 정규화 (82XXXXXXXXXX → 010XXXXXXXX)
-    const guest_phone = normalizePhoneNumber(rawGuestPhone) || rawGuestPhone;
+    // 우선순위: 1) body의 guest_phone, 2) Supabase Auth
+    const guest_phone = normalizePhoneNumber(rawGuestPhone || user.phone) || rawGuestPhone;
 
     if (!package_type || !date) {
       return NextResponse.json(
