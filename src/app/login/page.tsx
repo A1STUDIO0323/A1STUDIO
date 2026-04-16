@@ -227,14 +227,17 @@ function LoginContent() {
               </span>
             </label>
             <div className="mt-2 ml-7 text-xs text-[#6f655d] leading-relaxed">
-              <p className="mb-1">수집 항목:</p>
+              <p className="mb-1 font-semibold">필수 수집 항목:</p>
               <ul className="list-disc list-inside space-y-0.5 ml-2">
                 <li>Google: 이메일, 이름, 프로필 이미지</li>
-                <li>Kakao: 카카오계정(전화번호), 출생 연도</li>
+                <li>Kakao: 이름, 출생 연도, 카카오계정(전화번호)</li>
               </ul>
-              <p className="mt-2">
-                이용 목적: 회원 식별 및 인증, 서비스 제공
-              </p>
+              <p className="mt-2 font-semibold">이용 목적:</p>
+              <ul className="list-disc list-inside space-y-0.5 ml-2">
+                <li>회원 식별 및 인증</li>
+                <li>성인 인증 (만 19세 이상 확인)</li>
+                <li>예약 확인 및 안내 메시지 발송</li>
+              </ul>
             </div>
           </div>
         </div>
