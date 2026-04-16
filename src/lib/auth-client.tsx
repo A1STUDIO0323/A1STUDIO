@@ -158,7 +158,7 @@ export async function signIn(
 
   // 카카오 로그인 시 필수 동의 항목 설정
   const scopes = provider === "kakao" 
-    ? "profile_nickname,birthyear,phone_number" // 필수: 이름, 출생 연도, 전화번호
+    ? "name,birthyear,phone_number" // 필수: 이름(실명), 출생 연도, 전화번호
     : undefined;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
