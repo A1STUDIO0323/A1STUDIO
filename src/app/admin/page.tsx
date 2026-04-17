@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CalendarCheck, Users, DollarSign, AlertCircle, Filter, CheckCircle2, XCircle, Lock } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 import { useAdmin } from "@/lib/admin-context";
@@ -261,9 +262,25 @@ export default function AdminPage() {
         )}
 
         {/* 다른 탭들 (플레이스홀더) */}
-        {activeTab !== 0 && (
+        {activeTab !== 0 && activeTab !== 3 && (
           <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-[#D8CCBC] text-[#b0a89e]">
             {TABS[activeTab]} 기능 구현 예정
+          </div>
+        )}
+
+        {/* 후기 관리 탭 */}
+        {activeTab === 3 && (
+          <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-center">
+            <h3 className="text-lg font-bold text-[#3B342F]">후기 관리</h3>
+            <p className="mt-2 text-sm text-[#6f655d]">
+              고객 후기를 조회하고 공개/비공개 설정 및 삭제를 관리할 수 있습니다.
+            </p>
+            <Link
+              href="/admin/reviews"
+              className="mt-4 inline-flex rounded-lg bg-[#B98768] px-5 py-2.5 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"
+            >
+              후기 관리 페이지로 이동
+            </Link>
           </div>
         )}
       </div>
