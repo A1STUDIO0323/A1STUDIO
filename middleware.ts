@@ -127,13 +127,18 @@ export async function middleware(request: NextRequest) {
     if (profileRes.ok) {
       const { profile } = await profileRes.json();
 
+      // 디버깅: 프로필 데이터 확인
+      console.log("[middleware] profile:", JSON.stringify(profile));
+
       // 이름 또는 출생연도 없음 → /onboarding/profile
       if (!profile || !profile.name || !profile.birthYear) {
+        console.log("[middleware] Redirecting to /onboarding/profile - name:", profile?.name, "birthYear:", profile?.birthYear);
         return NextResponse.redirect(new URL("/onboarding/profile", request.url));
       }
 
       // 전화번호 미인증 → /onboarding/phone
       if (!profile.phoneVerified) {
+        console.log("[middleware] Redirecting to /onboarding/phone - phoneVerified:", profile.phoneVerified);
         return NextResponse.redirect(new URL("/onboarding/phone", request.url));
       }
     }

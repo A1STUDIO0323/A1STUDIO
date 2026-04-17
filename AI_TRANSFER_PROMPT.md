@@ -96,13 +96,17 @@
 ```prisma
 // Supabase Auth와 연동되는 사용자 프로필
 model User {
-  id        String   @id @db.Uuid  // Supabase auth.users.id와 동일
-  email     String?  @unique
-  name      String?
-  avatarUrl String?
-  provider  String?  // "google", "kakao", "email"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @db.Uuid  // Supabase auth.users.id와 동일
+  email           String?  @unique
+  name            String?
+  avatarUrl       String?
+  provider        String?  // "google", "kakao", "email"
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  birthYear       Int?     @map("birth_year") @db.SmallInt
+  phone           String?  @unique
+  phoneVerified   Boolean  @default(false) @map("phone_verified")
+  marketingAgreed Boolean  @default(false) @map("marketing_agreed")
   
   accounts        Account[]
   sessions        Session[]
@@ -525,11 +529,12 @@ $$ LANGUAGE plpgsql;
 
 인증
 /login                      # 로그인 (Google/Kakao OAuth)
-/signup                     # 회원가입 (이메일/비밀번호)
+/signup                     # 회원가입 (Google/Kakao/이메일, 약관 동의)
 /forgot-password            # 비밀번호 찾기
 /reset-password             # 비밀번호 재설정
-/onboarding/phone           # 휴대폰 인증 (SMS OTP)
-/onboarding/profile         # 추가 정보 입력
+/onboarding/profile         # 온보딩 1단계: 이름, 출생연도 입력
+/onboarding/phone           # 온보딩 2단계: 휴대폰 SMS 인증
+/auth/callback              # OAuth 콜백 처리
 
 마이페이지
 /mypage                     # 마이페이지 (포인트, 예약내역, 계정)
@@ -586,8 +591,8 @@ POST /api/charge/ready                   # 충전 결제 준비
 GET  /api/charge/approve                 # 충전 결제 승인 (콜백)
 
 회원 API
-GET  /api/members/profile                # 프로필 조회
-POST /api/members/profile                # 프로필 업데이트
+GET  /api/members/profile                # 프로필 조회 (이름, 출생연도, 전화번호, 인증 상태)
+POST /api/members/profile                # 프로필 생성/업데이트 (upsert)
 POST /api/members/sync                   # Supabase Auth → Prisma 동기화
 POST /api/members/withdraw               # 회원 탈퇴
 POST /api/account/delete                 # 계정 삭제
@@ -822,7 +827,117 @@ export function getReservationCancelMessage(params: {
 // 발송 후 MessageLog에 자동 기록
 ```
 
-### 8. 회원 등급 시스템
+### 8. 회원가입 & 온보딩 플로우
+
+**회원가입 프로세스**
+
+```typescript
+// src/app/signup/page.tsx
+
+// 지원 가입 방식:
+// 1. Google OAuth
+// 2. Kakao OAuth
+// 3. 이메일/비밀번호
+
+// 약관 동의:
+// - 개인정보 수집 및 이용 동의 (필수)
+// - 서비스 이용약관 동의 (필수)
+// - 마케팅 수신 동의 (선택)
+
+// OAuth 가입 시 redirectTo:
+redirectTo: `${window.location.origin}/auth/callback?next=/onboarding/profile`
+
+// 가입 완료 후 자동 리다이렉트:
+// → /onboarding/profile (프로필 입력)
+```
+
+**온보딩 1단계: 프로필 입력**
+
+```typescript
+// src/app/onboarding/profile/page.tsx
+
+// 필수 입력 항목:
+// - 이름 (name): 2~20자
+// - 출생연도 (birthYear): 1900~현재년도
+
+// 프로세스:
+// 1. 입력값 클라이언트 검증
+// 2. POST /api/members/profile
+//    - Zod 스키마 검증
+//    - Prisma upsert (User 테이블)
+// 3. 성공 시 리다이렉트 → /onboarding/phone
+```
+
+**온보딩 2단계: 휴대폰 인증**
+
+```typescript
+// src/app/onboarding/phone/page.tsx
+
+// 프로세스:
+// 1. 휴대폰 번호 입력 (01012345678 형식)
+// 2. POST /api/auth/sms/send-code
+//    - 6자리 인증번호 생성
+//    - SMS 발송 (SOLAPI/COOLSMS)
+//    - 3분 타이머 시작
+// 3. 인증번호 입력
+// 4. POST /api/auth/sms/verify-code
+//    - 인증번호 검증
+// 5. POST /api/members/profile
+//    - phone, phoneVerified: true 업데이트
+// 6. 리다이렉트 → / (홈페이지)
+
+// 특징:
+// - 3분 카운트다운 타이머
+// - 재발송 기능 (60초 제한)
+// - 인증 실패 시 에러 표시
+```
+
+**미들웨어 라우트 가드**
+
+```typescript
+// middleware.ts
+export const runtime = "nodejs";
+
+// 적용 규칙:
+// 1. 비로그인 사용자가 보호된 페이지 접근 → /login
+// 2. 로그인했지만 프로필 미완성(이름/출생연도 없음) → /onboarding/profile
+// 3. 로그인했지만 전화번호 미인증 → /onboarding/phone
+// 4. 이미 로그인한 사용자가 /login, /signup 접근 → /
+
+// 프로필 체크 플로우:
+// 1. Supabase Auth 세션 확인
+// 2. GET /api/members/profile 호출
+// 3. profile.name || profile.birthYear 없으면 → /onboarding/profile
+// 4. profile.phoneVerified === false → /onboarding/phone
+// 5. 모두 완료 시 요청한 페이지로 진행
+
+// 온보딩 경로는 가드 스킵:
+const ONBOARDING_PATHS = ["/onboarding/profile", "/onboarding/phone"];
+```
+
+**프로필 API**
+
+```typescript
+// src/app/api/members/profile/route.ts
+
+// GET: 프로필 조회
+// - Supabase Auth 세션 확인
+// - Prisma User.findUnique(where: { id: user.id })
+// - { profile: { name, birthYear, phone, phoneVerified, ... } }
+
+// POST: 프로필 생성/업데이트
+// - Zod 스키마 검증:
+//   - name: string, 2~20자 (optional)
+//   - birthYear: number, 1900~현재년도 (optional)
+//   - phone: string, 01[0-9]{8,9} (optional)
+//   - phoneVerified: boolean (optional)
+// - Prisma User.upsert()
+//   - create: 새 사용자 생성 (auth id 기준)
+//   - update: 기존 사용자 업데이트
+// - { profile: { ... } }
+```
+
+### 9. 회원 등급 시스템
 
 ```typescript
 // src/lib/member-role.ts & member-role-db.ts
@@ -839,7 +954,7 @@ type MemberRole = "NONE" | "CM"; // CM = Class Master (클래스마스터)
 //   - 클래스 공고 신청
 ```
 
-### 9. 결제 락 시스템
+### 10. 결제 락 시스템
 
 ```typescript
 // src/lib/payment-lock.ts
@@ -1291,8 +1406,8 @@ A1STUDIO/
 │   │   │   └── fail/page.tsx
 │   │   ├── mypage/                         # 마이페이지
 │   │   ├── onboarding/                     # 온보딩
-│   │   │   ├── phone/
-│   │   │   └── profile/
+│   │   │   ├── profile/page.tsx            # 1단계: 이름, 출생연도
+│   │   │   └── phone/page.tsx              # 2단계: 휴대폰 인증
 │   │   ├── one-day-class/                  # 원데이클래스
 │   │   │   ├── page.tsx
 │   │   │   ├── requests/page.tsx
@@ -1320,6 +1435,8 @@ A1STUDIO/
 │   │       │   ├── email-signup/route.ts
 │   │       │   ├── password-reset/
 │   │       │   └── sms/
+│   │       │       ├── send-code/route.ts  # SMS 인증번호 발송
+│   │       │       └── verify-code/route.ts # SMS 인증번호 확인
 │   │       ├── reservations/
 │   │       │   ├── route.ts
 │   │       │   ├── create/route.ts
@@ -1336,7 +1453,7 @@ A1STUDIO/
 │   │       │   ├── ready/route.ts
 │   │       │   └── approve/route.ts
 │   │       ├── members/
-│   │       │   ├── profile/route.ts
+│   │       │   ├── profile/route.ts        # 프로필 조회/업데이트
 │   │       │   ├── sync/route.ts
 │   │       │   └── withdraw/route.ts
 │   │       ├── member-roles/
@@ -1399,6 +1516,7 @@ A1STUDIO/
 │           ├── toss.ts                     # Toss Payments
 │           └── kakaopay.ts                 # Kakao Pay
 │
+├── middleware.ts                           # Next.js 미들웨어 (라우트 가드)
 ├── prisma/
 │   ├── schema.prisma                       # DB 스키마
 │   └── seed.ts                             # 시드 데이터
@@ -1436,6 +1554,9 @@ A1STUDIO/
 - ✅ 라이트박스 갤러리 (PC/모바일)
 - ✅ 요금 안내 (이벤트 가격 적용)
 - ✅ 인증 시스템 (Google/Kakao OAuth, Phone OTP, Email/Password)
+- ✅ 회원가입 페이지 (Google/Kakao/이메일, 약관 동의)
+- ✅ 온보딩 플로우 (프로필 입력, 휴대폰 인증)
+- ✅ 라우트 가드 미들웨어 (인증 & 온보딩 체크)
 - ✅ 예약 시스템 (연습실 - 포인트 결제)
 - ✅ 파티룸 예약 (카카오페이 직접 결제)
 - ✅ 포인트 충전 (Kakao Pay)
@@ -1451,6 +1572,10 @@ A1STUDIO/
 **백엔드 & 시스템**:
 - ✅ Prisma + PostgreSQL (Supabase)
 - ✅ Supabase Auth + 포인트 시스템
+- ✅ User 모델 확장 (birthYear, phone, phoneVerified, marketingAgreed)
+- ✅ 프로필 API (GET/POST /api/members/profile)
+- ✅ SMS 인증 API (send-code, verify-code)
+- ✅ Next.js 미들웨어 (라우트 가드, 온보딩 플로우 강제)
 - ✅ 카카오페이 결제 연동 (포인트 충전 + 파티룸)
 - ✅ SMS 발송 (SOLAPI/COOLSMS)
 - ✅ 이메일 발송 (SendGrid)
@@ -1623,8 +1748,8 @@ A1STUDIO/
 - 현재 상태 & 개선 필요 사항
 - 외부 서비스 연동 정보
 
-**작성일**: 2026-04-16  
-**버전**: 2.0 (최신)  
+**작성일**: 2026-04-17  
+**버전**: 2.2 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
