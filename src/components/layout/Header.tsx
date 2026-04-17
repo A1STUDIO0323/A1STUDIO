@@ -231,7 +231,7 @@ export default function Header() {
                 
                 <Link
                   href={getFullyGuardedHref("/mypage")}
-                  className="flex items-center gap-1.5 text-sm font-medium text-[#6f655d] transition-colors hover:text-[#B98768]"
+                  className="hidden lg:flex items-center gap-1.5 text-sm font-medium text-[#6f655d] transition-colors hover:text-[#B98768]"
                 >
                   <User className="h-4 w-4" />
                   <span className="hidden xl:inline">마이페이지</span>
@@ -266,7 +266,7 @@ export default function Header() {
 
             {/* 관리자 모드 버튼 */}
             {isAdmin ? (
-              <div className="relative">
+              <div className="relative hidden lg:block">
                 <button
                   onClick={() => setShowAdminMenu((prev) => !prev)}
                   className="flex items-center gap-1.5 rounded-full border border-[#B98768]/50 bg-violet-900/20 px-3 py-2 text-xs font-semibold text-[#B98768] transition-all hover:bg-[#B98768]/10"
@@ -314,7 +314,7 @@ export default function Header() {
             ) : (
               <button
                 onClick={() => setShowAdminLogin(!showAdminLogin)}
-                className="flex items-center gap-1 text-xs text-[#b0a89e] transition-colors hover:text-[#6f655d]"
+                className="hidden lg:flex items-center gap-1 text-xs text-[#b0a89e] transition-colors hover:text-[#6f655d]"
                 title="관리자 로그인"
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
