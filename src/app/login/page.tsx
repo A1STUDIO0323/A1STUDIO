@@ -229,7 +229,7 @@ function LoginContent() {
             <div className="mt-2 ml-7 text-xs text-[#6f655d] leading-relaxed">
               <p className="mb-1 font-semibold">필수 수집 항목:</p>
               <ul className="list-disc list-inside space-y-0.5 ml-2">
-                <li>Google: 이메일, 이름, 프로필 이미지</li>
+                <li>Google: 이름, 출생 연도, 구글계정(전화번호)</li>
                 <li>Kakao: 이름, 출생 연도, 카카오계정(전화번호)</li>
               </ul>
               <p className="mt-2 font-semibold">이용 목적:</p>
