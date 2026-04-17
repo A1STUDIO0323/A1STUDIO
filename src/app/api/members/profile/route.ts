@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import prisma from "@/lib/db";
+import { prisma } from "@/lib/db";
 
 // ── 유효성 검사 스키마 ──────────────────────────────────────
 const profileUpdateSchema = z.object({
@@ -26,7 +26,7 @@ const profileUpdateSchema = z.object({
 // ── GET: 프로필 조회 ────────────────────────────────────────
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
     const {
       data: { user },
       error: authError,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 // ── POST: 프로필 생성/업데이트 (upsert) ─────────────────────
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
     const {
       data: { user },
       error: authError,
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     const parsed = profileUpdateSchema.safeParse(body);
 
     if (!parsed.success) {
-      const firstError = parsed.error.errors[0]?.message ?? "입력값이 올바르지 않습니다.";
+      const firstError = parsed.error.issues[0]?.message ?? "입력값이 올바르지 않습니다.";
       return NextResponse.json({ error: firstError }, { status: 400 });
     }
 

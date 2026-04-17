@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient as createSupabaseMiddlewareClient } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 
 /**
  * A1 STUDIO 라우트 가드 미들웨어
@@ -55,11 +55,9 @@ export async function middleware(request: NextRequest) {
   // Supabase 클라이언트 (미들웨어용)
   let response = NextResponse.next({ request });
 
-  const supabase = createSupabaseMiddlewareClient(
-    {
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      key: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    },
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
