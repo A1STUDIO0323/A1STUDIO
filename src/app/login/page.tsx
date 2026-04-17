@@ -29,26 +29,9 @@ function LoginContent() {
   const error = searchParams.get("error");
   const onboardingPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
   const onboardingCallbackUrl = `${onboardingPath}?next=${encodeURIComponent(safeCallback)}`;
-
-  // 로그인 상태 유지 체크박스
-  const [rememberMe, setRememberMe] = useState(true); // 기본값: 체크됨
   
   // 개인정보 수집·이용 동의 (필수)
   const [privacyConsent, setPrivacyConsent] = useState(false);
-
-  // 컴포넌트 마운트 시 저장된 설정 불러오기
-  useEffect(() => {
-    const saved = localStorage.getItem('rememberMe');
-    if (saved !== null) {
-      setRememberMe(saved === 'true');
-    }
-  }, []);
-
-  // remember me 설정 저장
-  const handleRememberMeChange = (checked: boolean) => {
-    setRememberMe(checked);
-    localStorage.setItem('rememberMe', String(checked));
-  };
 
   // OAuth 로그인 핸들러
   const handleOAuthLogin = async (provider: "google" | "kakao") => {
@@ -59,9 +42,6 @@ function LoginContent() {
     }
     
     try {
-      // remember me 설정 저장
-      localStorage.setItem('rememberMe', String(rememberMe));
-      
       console.log(`%c[handleOAuthLogin] Starting ${provider} login`, 'color: blue; font-weight: bold');
       console.log('Callback URL:', onboardingCallbackUrl);
       
@@ -230,26 +210,6 @@ function LoginContent() {
               </ul>
             </div>
           </div>
-        </div>
-
-        {/* 로그인 상태 유지 체크박스 */}
-        <div className="mt-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => handleRememberMeChange(e.target.checked)}
-              className="w-4 h-4 rounded border-[#D8CCBC] text-[#B98768] focus:ring-[#B98768] focus:ring-offset-0"
-            />
-            <span className="text-sm text-[#6f655d]">
-              로그인 상태 유지
-            </span>
-          </label>
-          <p className="mt-1 ml-6 text-xs text-[#9b9189]">
-            {rememberMe 
-              ? "브라우저를 닫아도 로그인 상태가 유지됩니다." 
-              : "브라우저를 닫으면 자동으로 로그아웃됩니다."}
-          </p>
         </div>
 
         {/* 건너뛰기 */}
