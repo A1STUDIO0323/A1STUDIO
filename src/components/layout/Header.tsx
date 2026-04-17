@@ -26,7 +26,6 @@ export default function Header() {
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [adminPw, setAdminPw] = useState("");
   const [adminError, setAdminError] = useState("");
-  const [isProfileComplete, setIsProfileComplete] = useState<boolean | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState<string | null>(null);
   const [userPoints, setUserPoints] = useState<number | null>(null);
@@ -43,10 +42,7 @@ export default function Header() {
   }, [mobileOpen]);
 
   const getFullyGuardedHref = (href: string) => {
-    if (!session?.user?.email) return href;
-    if (isProfileComplete !== false) return href;
-    if (href.startsWith("/onboarding/profile")) return href;
-    return `/onboarding/profile?next=${encodeURIComponent(href)}`;
+    return href;
   };
 
   useEffect(() => {
@@ -83,38 +79,6 @@ export default function Header() {
         setUserPoints(data?.balance || 0);
       });
   }, [session?.user?.email, session?.user?.id, session?.user?.image, session?.user?.name, session?.user?.provider]);
-
-  useEffect(() => {
-    const email = session?.user?.email;
-    if (!email) return;
-    if (pathname.startsWith("/onboarding/profile") || pathname.startsWith("/onboarding/phone")) {
-      return;
-    }
-
-    void (async () => {
-      try {
-        const res = await fetch("/api/members/profile", {
-          cache: "no-store",
-        });
-        const data = (await res.json()) as {
-          success?: boolean;
-          profile?: { isComplete?: boolean };
-        };
-        if (!res.ok || !data.success) {
-          setIsProfileComplete(false);
-          return;
-        }
-        const complete = Boolean(data.profile?.isComplete);
-        setIsProfileComplete(complete);
-        if (!complete) {
-          const safe = sanitizePostAuthRedirect(pathname);
-          router.push(`/onboarding/profile?next=${encodeURIComponent(safe)}`);
-        }
-      } catch {
-        setIsProfileComplete(false);
-      }
-    })();
-  }, [pathname, router, session?.user?.email]);
 
   return (
     <>
