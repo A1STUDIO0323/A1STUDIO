@@ -43,6 +43,8 @@ const AUTH_ONLY_PATHS = ["/login", "/signup"];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  console.log("[middleware] 실행됨:", request.nextUrl.pathname);
+
   // /api, /_next, /auth/callback 등 항상 통과
   if (
     pathname.startsWith("/_next") ||
@@ -124,11 +126,16 @@ export async function middleware(request: NextRequest) {
       }
     );
 
+    console.log("[middleware] profile fetch status:", profileRes.status);
+    const rawText = await profileRes.text();
+    console.log("[middleware] profile raw response:", rawText);
+
     if (profileRes.ok) {
-      const { profile } = await profileRes.json();
+      const { profile } = JSON.parse(rawText);
 
       // 디버깅: 프로필 데이터 확인
-      console.log("[middleware] profile:", JSON.stringify(profile));
+      console.log("[middleware] profile response:", JSON.stringify(profile));
+      console.log("[middleware] name:", profile?.name, "birthYear:", profile?.birthYear, "phoneVerified:", profile?.phoneVerified);
 
       // 이름 또는 출생연도 없음 → /onboarding/profile
       if (!profile || !profile.name || !profile.birthYear) {
