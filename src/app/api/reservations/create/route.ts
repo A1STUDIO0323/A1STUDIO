@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
 
         const smsResult = await sendMessage({
           to: reservationData.guest_phone,
-          message: messageContent,
+          text: messageContent,
         });
 
         // 로그 저장

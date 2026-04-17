@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     // SMS 발송
     const result = await sendMessage({
       to: guestPhone,
-      message: messageContent,
+      text: messageContent,
     });
 
     // 로그 저장
