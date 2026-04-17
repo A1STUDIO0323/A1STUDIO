@@ -1,0 +1,158 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient as createSupabaseMiddlewareClient } from "@supabase/ssr";
+
+/**
+ * A1 STUDIO 라우트 가드 미들웨어
+ *
+ * 적용 규칙:
+ * 1. 로그인하지 않은 사용자가 보호된 페이지 접근 → /login
+ * 2. 로그인했지만 프로필 미완성(이름/출생연도 없음) → /onboarding/profile
+ * 3. 로그인했지만 전화번호 미인증 → /onboarding/phone
+ * 4. 이미 로그인한 사용자가 /login, /signup 접근 → /
+ */
+
+// 로그인 없이도 접근 가능한 공개 경로
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/spaces",
+  "/pricing",
+  "/guide",
+  "/reviews",
+  "/notices",
+  "/events",
+  "/contact",
+  "/location",
+  "/availability",
+  "/privacy",
+  "/auth",
+  "/api",
+];
+
+// 온보딩 중에만 접근 가능한 경로 (가드 스킵)
+const ONBOARDING_PATHS = ["/onboarding/profile", "/onboarding/phone"];
+
+// 로그인 후 접근 불필요한 경로 (리다이렉트 대상)
+const AUTH_ONLY_PATHS = ["/login", "/signup"];
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // /api, /_next, /auth/callback 등 항상 통과
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/static") ||
+    /\.(jpg|jpeg|png|gif|svg|ico|webp|css|js|woff|woff2)$/.test(pathname)
+  ) {
+    return NextResponse.next();
+  }
+
+  // Supabase 클라이언트 (미들웨어용)
+  let response = NextResponse.next({ request });
+
+  const supabase = createSupabaseMiddlewareClient(
+    {
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      key: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    },
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // ── 비로그인 사용자 처리 ─────────────────────────────────
+  if (!user) {
+    // 공개 경로 또는 온보딩 경로는 통과
+    const isPublic = PUBLIC_PATHS.some(
+      (p) => pathname === p || pathname.startsWith(p + "/")
+    );
+    if (isPublic) return response;
+
+    // 보호된 경로 → 로그인 페이지
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // ── 로그인 사용자가 auth 전용 경로 접근 ─────────────────
+  if (AUTH_ONLY_PATHS.includes(pathname)) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // ── 온보딩 경로는 추가 가드 없이 통과 ──────────────────
+  if (ONBOARDING_PATHS.some((p) => pathname.startsWith(p))) {
+    return response;
+  }
+
+  // ── 프로필 완성 여부 확인 (보호된 경로 접근 시) ─────────
+  // 공개 경로는 프로필 체크 스킵
+  const isPublicPath = PUBLIC_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
+  if (isPublicPath) return response;
+
+  // 보호된 경로: 프로필 데이터 확인
+  try {
+    const profileRes = await fetch(
+      new URL("/api/members/profile", request.url).toString(),
+      {
+        headers: {
+          cookie: request.headers.get("cookie") ?? "",
+        },
+      }
+    );
+
+    if (profileRes.ok) {
+      const { profile } = await profileRes.json();
+
+      // 이름 또는 출생연도 없음 → /onboarding/profile
+      if (!profile || !profile.name || !profile.birthYear) {
+        return NextResponse.redirect(new URL("/onboarding/profile", request.url));
+      }
+
+      // 전화번호 미인증 → /onboarding/phone
+      if (!profile.phoneVerified) {
+        return NextResponse.redirect(new URL("/onboarding/phone", request.url));
+      }
+    }
+  } catch (err) {
+    // 프로필 API 오류 시 조용히 통과 (UX 우선)
+    console.error("[middleware] profile check error:", err);
+  }
+
+  return response;
+}
+
+export const config = {
+  matcher: [
+    /*
+     * 다음 경로를 제외한 모든 경로에 적용:
+     * - _next/static (정적 파일)
+     * - _next/image (이미지 최적화)
+     * - favicon.ico
+     */
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
+};

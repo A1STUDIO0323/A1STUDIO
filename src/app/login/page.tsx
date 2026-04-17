@@ -2,6 +2,7 @@
 
 import { signIn, useSession } from "@/lib/auth-client";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { STUDIO_NAME } from "@/lib/constants";
 import { AlertCircle } from "lucide-react";
@@ -274,6 +275,14 @@ function LoginContent() {
 
         <p className="mt-4 text-center text-xs text-[#b0a89e]">
           소셜 로그인 후 생년월일·이메일·연락처를 확인/입력합니다.
+        </p>
+
+        {/* 회원가입 링크 */}
+        <p className="mt-3 text-center text-sm text-[#6f655d]">
+          아직 계정이 없으신가요?{" "}
+          <Link href="/signup" className="font-medium underline text-[#B98768] hover:text-[#a9785c]">
+            회원가입
+          </Link>
         </p>
 
         {/* Google/Kakao 설정 안내 (개발용) */}

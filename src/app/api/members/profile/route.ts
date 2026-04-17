@@ -1,146 +1,105 @@
-export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import {
-  getMemberProfileByEmail,
-  upsertMemberProfileByEmail,
-} from "@/lib/member-profile-db";
-import { createClient } from "@/lib/supabase/server";
+import prisma from "@/lib/db";
 
-const schoolStatusSchema = z.enum(["ENROLLED", "GRADUATED"]);
-
-const updateSchema = z.object({
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  phone: z.string().min(8).optional().nullable(),
-  middleSchool: z.string().trim().max(100).optional().nullable(),
-  middleSchoolStatus: schoolStatusSchema.optional().nullable(),
-  highSchool: z.string().trim().max(100).optional().nullable(),
-  highSchoolStatus: schoolStatusSchema.optional().nullable(),
-  university: z.string().trim().max(100).optional().nullable(),
-  universityStatus: schoolStatusSchema.optional().nullable(),
-  graduateSchool: z.string().trim().max(100).optional().nullable(),
-  graduateSchoolStatus: schoolStatusSchema.optional().nullable(),
+// ── 유효성 검사 스키마 ──────────────────────────────────────
+const profileUpdateSchema = z.object({
+  name: z
+    .string()
+    .min(2, "이름은 2자 이상이어야 합니다.")
+    .max(20, "이름은 20자 이하이어야 합니다.")
+    .optional(),
+  birthYear: z
+    .number()
+    .int()
+    .min(1900, "올바른 출생연도를 입력해주세요.")
+    .max(new Date().getFullYear(), "올바른 출생연도를 입력해주세요.")
+    .optional(),
+  phone: z
+    .string()
+    .regex(/^01[0-9]{8,9}$/, "올바른 전화번호 형식이 아닙니다.")
+    .optional(),
+  phoneVerified: z.boolean().optional(),
 });
 
-function isDbConnectionError(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-  const maybeCode = (error as { code?: string }).code;
-  if (maybeCode === "P1001" || maybeCode === "P1011" || maybeCode === "P2010") return true;
-  const maybeMessage = (error as { message?: string }).message;
-  if (typeof maybeMessage !== "string") return false;
-  return (
-    maybeMessage.includes("Can't reach database server") ||
-    maybeMessage.includes("self-signed certificate in certificate chain") ||
-    maybeMessage.includes("Error opening a TLS connection")
-  );
-}
-
-export async function GET(req: NextRequest) {
+// ── GET: 프로필 조회 ────────────────────────────────────────
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
-    const email = user?.email?.trim().toLowerCase() ?? "";
-    if (!email) {
-      return NextResponse.json(
-        { success: false, error: "로그인이 필요합니다" },
-        { status: 401 }
-      );
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
     }
 
-    const profile = await getMemberProfileByEmail(email);
-    
-    // 전화번호 82 → 0 변환
-    if (profile.phone && profile.phone.startsWith("82")) {
-      profile.phone = "0" + profile.phone.slice(2);
+    const profile = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+
+    if (!profile) {
+      return NextResponse.json({ profile: null }, { status: 200 });
     }
-    
-    return NextResponse.json({ success: true, profile });
+
+    return NextResponse.json({ profile }, { status: 200 });
   } catch (error) {
-    if (isDbConnectionError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: "데이터베이스 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
-      });
-    }
     console.error("[GET /api/members/profile]", error);
-    return NextResponse.json(
-      { success: false, error: "프로필 조회에 실패했습니다" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }
 
-export async function POST(req: NextRequest) {
+// ── POST: 프로필 생성/업데이트 (upsert) ─────────────────────
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
-    const email = user?.email?.trim().toLowerCase() ?? "";
-    if (!email) {
-      return NextResponse.json(
-        { success: false, error: "로그인이 필요합니다" },
-        { status: 401 }
-      );
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
     }
 
-    const body = await req.json();
-    
-    // 디버깅: 받은 데이터 로깅
-    console.log('[POST /api/members/profile] 받은 데이터:', {
-      birthDate: body.birthDate,
-      phone: body.phone,
-    });
-    
-    const data = updateSchema.parse(body);
-    
-    // 전화번호 82 → 0 변환
-    if (data.phone && data.phone.startsWith("82")) {
-      data.phone = "0" + data.phone.slice(2);
+    const body = await request.json();
+    const parsed = profileUpdateSchema.safeParse(body);
+
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0]?.message ?? "입력값이 올바르지 않습니다.";
+      return NextResponse.json({ error: firstError }, { status: 400 });
     }
-    
-    await upsertMemberProfileByEmail({
-      email,
-      birthDate: data.birthDate,
-      phone: data.phone,
-      middleSchool: data.middleSchool,
-      middleSchoolStatus: data.middleSchoolStatus,
-      highSchool: data.highSchool,
-      highSchoolStatus: data.highSchoolStatus,
-      university: data.university,
-      universityStatus: data.universityStatus,
-      graduateSchool: data.graduateSchool,
-      graduateSchoolStatus: data.graduateSchoolStatus,
+
+    const { name, birthYear, phone, phoneVerified } = parsed.data;
+
+    // Prisma upsert — auth user id 기준
+    const updatedProfile = await prisma.user.upsert({
+      where: { id: user.id },
+      create: {
+        id: user.id,
+        email: user.email ?? null,
+        name: name ?? null,
+        // @ts-ignore — 스키마 확장 필드 (마이그레이션 후 타입 자동 생성됨)
+        birthYear: birthYear ?? null,
+        phone: phone ?? null,
+        phoneVerified: phoneVerified ?? false,
+        provider: user.app_metadata?.provider ?? "email",
+      },
+      update: {
+        ...(name !== undefined && { name }),
+        // @ts-ignore
+        ...(birthYear !== undefined && { birthYear }),
+        ...(phone !== undefined && { phone }),
+        ...(phoneVerified !== undefined && { phoneVerified }),
+        updatedAt: new Date(),
+      },
     });
 
-    const profile = await getMemberProfileByEmail(email);
-    
-    // 전화번호 82 → 0 변환
-    if (profile.phone && profile.phone.startsWith("82")) {
-      profile.phone = "0" + profile.phone.slice(2);
-    }
-    
-    return NextResponse.json({ success: true, profile });
+    return NextResponse.json({ profile: updatedProfile }, { status: 200 });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error('[POST /api/members/profile] Zod 유효성 검사 실패:', error.issues);
-      return NextResponse.json(
-        { success: false, error: "입력값이 올바르지 않습니다" },
-        { status: 400 }
-      );
-    }
-    if (isDbConnectionError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: "데이터베이스 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
-      });
-    }
     console.error("[POST /api/members/profile]", error);
-    return NextResponse.json(
-      { success: false, error: "프로필 저장에 실패했습니다" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "프로필 저장 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
