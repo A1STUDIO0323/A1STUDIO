@@ -80,19 +80,9 @@ function LoginContent() {
     }
   };
 
-  // 이미 로그인된 경우: 루프 방지를 위해 callbackUrl 정리 후 휴대폰/프로필 여부에 따라 분기
+  // 이미 로그인된 경우: callbackUrl로 리다이렉트
   useEffect(() => {
     if (status !== "authenticated" || !session?.user) return;
-    const phoneOk =
-      !PHONE_OTP_ENABLED || Boolean(session.user.phoneConfirmedAt);
-    if (!phoneOk) {
-      const target = `/onboarding/phone?next=${encodeURIComponent(safeCallback)}`;
-      if (process.env.NODE_ENV === "development") {
-        console.log("[login] already signed in, phone pending ->", target);
-      }
-      router.replace(target);
-      return;
-    }
     if (process.env.NODE_ENV === "development") {
       console.log("[login] already signed in ->", safeCallback);
     }
@@ -100,7 +90,6 @@ function LoginContent() {
   }, [
     status,
     session?.user?.id,
-    session?.user?.phoneConfirmedAt,
     safeCallback,
     router,
   ]);

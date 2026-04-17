@@ -7,7 +7,7 @@ import crypto from 'crypto';
 
 interface SendMessageParams {
   to: string; // 수신자 전화번호 (01012345678 형식)
-  message: string; // 메시지 내용
+  text: string; // 메시지 내용
   from?: string; // 발신자 번호 (선택, 환경변수에서 기본값 사용)
 }
 
@@ -40,7 +40,7 @@ async function sendSMSViaCoolsms(params: SendMessageParams): Promise<SendMessage
       message: {
         to: normalizedTo,
         from: fromNumber,
-        text: params.message,
+        text: params.text,
         type: 'LMS',
       },
     };
@@ -105,7 +105,7 @@ async function sendSMSViaSolapi(params: SendMessageParams): Promise<SendMessageR
       message: {
         to: normalizedTo,
         from: fromNumber,
-        text: params.message,
+        text: params.text,
       },
     };
 

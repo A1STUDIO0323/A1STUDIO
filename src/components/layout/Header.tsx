@@ -29,7 +29,6 @@ export default function Header() {
   const [isProfileComplete, setIsProfileComplete] = useState<boolean | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState<string | null>(null);
-  const isPhoneVerified = !PHONE_OTP_ENABLED || Boolean(session?.user?.phoneConfirmedAt);
   const [userPoints, setUserPoints] = useState<number | null>(null);
 
   // 페이지 이동 시 드로어 닫기
@@ -43,17 +42,7 @@ export default function Header() {
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
 
-  const getGuardedHref = (href: string) => {
-    if (!session?.user?.email) return href;
-    if (isPhoneVerified) return href;
-    if (href.startsWith("/onboarding/phone")) return href;
-    const safe = sanitizePostAuthRedirect(href);
-    return `/onboarding/phone?next=${encodeURIComponent(safe)}`;
-  };
-
   const getFullyGuardedHref = (href: string) => {
-    const phoneGuarded = getGuardedHref(href);
-    if (phoneGuarded !== href) return phoneGuarded;
     if (!session?.user?.email) return href;
     if (isProfileComplete !== false) return href;
     if (href.startsWith("/onboarding/profile")) return href;
@@ -98,19 +87,6 @@ export default function Header() {
   useEffect(() => {
     const email = session?.user?.email;
     if (!email) return;
-    // /login 등 인증 흐름 경로에서는 next=/login 루프를 만들지 않도록 제외
-    if (
-      !isPhoneVerified &&
-      !pathname.startsWith("/onboarding/phone") &&
-      !isAuthFlowPath(pathname)
-    ) {
-      const safe = sanitizePostAuthRedirect(pathname);
-      router.replace(`/onboarding/phone?next=${encodeURIComponent(safe)}`);
-      if (process.env.NODE_ENV === "development") {
-        console.log("[Header] phone required redirect", { safe });
-      }
-      return;
-    }
     if (pathname.startsWith("/onboarding/profile") || pathname.startsWith("/onboarding/phone")) {
       return;
     }
@@ -138,7 +114,7 @@ export default function Header() {
         setIsProfileComplete(false);
       }
     })();
-  }, [isPhoneVerified, pathname, router, session?.user?.email]);
+  }, [pathname, router, session?.user?.email]);
 
   return (
     <>

@@ -50,19 +50,6 @@ async function authGuardResponse(
     return NextResponse.redirect(url);
   }
 
-  if (PHONE_OTP_ENABLED && !user.phone_confirmed_at) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/onboarding/phone";
-    url.search = "";
-    url.searchParams.set("next", dest);
-    if (process.env.NODE_ENV === "development") {
-      console.log("[proxy] -> /onboarding/phone (phone pending)", {
-        dest: dest.length > 100 ? `${dest.slice(0, 100)}…` : dest,
-      });
-    }
-    return NextResponse.redirect(url);
-  }
-
   return null;
 }
 
