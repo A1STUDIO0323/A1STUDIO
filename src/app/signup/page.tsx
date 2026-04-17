@@ -8,14 +8,10 @@ import { createClient } from "@/lib/supabase/client";
 export default function SignupPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [loading, setLoading] = useState<"google" | "kakao" | "email" | null>(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState<"google" | "kakao" | null>(null);
   const [agreedPrivacy, setAgreedPrivacy] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [agreedMarketing, setAgreedMarketing] = useState(false);
-  const [step, setStep] = useState<"social" | "email">("social");
   const [error, setError] = useState<string | null>(null);
 
   const allRequiredAgreed = agreedPrivacy && agreedTerms;
@@ -58,37 +54,6 @@ export default function SignupPage() {
       if (error) throw error;
     } catch (e: any) {
       setError(e.message ?? "카카오 회원가입 중 오류가 발생했습니다.");
-      setLoading(null);
-    }
-  };
-
-  const handleEmailSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!allRequiredAgreed) {
-      setError("필수 약관에 동의해주세요.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("비밀번호가 일치하지 않습니다.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("비밀번호는 8자 이상이어야 합니다.");
-      return;
-    }
-    setLoading("email");
-    setError(null);
-    try {
-      const response = await fetch("/api/auth/email-signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "회원가입 실패");
-      router.push("/onboarding/profile");
-    } catch (e: any) {
-      setError(e.message ?? "이메일 회원가입 중 오류가 발생했습니다.");
       setLoading(null);
     }
   };
@@ -225,144 +190,34 @@ export default function SignupPage() {
           </div>
         )}
 
-        {/* step: 소셜 가입 */}
-        {step === "social" && (
-          <div className="flex flex-col gap-3">
-            {/* 구글 */}
-            <button
-              onClick={handleGoogleSignup}
-              disabled={loading !== null}
-              aria-label="구글로 회원가입"
-              className="flex items-center justify-center gap-3 w-full py-3 px-4 rounded-xl border font-medium text-sm transition-all disabled:opacity-50"
-              style={{
-                borderColor: "var(--color-border)",
-                background: "#fff",
-                color: "var(--color-text)",
-              }}>
-              <GoogleIcon />
-              {loading === "google" ? "연결 중..." : "구글로 회원가입"}
-            </button>
+        {/* 소셜 로그인 버튼 */}
+        <div className="flex flex-col gap-3">
+          {/* 구글 */}
+          <button
+            onClick={handleGoogleSignup}
+            disabled={loading !== null}
+            aria-label="구글로 회원가입"
+            className="flex items-center justify-center gap-3 w-full py-3 px-4 rounded-xl border font-medium text-sm transition-all disabled:opacity-50"
+            style={{
+              borderColor: "var(--color-border)",
+              background: "#fff",
+              color: "var(--color-text)",
+            }}>
+            <GoogleIcon />
+            {loading === "google" ? "연결 중..." : "구글로 회원가입"}
+          </button>
 
-            {/* 카카오 */}
-            <button
-              onClick={handleKakaoSignup}
-              disabled={loading !== null}
-              aria-label="카카오로 회원가입"
-              className="flex items-center justify-center gap-3 w-full py-3 px-4 rounded-xl font-medium text-sm transition-all disabled:opacity-50"
-              style={{ background: "#FEE500", color: "#191919" }}>
-              <KakaoIcon />
-              {loading === "kakao" ? "연결 중..." : "카카오로 회원가입"}
-            </button>
-
-            {/* 구분선 */}
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 border-t" style={{ borderColor: "var(--color-border)" }} />
-              <span className="text-xs" style={{ color: "var(--color-text-subtle)" }}>또는</span>
-              <div className="flex-1 border-t" style={{ borderColor: "var(--color-border)" }} />
-            </div>
-
-            {/* 이메일 */}
-            <button
-              onClick={() => setStep("email")}
-              disabled={loading !== null}
-              aria-label="이메일로 회원가입"
-              className="flex items-center justify-center gap-3 w-full py-3 px-4 rounded-xl border font-medium text-sm transition-all disabled:opacity-50"
-              style={{
-                borderColor: "var(--color-border)",
-                background: "var(--color-bg)",
-                color: "var(--color-text)",
-              }}>
-              <EmailIcon />
-              이메일로 회원가입
-            </button>
-          </div>
-        )}
-
-        {/* step: 이메일 가입 폼 */}
-        {step === "email" && (
-          <form onSubmit={handleEmailSignup} noValidate className="flex flex-col gap-4">
-            <button type="button" onClick={() => setStep("social")}
-              className="flex items-center gap-1 text-xs mb-1"
-              style={{ color: "var(--color-text-muted)" }}>
-              ← 뒤로
-            </button>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="email" className="text-sm font-medium"
-                style={{ color: "var(--color-text)" }}>
-                이메일 <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>*</span>
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@email.com"
-                className="w-full px-4 py-3 rounded-xl border text-sm outline-none focus:ring-2 transition"
-                style={{
-                  borderColor: "var(--color-border)",
-                  background: "var(--color-bg)",
-                  color: "var(--color-text)",
-                }}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="password" className="text-sm font-medium"
-                style={{ color: "var(--color-text)" }}>
-                비밀번호 <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>*</span>
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="8자 이상"
-                className="w-full px-4 py-3 rounded-xl border text-sm outline-none focus:ring-2 transition"
-                style={{
-                  borderColor: "var(--color-border)",
-                  background: "var(--color-bg)",
-                  color: "var(--color-text)",
-                }}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="confirmPassword" className="text-sm font-medium"
-                style={{ color: "var(--color-text)" }}>
-                비밀번호 확인 <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>*</span>
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="비밀번호를 한 번 더 입력하세요"
-                className="w-full px-4 py-3 rounded-xl border text-sm outline-none focus:ring-2 transition"
-                style={{
-                  borderColor: "var(--color-border)",
-                  background: "var(--color-bg)",
-                  color: "var(--color-text)",
-                }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading !== null || !allRequiredAgreed}
-              className="w-full py-3 rounded-xl font-medium text-sm transition-all disabled:opacity-50 mt-2"
-              style={{ background: "var(--color-accent)", color: "#fff" }}>
-              {loading === "email" ? "처리 중..." : "가입하기"}
-            </button>
-          </form>
-        )}
+          {/* 카카오 */}
+          <button
+            onClick={handleKakaoSignup}
+            disabled={loading !== null}
+            aria-label="카카오로 회원가입"
+            className="flex items-center justify-center gap-3 w-full py-3 px-4 rounded-xl font-medium text-sm transition-all disabled:opacity-50"
+            style={{ background: "#FEE500", color: "#191919" }}>
+            <KakaoIcon />
+            {loading === "kakao" ? "연결 중..." : "카카오로 회원가입"}
+          </button>
+        </div>
 
         {/* 안내 문구 */}
         <p className="mt-6 text-center text-xs leading-relaxed"
@@ -401,16 +256,6 @@ function KakaoIcon() {
       <path fillRule="evenodd" clipRule="evenodd"
         d="M9 1C4.582 1 1 3.91 1 7.5c0 2.29 1.518 4.296 3.812 5.476l-.97 3.556a.3.3 0 0 0 .455.327L8.56 14.39A10.62 10.62 0 0 0 9 14.4c4.418 0 8-2.91 8-6.5S13.418 1 9 1Z"
         fill="#191919"/>
-    </svg>
-  );
-}
-
-function EmailIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect width="20" height="16" x="2" y="4" rx="2"/>
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
     </svg>
   );
 }
