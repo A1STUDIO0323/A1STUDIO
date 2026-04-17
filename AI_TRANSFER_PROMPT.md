@@ -528,8 +528,8 @@ $$ LANGUAGE plpgsql;
 /location                   # 오시는 길
 
 인증
-/login                      # 로그인 (Google/Kakao OAuth)
-/signup                     # 회원가입 (Google/Kakao/이메일, 약관 동의)
+/login                      # 로그인 (Google/Kakao OAuth, 소셜 로그인만)
+/signup                     # 회원가입 (Google/Kakao 소셜, 약관 동의)
 /forgot-password            # 비밀번호 찾기
 /reset-password             # 비밀번호 재설정
 /onboarding/profile         # 온보딩 1단계: 이름, 출생연도 입력
@@ -555,10 +555,10 @@ $$ LANGUAGE plpgsql;
 
 ```
 인증 API
-POST /api/auth/email-signup              # 이메일 회원가입
+POST /api/auth/email-signup              # 이메일 회원가입 (사용 안 함)
 POST /api/auth/password-reset/request    # 비밀번호 재설정 요청
 POST /api/auth/password-reset/confirm    # 비밀번호 재설정 확인
-POST /api/auth/sms/send-code             # SMS 인증번호 발송
+POST /api/auth/sms/send-code             # SMS 인증번호 발송 (SOLAPI 연동)
 POST /api/auth/sms/verify-code           # SMS 인증번호 확인
 GET  /auth/callback                      # OAuth 콜백 (Google/Kakao)
 
@@ -804,7 +804,7 @@ export const REFUND_POLICY = {
 
 export async function sendSMS(params: {
   to: string;
-  text: string;
+  text: string;  // 메시지 내용 (message → text로 변경됨)
   from?: string;
 }): Promise<{ success: boolean; messageId?: string; error?: string }>
 
@@ -827,6 +827,28 @@ export function getReservationCancelMessage(params: {
 // 발송 후 MessageLog에 자동 기록
 ```
 
+**SMS 인증 구현**
+
+```typescript
+// src/app/api/auth/sms/send-code/route.ts
+
+// POST: SMS 인증번호 발송
+// 1. 전화번호 유효성 검증 (normalizePhone, isValidKoreanMobile)
+// 2. 6자리 인증번호 생성 (createOtp)
+// 3. SOLAPI를 통해 실제 SMS 발송
+//    메시지: "[A1 STUDIO] 인증번호는 [${code}]입니다. 3분 내에 입력해주세요."
+// 4. OTP는 메모리 캐시에 저장 (3분 TTL)
+// 5. { success: true, message: "인증코드가 발송되었습니다." }
+
+// src/app/api/auth/sms/verify-code/route.ts
+
+// POST: SMS 인증번호 확인
+// 1. 전화번호와 인증번호 검증
+// 2. 캐시된 OTP와 비교
+// 3. 일치 시 { success: true, verified: true }
+// 4. 불일치 시 { success: false, error: "인증번호가 일치하지 않습니다." }
+```
+
 ### 8. 회원가입 & 온보딩 플로우
 
 **회원가입 프로세스**
@@ -834,10 +856,10 @@ export function getReservationCancelMessage(params: {
 ```typescript
 // src/app/signup/page.tsx
 
-// 지원 가입 방식:
+// 지원 가입 방식 (소셜 로그인만):
 // 1. Google OAuth
 // 2. Kakao OAuth
-// 3. 이메일/비밀번호
+// ※ 이메일/비밀번호 가입은 제거됨
 
 // 약관 동의:
 // - 개인정보 수집 및 이용 동의 (필수)
@@ -895,8 +917,10 @@ redirectTo: `${window.location.origin}/auth/callback?next=/onboarding/profile`
 **미들웨어 라우트 가드**
 
 ```typescript
-// middleware.ts
+// middleware.ts (프로젝트 루트)
 export const runtime = "nodejs";
+
+// import { createServerClient } from "@supabase/ssr";
 
 // 적용 규칙:
 // 1. 비로그인 사용자가 보호된 페이지 접근 → /login
@@ -905,20 +929,32 @@ export const runtime = "nodejs";
 // 4. 이미 로그인한 사용자가 /login, /signup 접근 → /
 
 // 프로필 체크 플로우:
-// 1. Supabase Auth 세션 확인
+// 1. Supabase Auth 세션 확인 (createServerClient)
 // 2. GET /api/members/profile 호출
 // 3. profile.name || profile.birthYear 없으면 → /onboarding/profile
 // 4. profile.phoneVerified === false → /onboarding/phone
 // 5. 모두 완료 시 요청한 페이지로 진행
 
+// 디버깅 로그 (개발 모드):
+console.log("[middleware] profile:", JSON.stringify(profile));
+console.log("[middleware] Redirecting to /onboarding/profile - name:", profile?.name, "birthYear:", profile?.birthYear);
+console.log("[middleware] Redirecting to /onboarding/phone - phoneVerified:", profile.phoneVerified);
+
 // 온보딩 경로는 가드 스킵:
 const ONBOARDING_PATHS = ["/onboarding/profile", "/onboarding/phone"];
+
+// 레거시 파일 (src/proxy.ts):
+// - phone 관련 리다이렉트 로직이 제거됨 (user.phone_confirmed_at 체크 제거)
+// - 이제 phone 인증은 middleware.ts에서만 관리됨
 ```
 
 **프로필 API**
 
 ```typescript
 // src/app/api/members/profile/route.ts
+
+// import { createClient } from "@/lib/supabase/server";
+// import { prisma } from "@/lib/db";
 
 // GET: 프로필 조회
 // - Supabase Auth 세션 확인
@@ -931,6 +967,7 @@ const ONBOARDING_PATHS = ["/onboarding/profile", "/onboarding/phone"];
 //   - birthYear: number, 1900~현재년도 (optional)
 //   - phone: string, 01[0-9]{8,9} (optional)
 //   - phoneVerified: boolean (optional)
+// - Zod 에러: error.issues[0]?.message (issues 사용)
 // - Prisma User.upsert()
 //   - create: 새 사용자 생성 (auth id 기준)
 //   - update: 기존 사용자 업데이트
@@ -1553,10 +1590,10 @@ A1STUDIO/
 - ✅ 스튜디오/대표 소개, 용도/비품 안내
 - ✅ 라이트박스 갤러리 (PC/모바일)
 - ✅ 요금 안내 (이벤트 가격 적용)
-- ✅ 인증 시스템 (Google/Kakao OAuth, Phone OTP, Email/Password)
-- ✅ 회원가입 페이지 (Google/Kakao/이메일, 약관 동의)
-- ✅ 온보딩 플로우 (프로필 입력, 휴대폰 인증)
-- ✅ 라우트 가드 미들웨어 (인증 & 온보딩 체크)
+- ✅ 인증 시스템 (Google/Kakao OAuth, Phone OTP - 소셜 로그인만)
+- ✅ 회원가입 페이지 (Google/Kakao 소셜만, 약관 동의)
+- ✅ 온보딩 플로우 (프로필 입력, 휴대폰 SMS 인증)
+- ✅ 라우트 가드 미들웨어 (인증 & 온보딩 체크, Prisma 기반)
 - ✅ 예약 시스템 (연습실 - 포인트 결제)
 - ✅ 파티룸 예약 (카카오페이 직접 결제)
 - ✅ 포인트 충전 (Kakao Pay)
@@ -1573,9 +1610,11 @@ A1STUDIO/
 - ✅ Prisma + PostgreSQL (Supabase)
 - ✅ Supabase Auth + 포인트 시스템
 - ✅ User 모델 확장 (birthYear, phone, phoneVerified, marketingAgreed)
-- ✅ 프로필 API (GET/POST /api/members/profile)
-- ✅ SMS 인증 API (send-code, verify-code)
-- ✅ Next.js 미들웨어 (라우트 가드, 온보딩 플로우 강제)
+- ✅ 프로필 API (GET/POST /api/members/profile, Zod error.issues 사용)
+- ✅ SMS 인증 API (send-code: SOLAPI 실제 발송, verify-code)
+- ✅ SMS 라이브러리 (sendSMS 파라미터: text 필드 사용)
+- ✅ Next.js 미들웨어 (라우트 가드, 온보딩 플로우 강제, runtime: nodejs)
+- ✅ 레거시 코드 정리 (proxy.ts, Header.tsx, login/page.tsx)
 - ✅ 카카오페이 결제 연동 (포인트 충전 + 파티룸)
 - ✅ SMS 발송 (SOLAPI/COOLSMS)
 - ✅ 이메일 발송 (SendGrid)
@@ -1593,6 +1632,7 @@ A1STUDIO/
 
 ### 🔧 개선 필요
 
+- 🔧 이메일/비밀번호 로그인 재구현 (현재 소셜 로그인만 지원)
 - 🔧 회원 탈퇴 처리 완성도 향상
 - 🔧 예약 리마인더 자동 발송
 - 🔧 환불 처리 자동화
@@ -1748,8 +1788,58 @@ A1STUDIO/
 - 현재 상태 & 개선 필요 사항
 - 외부 서비스 연동 정보
 
+---
+
+## 📝 최근 수정 사항 (2026-04-17)
+
+### 회원가입 & 온보딩 시스템 구현
+
+**1. 데이터베이스 스키마 확장**
+- User 모델에 `birthYear`, `phone`, `phoneVerified`, `marketingAgreed` 필드 추가
+
+**2. 회원가입 페이지 (`/signup`)**
+- Google/Kakao 소셜 로그인만 지원 (이메일 가입 제거)
+- 약관 동의 (개인정보, 이용약관, 마케팅)
+- OAuth redirectTo: `window.location.origin` 사용 (환경변수 하드코딩 제거)
+
+**3. 온보딩 플로우**
+- `/onboarding/profile`: 이름, 출생연도 입력
+- `/onboarding/phone`: 휴대폰 SMS 인증 (SOLAPI 연동)
+
+**4. 미들웨어 라우트 가드 (`middleware.ts`)**
+- `export const runtime = "nodejs"` 추가
+- Prisma `phoneVerified` 기반 온보딩 플로우 강제
+- 디버깅 로그 추가 (개발 모드)
+- 레거시 `src/proxy.ts`의 phone 리다이렉트 로직 제거됨
+
+**5. 프로필 API (`/api/members/profile`)**
+- `createClient` 사용 (from `@/lib/supabase/server`)
+- `{ prisma }` named import 사용 (from `@/lib/db`)
+- Zod 에러: `error.issues[0]?.message` 사용
+
+**6. SMS 인증 API (`/api/auth/sms/send-code`)**
+- SOLAPI를 통한 실제 SMS 발송 구현
+- `sendSMS()` 함수 사용
+- 메시지 템플릿: `[A1 STUDIO] 인증번호는 [${code}]입니다. 3분 내에 입력해주세요.`
+
+**7. SMS 라이브러리 (`src/lib/sms.ts`)**
+- `SendMessageParams` 파라미터: `message` → `text`로 변경
+- SOLAPI/COOLSMS 모두 `text` 필드 사용
+
+**8. 레거시 코드 제거**
+- `src/components/layout/Header.tsx`: phone 리다이렉트 로직 제거 (`isPhoneVerified`, `getGuardedHref`)
+- `src/app/login/page.tsx`: phone 리다이렉트 로직 제거, "로그인 상태 유지" 체크박스 제거
+- `src/proxy.ts`: `user.phone_confirmed_at` 체크 로직 제거
+
+**9. 로그인 페이지 개선**
+- `/login` → `/signup` 회원가입 링크 추가
+- 소셜 로그인만 지원 (이메일 로그인 종료 안내)
+- 개인정보 수집·이용 동의 필수
+
+---
+
 **작성일**: 2026-04-17  
-**버전**: 2.2 (최신)  
+**버전**: 2.3 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
