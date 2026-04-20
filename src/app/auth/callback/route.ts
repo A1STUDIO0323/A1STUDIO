@@ -32,6 +32,11 @@ export async function GET(request: Request) {
           });
         },
       },
+      auth: {
+        flowType: 'pkce',
+        detectSessionInUrl: true,
+        persistSession: true,
+      },
     }
   );
 
