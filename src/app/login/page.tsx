@@ -29,18 +29,9 @@ function LoginContent() {
   const error = searchParams.get("error");
   const onboardingPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
   const onboardingCallbackUrl = `${onboardingPath}?next=${encodeURIComponent(safeCallback)}`;
-  
-  // 개인정보 수집·이용 동의 (필수)
-  const [privacyConsent, setPrivacyConsent] = useState(false);
 
   // OAuth 로그인 핸들러
   const handleOAuthLogin = async (provider: "google" | "kakao") => {
-    // 개인정보 동의 확인
-    if (!privacyConsent) {
-      alert('개인정보 수집·이용에 동의해주세요.');
-      return;
-    }
-    
     try {
       console.log(`%c[handleOAuthLogin] Starting ${provider} login`, 'color: blue; font-weight: bold');
       console.log('Callback URL:', onboardingCallbackUrl);
@@ -124,8 +115,7 @@ function LoginContent() {
                 e.stopPropagation();
                 handleOAuthLogin("google");
               }}
-              disabled={!privacyConsent}
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-sm font-semibold text-[#3B342F] transition-all hover:bg-[#EFE7DA] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-sm font-semibold text-[#3B342F] transition-all hover:bg-[#EFE7DA] active:scale-95"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -156,8 +146,7 @@ function LoginContent() {
                 e.stopPropagation();
                 handleOAuthLogin("kakao");
               }}
-              disabled={!privacyConsent}
-              className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#3B342F] transition-all hover:bg-[#F5DC00] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#3B342F] transition-all hover:bg-[#F5DC00] active:scale-95"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" fill="currentColor">
                 <path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.72 1.56 5.12 3.96 6.6L5 21l4.2-2.28c.9.24 1.84.36 2.8.36 5.52 0 10-3.48 10-7.8C22 6.48 17.52 3 12 3z" />
@@ -174,60 +163,8 @@ function LoginContent() {
           )}
         </div>
 
-        {/* 개인정보 수집·이용 동의 (필수) */}
-        <div className="mt-5 space-y-3">
-          <div className="rounded-xl border border-[#D8CCBC] bg-[#F7F3EB]/60 p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={privacyConsent}
-                onChange={(e) => setPrivacyConsent(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-[#D8CCBC] text-[#B98768] focus:ring-[#B98768] focus:ring-offset-0 shrink-0"
-              />
-              <span className="text-sm text-[#3B342F] leading-relaxed">
-                <a 
-                  href="/privacy" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="font-semibold text-[#B98768] hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  개인정보 수집·이용
-                </a>에 동의합니다 (필수)
-              </span>
-            </label>
-            <div className="mt-2 ml-7 text-xs text-[#6f655d] leading-relaxed">
-              <p className="mb-1 font-semibold">필수 수집 항목:</p>
-              <ul className="list-disc list-inside space-y-0.5 ml-2">
-                <li>Google: 이름, 출생 연도, 구글계정(전화번호)</li>
-                <li>Kakao: 이름, 출생 연도, 카카오계정(전화번호)</li>
-              </ul>
-              <p className="mt-2 font-semibold">이용 목적:</p>
-              <ul className="list-disc list-inside space-y-0.5 ml-2">
-                <li>회원 식별 및 인증</li>
-                <li>성인 인증 (만 19세 이상 확인)</li>
-                <li>예약 확인 및 안내 메시지 발송</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* 건너뛰기 */}
-        <div className="mt-5 text-center">
-          <button
-            onClick={() => router.push(safeCallback)}
-            className="text-sm text-[#9b9189] underline-offset-2 hover:text-[#3B342F] hover:underline transition-colors"
-          >
-            로그인 없이 계속하기
-          </button>
-        </div>
-
-        <p className="mt-4 text-center text-xs text-[#b0a89e]">
-          소셜 로그인 후 생년월일·이메일·연락처를 확인/입력합니다.
-        </p>
-
         {/* 회원가입 링크 */}
-        <p className="mt-3 text-center text-sm text-[#6f655d]">
+        <p className="mt-6 text-center text-sm text-[#6f655d]">
           아직 계정이 없으신가요?{" "}
           <Link href="/signup" className="font-medium underline text-[#B98768] hover:text-[#a9785c]">
             회원가입

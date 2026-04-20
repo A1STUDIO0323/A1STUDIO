@@ -90,9 +90,6 @@ function MyPageContent() {
   // 계정 정보 관련
   const [profileData, setProfileData] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [editingBirthDate, setEditingBirthDate] = useState(false);
-  const [birthDateInput, setBirthDateInput] = useState("");
-  const [savingBirthDate, setSavingBirthDate] = useState(false);
 
   // 계정 탈퇴 관련
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -303,50 +300,6 @@ function MyPageContent() {
       console.error("계정 탈퇴 오류:", error);
       alert("계정 탈퇴 처리 중 오류가 발생했습니다");
       setIsDeleting(false);
-    }
-  };
-
-  const handleSaveBirthDate = async () => {
-    if (!birthDateInput) {
-      alert("생년월일을 입력해주세요");
-      return;
-    }
-
-    try {
-      setSavingBirthDate(true);
-      const res = await fetch("/api/members/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ birthDate: birthDateInput }),
-      });
-
-      const data = await res.json();
-      
-      if (!res.ok || !data.success) {
-        alert(data.error || "생년월일 저장에 실패했습니다");
-        return;
-      }
-
-      // URL에서 리다이렉트 파라미터 확인
-      const urlParams = new URLSearchParams(window.location.search);
-      const returnTo = urlParams.get('returnTo');
-      
-      if (returnTo === 'party-room') {
-        alert("생년월일이 저장되었습니다. 이제 파티룸을 예약하실 수 있습니다.");
-        // 잠시 대기 후 리다이렉트 (캐시 무효화를 위해)
-        setTimeout(() => {
-          router.push("/booking?type=party-room&refresh=" + Date.now());
-        }, 500);
-      } else {
-        alert("생년월일이 저장되었습니다");
-        // 페이지 새로고침하여 useIsAdult 훅이 업데이트된 정보를 가져오도록 함
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error("생년월일 저장 오류:", error);
-      alert("생년월일 저장 중 오류가 발생했습니다");
-    } finally {
-      setSavingBirthDate(false);
     }
   };
 
@@ -692,65 +645,13 @@ function MyPageContent() {
                   </div>
 
                   <div>
-                    <p className="text-sm text-[#9b9189] mb-1">생년월일</p>
-                    {editingBirthDate ? (
-                      <div className="space-y-2">
-                        <input
-                          type="date"
-                          value={birthDateInput}
-                          onChange={(e) => setBirthDateInput(e.target.value)}
-                          className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2 text-[#3B342F] focus:border-[#B98768] focus:outline-none"
-                          max={format(new Date(), "yyyy-MM-dd")}
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleSaveBirthDate}
-                            disabled={savingBirthDate}
-                            className="flex-1 rounded-lg bg-[#B98768] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a9785c] disabled:opacity-50"
-                          >
-                            {savingBirthDate ? "저장 중..." : "저장"}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingBirthDate(false);
-                              setBirthDateInput("");
-                            }}
-                            className="flex-1 rounded-lg border border-[#D8CCBC] px-4 py-2 text-sm font-semibold text-[#6f655d] hover:bg-[#EFE7DA]"
-                          >
-                            취소
-                          </button>
-                        </div>
-                      </div>
-                    ) : profileData?.birthDate ? (
-                      <div className="flex items-center justify-between">
-                        <p className="text-lg font-semibold text-[#3B342F]">
-                          {format(new Date(profileData.birthDate), "yyyy년 M월 d일", { locale: ko })}
-                        </p>
-                        <button
-                          onClick={() => {
-                            setBirthDateInput(profileData.birthDate);
-                            setEditingBirthDate(true);
-                          }}
-                          className="text-sm text-[#B98768] hover:underline"
-                        >
-                          수정
-                        </button>
-                      </div>
+                    <p className="text-sm text-[#9b9189] mb-1">출생연도</p>
+                    {profileData?.birthYear ? (
+                      <p className="text-lg font-semibold text-[#3B342F]">
+                        {profileData.birthYear}년생
+                      </p>
                     ) : (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <p className="text-[#9b9189]">미입력</p>
-                          <button
-                            onClick={() => setEditingBirthDate(true)}
-                            className="text-sm text-[#B98768] hover:underline font-semibold"
-                          >
-                            입력하기
-                          </button>
-                        </div>
-                        <p className="text-xs text-amber-600 leading-relaxed">
-                          파티룸 예약을 위해서는 생년월일(만 19세 이상) 확인이 필요합니다.
-                        </p>
-                      </div>
+                      <p className="text-[#9b9189]">미입력</p>
                     )}
                   </div>
 

@@ -543,6 +543,7 @@ $$ LANGUAGE plpgsql;
 관리자
 /admin                      # 관리자 대시보드
 /admin/members              # 회원 관리
+/admin/reviews              # 후기 관리
 /admin/class-requests       # 클래스 요청 관리
 /admin/reservations/calendar # 예약 캘린더
 
@@ -606,6 +607,9 @@ GET  /api/admin/dashboard                # 대시보드 통계
 GET  /api/admin/members                  # 회원 목록
 POST /api/admin/members/actions          # 회원 관리 액션
 GET  /api/admin/reservations/calendar    # 예약 캘린더 데이터
+GET  /api/admin/reviews                  # 후기 목록 조회 (Supabase)
+PATCH /api/admin/reviews                 # 후기 공개/비공개 토글
+DELETE /api/admin/reviews                # 후기 삭제
 
 원데이클래스 API
 GET  /api/one-day-class                  # 클래스 목록 조회
@@ -614,8 +618,8 @@ POST /api/one-day-class                  # 클래스 등록/신청
 컨텐츠 API
 GET  /api/notices                        # 공지사항 목록
 GET  /api/events                         # 이벤트 목록
-GET  /api/reviews                        # 후기 목록 (미구현)
 POST /api/contact                        # 문의하기
+※ 후기 API는 Supabase 직접 조회 (Server Action 사용)
 
 디버그 API (개발용)
 GET  /api/debug/profiles                 # 프로필 디버그
@@ -944,7 +948,7 @@ console.log("[middleware] Redirecting to /onboarding/phone - phoneVerified:", pr
 const ONBOARDING_PATHS = ["/onboarding/profile", "/onboarding/phone"];
 
 // 레거시 파일 (src/proxy.ts):
-// - phone 관련 리다이렉트 로직이 제거됨 (user.phone_confirmed_at 체크 제거)
+// - 2026-04-17에 완전 삭제됨 (phone 관련 리다이렉트 로직 포함)
 // - 이제 phone 인증은 middleware.ts에서만 관리됨
 ```
 
@@ -1168,6 +1172,8 @@ const cardsY = useTransform(scrollYProgress, [0.24, 0.48], [120, 0]);
 - 로고, 메뉴
 - 포인트 잔액 표시 (로그인 시)
 - 모바일 햄버거 메뉴
+- 모바일 UI: 마이페이지, 관리자 버튼 `hidden lg:flex` (햄버거 메뉴 공간 확보)
+- 프로필 완성 체크 로직 제거 (middleware.ts에서 처리)
 
 **Footer** (`src/components/layout/Footer.tsx`)
 - 스튜디오 정보
@@ -1452,6 +1458,7 @@ A1STUDIO/
 │   │   ├── admin/                          # 관리자
 │   │   │   ├── page.tsx
 │   │   │   ├── members/page.tsx
+│   │   │   ├── reviews/page.tsx            # 후기 관리
 │   │   │   ├── class-requests/page.tsx
 │   │   │   └── reservations/calendar/page.tsx
 │   │   ├── reviews/                        # 후기
@@ -1499,6 +1506,7 @@ A1STUDIO/
 │   │       │   ├── auth/route.ts
 │   │       │   ├── dashboard/route.ts
 │   │       │   ├── members/route.ts
+│   │       │   ├── reviews/route.ts        # 후기 관리 API
 │   │       │   └── reservations/calendar/route.ts
 │   │       ├── one-day-class/route.ts
 │   │       ├── notices/route.ts
@@ -1603,6 +1611,7 @@ A1STUDIO/
 - ✅ 회원 등급 (CM)
 - ✅ 관리자 대시보드 (기본)
 - ✅ 관리자 예약 캘린더
+- ✅ 관리자 후기 관리 (조회, 공개/비공개, 삭제)
 - ✅ 문의하기, 공지/이벤트
 - ✅ 개인정보처리방침
 
@@ -1614,7 +1623,8 @@ A1STUDIO/
 - ✅ SMS 인증 API (send-code: SOLAPI 실제 발송, verify-code)
 - ✅ SMS 라이브러리 (sendSMS 파라미터: text 필드 사용)
 - ✅ Next.js 미들웨어 (라우트 가드, 온보딩 플로우 강제, runtime: nodejs)
-- ✅ 레거시 코드 정리 (proxy.ts, Header.tsx, login/page.tsx)
+- ✅ 레거시 코드 정리 (src/proxy.ts 삭제, Header.tsx, login/page.tsx)
+- ✅ 관리자 후기 관리 (Supabase reviews 테이블 직접 조회/수정/삭제)
 - ✅ 카카오페이 결제 연동 (포인트 충전 + 파티룸)
 - ✅ SMS 발송 (SOLAPI/COOLSMS)
 - ✅ 이메일 발송 (SendGrid)
@@ -1628,7 +1638,7 @@ A1STUDIO/
 - ⏳ 네이버 지도 임베드 (현재 플레이스홀더)
 - ⏳ 카카오 알림톡 (SOLAPI - 선택 기능)
 - ⏳ 고급 관리자 기능 (통계, 정산 등)
-- ⏳ 리뷰 시스템 (UI만 존재)
+- ⏳ 후기 이미지/동영상 표시 (관리자 페이지)
 
 ### 🔧 개선 필요
 
@@ -1809,8 +1819,16 @@ A1STUDIO/
 **4. 미들웨어 라우트 가드 (`middleware.ts`)**
 - `export const runtime = "nodejs"` 추가
 - Prisma `phoneVerified` 기반 온보딩 플로우 강제
-- 디버깅 로그 추가 (개발 모드)
-- 레거시 `src/proxy.ts`의 phone 리다이렉트 로직 제거됨
+- 프로필 API fetch 디버깅 로그 추가:
+  ```typescript
+  console.log("[middleware] 실행됨:", request.nextUrl.pathname);
+  console.log("[middleware] profile fetch status:", profileRes.status);
+  const rawText = await profileRes.text();
+  console.log("[middleware] profile raw response:", rawText);
+  console.log("[middleware] profile response:", JSON.stringify(profile));
+  console.log("[middleware] name:", profile?.name, "birthYear:", profile?.birthYear, "phoneVerified:", profile?.phoneVerified);
+  ```
+- 레거시 `src/proxy.ts` 파일 완전 삭제 (phone 리다이렉트 로직 제거)
 
 **5. 프로필 API (`/api/members/profile`)**
 - `createClient` 사용 (from `@/lib/supabase/server`)
@@ -1827,19 +1845,39 @@ A1STUDIO/
 - SOLAPI/COOLSMS 모두 `text` 필드 사용
 
 **8. 레거시 코드 제거**
-- `src/components/layout/Header.tsx`: phone 리다이렉트 로직 제거 (`isPhoneVerified`, `getGuardedHref`)
+- `src/proxy.ts`: 파일 전체 삭제 (phone 관련 리다이렉트 로직 포함)
+- `src/components/layout/Header.tsx`: 
+  - `isProfileComplete` state 및 관련 로직 제거
+  - phone 리다이렉트 로직 제거 (`getGuardedHref` 함수 단순화)
+  - 모바일 UI 개선: 마이페이지, 관리자 버튼에 `hidden lg:flex` 추가 (햄버거 메뉴 공간 확보)
 - `src/app/login/page.tsx`: phone 리다이렉트 로직 제거, "로그인 상태 유지" 체크박스 제거
-- `src/proxy.ts`: `user.phone_confirmed_at` 체크 로직 제거
 
 **9. 로그인 페이지 개선**
 - `/login` → `/signup` 회원가입 링크 추가
 - 소셜 로그인만 지원 (이메일 로그인 종료 안내)
 - 개인정보 수집·이용 동의 필수
 
+**10. 관리자 후기 관리 기능 추가**
+- `src/app/api/admin/reviews/route.ts` 생성 (Supabase 직접 사용):
+  - GET: 전체 후기 목록 조회 (`reviews` 테이블, `author_name`, `is_visible` 등)
+  - PATCH: `is_visible` 공개/비공개 토글
+  - DELETE: 후기 삭제
+- `src/app/admin/reviews/page.tsx` 생성:
+  - 관리자 인증 체크 (`useAdmin` 훅)
+  - 후기 목록 테이블 (닉네임, 별점, 내용, 공개여부, 작성일, 액션)
+  - 공개/비공개 토글 버튼
+  - 삭제 확인 모달
+  - A1 STUDIO 디자인 시스템 적용
+- `src/app/admin/page.tsx`: "후기 관리" 탭(4번째) 추가, `/admin/reviews` 링크 연결
+
+**11. 후기 시스템 데이터 소스 확인**
+- 일반 사용자 후기 페이지 (`/reviews`): Supabase `reviews` 테이블 사용 (`author_name`, `is_visible`, `image_url`, `video_url`)
+- 관리자 후기 관리: Supabase `reviews` 테이블 직접 조회/수정 (Prisma Review 모델과 별도)
+
 ---
 
 **작성일**: 2026-04-17  
-**버전**: 2.3 (최신)  
+**버전**: 2.4 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
