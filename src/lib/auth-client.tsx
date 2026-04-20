@@ -165,7 +165,6 @@ export async function signIn(
     provider,
     options: { 
       redirectTo,
-      skipBrowserRedirect: false, // Supabase가 자동 리다이렉트하도록 변경
       ...(scopes && { scopes }),
     },
   });
