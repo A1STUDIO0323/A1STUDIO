@@ -281,8 +281,7 @@ export function useMemberRole(email?: string | null) {
         }
         const data = (await res.json()) as { role?: MemberRole };
         if (mounted) {
-          // 서버 응답이 MEMBER여도, 방금 관리자 화면에서 반영된 로컬 CM 상태를 우선합니다.
-          setRole(data.role === "CM" || localRole === "CM" ? "CM" : "MEMBER");
+          setRole(data.role === "CM" ? "CM" : "MEMBER");
         }
       } catch {
         if (mounted) setRole(localRole);
