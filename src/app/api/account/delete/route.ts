@@ -141,24 +141,6 @@ export async function POST(request: NextRequest) {
 
     console.log('[계정탈퇴] 포인트 및 예약 처리 완료 - 탈퇴 진행');
 
-    // 3. 개인정보 비식별화 (member_profiles)
-    const { error: profileError } = await supabase
-      .from("member_profiles")
-      .update({
-        phone: null,
-        birth_date: null,
-        middle_school: null,
-        high_school: null,
-        university: null,
-        graduate_school: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("email", user.email);
-
-    if (profileError) {
-      console.error("프로필 삭제 실패:", profileError);
-    }
-
     // 4. 예약 정보 비식별화 (guest_name, guest_phone)
     await supabase
       .from("reservations")

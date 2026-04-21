@@ -9,8 +9,8 @@ export async function GET(req: NextRequest) {
     if (email) {
       // 특정 이메일 조회
       const profile = await prisma.$queryRaw`
-        SELECT email, birth_date, phone, created_at, updated_at
-        FROM member_profiles
+        SELECT email, birth_year, phone, created_at, updated_at
+        FROM profiles
         WHERE email = ${email.trim().toLowerCase()}
         LIMIT 1
       `;
@@ -20,8 +20,8 @@ export async function GET(req: NextRequest) {
     
     // 전체 목록 조회
     const profiles = await prisma.$queryRaw`
-      SELECT email, birth_date, phone, created_at, updated_at
-      FROM member_profiles
+      SELECT email, birth_year, phone, created_at, updated_at
+      FROM profiles
       ORDER BY updated_at DESC
       LIMIT 10
     `;

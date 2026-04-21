@@ -59,22 +59,22 @@ export async function POST(request: NextRequest) {
     // 파티룸 예약인 경우 추가 검증
     if (reservation_type === 'party-room') {
       // 1. 성인 여부 서버사이드 재검증
-      const { data: memberProfile } = await supabase
-        .from('member_profiles')
-        .select('birth_date')
-        .eq('email', user.email)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('birth_year')
+        .eq('id', user.id)
         .single();
 
-      const birthdate = memberProfile?.birth_date;
+      const birthYear = profile?.birth_year;
       
-      if (!birthdate) {
+      if (birthYear == null) {
         return NextResponse.json(
           { error: '파티룸 예약을 위해서는 생년월일 정보가 필요합니다. 프로필을 완성해주세요.' }, 
           { status: 403 }
         );
       }
       
-      if (!isAdult(birthdate)) {
+      if (!isAdult(new Date(birthYear, 11, 31))) {
         return NextResponse.json(
           { error: '파티룸은 만 19세 이상 성인만 예약 가능합니다.' }, 
           { status: 403 }
@@ -140,15 +140,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 사용자 프로필 정보 조회 (guest_name, guest_phone)
-    const { data: memberProfile } = await supabase
-      .from('member_profiles')
-      .select('phone, birth_date')
-      .eq('email', user.email)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('phone, birth_year')
+      .eq('id', user.id)
       .single();
 
     // 전화번호 정규화 (82XXXXXXXXXX → 010XXXXXXXX)
-    // 우선순위: 1) member_profiles 테이블, 2) Supabase Auth
-    const normalizedPhone = normalizePhoneNumber(memberProfile?.phone || user.phone);
+    // 우선순위: 1) profiles 테이블, 2) Supabase Auth
+    const normalizedPhone = normalizePhoneNumber(profile?.phone || user.phone);
 
     // 포인트 잔액 확인 및 차감 (use_points 함수 호출)
     const { data: usePointsResult, error: usePointsError } = await supabase.rpc("use_points", {
