@@ -549,6 +549,7 @@ $$ LANGUAGE plpgsql;
 
 기타
 /privacy                    # 개인정보처리방침
+/terms                      # 서비스 이용약관
 /test-auth                  # 인증 테스트 (개발용)
 ```
 
@@ -1470,6 +1471,7 @@ A1STUDIO/
 │   │   ├── pricing/                        # 요금안내
 │   │   ├── availability/                   # 예약현황
 │   │   ├── privacy/                        # 개인정보처리방침
+│   │   ├── terms/                          # 서비스 이용약관
 │   │   ├── login/                          # 로그인
 │   │   ├── signup/                         # 회원가입
 │   │   ├── forgot-password/                # 비밀번호 찾기
@@ -1549,7 +1551,6 @@ A1STUDIO/
 │       ├── local-store.ts                  # 로컬 스토리지
 │       ├── member-role.ts                  # 회원 등급 (클라이언트)
 │       ├── member-role-db.ts               # 회원 등급 (DB)
-│       ├── member-profile-db.ts            # 회원 프로필 DB
 │       ├── email-auth-db.ts                # 이메일 인증 DB
 │       ├── db.ts                           # Prisma 클라이언트
 │       ├── supabase-auth.ts                # Supabase Auth 헬퍼
@@ -1876,8 +1877,35 @@ A1STUDIO/
 
 ---
 
-**작성일**: 2026-04-17  
-**버전**: 2.4 (최신)  
+## 📝 최근 수정 사항 (2026-04-20)
+
+### 1. OAuth 콜백 (`src/app/auth/callback/route.ts`)
+- Supabase `createServerClient` 세 번째 인자에 `auth` 옵션 추가: `flowType: 'pkce'`, `detectSessionInUrl: true`, `persistSession: true` (클라이언트·서버 세션 정책 정렬, PKCE 흐름 명시)
+
+### 2. 회원 탈퇴 API (`src/app/api/members/withdraw/route.ts`)
+- `withdrawMemberByUserId` 처리 후 `prisma.$executeRaw`로 Postgres `member_roles` 테이블에서 탈퇴 사용자 이메일 행 `DELETE` (실패 시 `console.error`만, 본 흐름은 유지)
+- `import { prisma } from "@/lib/db"` 사용
+
+### 3. 서비스 이용약관 페이지 (`src/app/terms/page.tsx`)
+- 신규 추가: `/terms`, 제목「서비스 이용약관」, 시행일 2026-05-01
+- 레이아웃·타이포는 `privacy` 페이지와 동일한 LEGAL 문서 스타일(히어로 + 본문 `max-w-7xl` + 하단 사업자 정보 박스)
+
+### 4. `member_profiles` 테이블 의존 제거 및 `profiles` 통합
+- **`src/lib/member-profile-db.ts` 파일 삭제** (Supabase `member_profiles` 전용 DDL/upsert 모듈 — 더 이상 사용하지 않음)
+- **`POST /api/reservations/create`** (`src/app/api/reservations/create/route.ts`):
+  - 파티룸 성인 검증·연락처 조회: `supabase.from('profiles')`, `.eq('id', user.id)`, `select('birth_year')` / `select('phone, birth_year')`
+  - `isAdult`는 출생연도만 있을 때 `isAdult(new Date(birthYear, 11, 31))`로 호출 (기존 `isAdult(birthdate)` 시그니처 유지)
+- **`GET /api/debug/profiles`** (`src/app/api/debug/profiles/route.ts`): raw SQL 대상 테이블을 `member_profiles` → **`profiles`**, 컬럼 `birth_date` → **`birth_year`**
+- **`POST /api/account/delete`** (`src/app/api/account/delete/route.ts`): `member_profiles` 행 비식별화 `update` 블록 **전체 제거** (테이블/기능 폐기에 맞춤)
+
+### 5. 문서·경로 반영
+- 라우트 목록·`src/app` 트리에 `/terms` · `terms/page.tsx` 반영
+- `src/lib` 파일 트리에서 `member-profile-db.ts` 항목 제거
+
+---
+
+**작성일**: 2026-04-20  
+**버전**: 2.5 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---

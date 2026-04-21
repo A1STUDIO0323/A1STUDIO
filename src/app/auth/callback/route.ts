@@ -1,6 +1,29 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import type { User as SupabaseAuthUser } from '@supabase/supabase-js';
+
+function prismaPayloadFromAuthUser(user: SupabaseAuthUser) {
+  const email = (user.email ?? '').trim().toLowerCase() || null;
+  const userName =
+    typeof user.user_metadata?.name === 'string'
+      ? user.user_metadata.name
+      : typeof user.user_metadata?.full_name === 'string'
+        ? user.user_metadata.full_name
+        : null;
+  const avatarUrl =
+    typeof user.user_metadata?.avatar_url === 'string'
+      ? user.user_metadata.avatar_url
+      : typeof user.user_metadata?.picture === 'string'
+        ? user.user_metadata.picture
+        : null;
+  const provider =
+    typeof user.app_metadata?.provider === 'string'
+      ? user.app_metadata.provider
+      : null;
+  return { email, userName, avatarUrl, provider };
+}
 
 function sanitizePostAuthRedirect(next: string | null): string {
   if (!next) return '/';
@@ -47,8 +70,34 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=session_failed`);
   }
 
-  // 카카오 OAuth: user_metadata 자동 저장
   const { data: { user } } = await supabase.auth.getUser();
+
+  // OAuth로 auth.users에 생성된 동일 id로 public.profiles(Prisma User) 동기화
+  if (user?.id) {
+    try {
+      const { email, userName, avatarUrl, provider } = prismaPayloadFromAuthUser(user);
+      await prisma.user.upsert({
+        where: { id: user.id },
+        update: {
+          email,
+          name: userName,
+          avatarUrl,
+          provider,
+        },
+        create: {
+          id: user.id,
+          email,
+          name: userName,
+          avatarUrl,
+          provider,
+        },
+      });
+    } catch (e) {
+      console.error('[auth/callback] Prisma profiles 동기화 실패:', e);
+    }
+  }
+
+  // 카카오 OAuth: user_metadata 자동 저장
   if (user && user.app_metadata?.provider === 'kakao') {
     const meta = user.user_metadata ?? {};
     
@@ -63,33 +112,32 @@ export async function GET(request: Request) {
       if (phoneNumber && typeof phoneNumber === 'string') {
         phone = phoneNumber.replace(/^\+82/, '0').replace(/\D/g, '');
       }
-      
-      // 프로필 저장
+
       try {
-        const profilePayload: any = {};
-        if (name) profilePayload.name = name;
-        if (birthyear) profilePayload.birthYear = parseInt(birthyear, 10);
-        if (phone) {
-          profilePayload.phone = phone;
-          profilePayload.phoneVerified = true; // 카카오 인증 완료
+        const data: {
+          name?: string;
+          birthYear?: number;
+          phone?: string;
+          phoneVerified?: boolean;
+        } = {};
+        if (name) data.name = String(name);
+        if (birthyear) {
+          const y = parseInt(String(birthyear), 10);
+          if (!Number.isNaN(y)) data.birthYear = y;
         }
-        
-        const profileRes = await fetch(`${origin}/api/members/profile`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            cookie: cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; '),
-          },
-          body: JSON.stringify(profilePayload),
-        });
-        
-        if (!profileRes.ok) {
-          console.error('[auth/callback] 프로필 저장 실패:', await profileRes.text());
-        } else {
-          console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', profilePayload);
+        if (phone) {
+          data.phone = phone;
+          data.phoneVerified = true;
+        }
+        if (Object.keys(data).length > 0) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data,
+          });
+          console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', data);
         }
       } catch (err) {
-        console.error('[auth/callback] 프로필 저장 오류:', err);
+        console.error('[auth/callback] 카카오 프로필 저장 오류:', err);
       }
     }
   }
