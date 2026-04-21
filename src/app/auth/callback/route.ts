@@ -183,5 +183,35 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  // 온보딩 플로우: 프로필 완성도에 따라 리다이렉트
+  if (user?.id) {
+    try {
+      const profile = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { name: true, birthYear: true, phone: true, phoneVerified: true },
+      });
+
+      let redirectPath = next || '/';
+
+      // 1. 이름 또는 출생연도가 없으면 → 프로필 입력
+      if (!profile?.name || !profile?.birthYear) {
+        redirectPath = '/onboarding/profile';
+      }
+      // 2. 이름과 출생연도는 있지만 전화번호 미인증 → 전화번호 인증
+      else if (!profile?.phoneVerified) {
+        redirectPath = '/onboarding/phone';
+      }
+      // 3. 모두 완료 → 원래 목적지 또는 홈
+      else {
+        redirectPath = next || '/';
+      }
+
+      console.log('[auth/callback] 리다이렉트:', redirectPath, '프로필:', profile);
+      return NextResponse.redirect(new URL(redirectPath, request.url));
+    } catch (err) {
+      console.error('[auth/callback] 온보딩 리다이렉트 오류:', err);
+    }
+  }
+
+  return NextResponse.redirect(new URL(next || '/', request.url));
 }
