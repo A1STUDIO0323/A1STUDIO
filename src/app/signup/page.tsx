@@ -49,7 +49,7 @@ export default function SignupPage() {
         provider: "kakao",
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=/onboarding/profile`,
-          scopes: "openid name birthyear phone_number",
+          scopes: "name birthyear phone_number",
         },
       });
       if (error) throw error;

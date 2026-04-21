@@ -158,7 +158,7 @@ export async function signIn(
 
   // 카카오 로그인 시 필수 동의 항목 설정 (GoTrue/OAuth는 공백 구분 scope 문자열 사용)
   const scopes = provider === "kakao"
-    ? "openid name birthyear phone_number"
+    ? "name birthyear phone_number"
     : undefined;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
