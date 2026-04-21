@@ -72,13 +72,16 @@ export async function POST(req: NextRequest) {
         ? user.app_metadata.provider
         : null);
 
+    // 카카오 사용자는 name 업데이트 제외 (auth/callback에서 처리함)
+    const isKakao = provider === "kakao";
+
     let prismaUserSynced = true;
     try {
       await prisma.user.upsert({
         where: { id },
         update: {
           email,
-          name: userName,
+          ...(isKakao ? {} : { name: userName }),
           avatarUrl,
           provider,
         },
