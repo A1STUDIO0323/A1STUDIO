@@ -10,6 +10,7 @@ model User {
   id        String   @id @db.Uuid
   email     String?  @unique
   name      String?
+  nickname  String?  @map("nickname")
   avatarUrl String?  @map("avatar_url")
   provider  String?
   createdAt DateTime @default(now()) @map("created_at")
@@ -92,6 +93,7 @@ enum OneDayClassStatus {
   CONFIRMED // 인원 충족, 확정
   CANCELLED // 취소됨
   COMPLETED // 진행 완료
+
 }
 
 model OneDayClass {
@@ -182,6 +184,7 @@ enum ReservationStatus {
   CANCELLED
   EXPIRED
   REFUNDED
+
 }
 
 model Reservation {
@@ -235,6 +238,7 @@ enum PaymentStatus {
   CANCELLED
   PARTIAL_REFUNDED
   REFUNDED
+
 }
 
 model Payment {
@@ -259,6 +263,7 @@ enum RefundStatus {
   REQUESTED
   APPROVED
   REJECTED
+
 }
 
 model Refund {

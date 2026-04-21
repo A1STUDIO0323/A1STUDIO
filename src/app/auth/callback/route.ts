@@ -107,12 +107,13 @@ export async function GET(request: Request) {
   // 카카오 OAuth: 카카오 API 직접 호출로 사용자 정보 저장
   if (user && user.app_metadata?.provider === 'kakao') {
     try {
-      const meta = user.user_metadata ?? {};
-      const name = meta.name || meta.full_name;
+      const { email, userName, avatarUrl, provider } = prismaPayloadFromAuthUser(user);
 
       // 카카오 API에서 직접 정보 가져오기
       let kakaoBirthyear: number | null = null;
       let kakaoPhone: string | null = null;
+      let kakaoRealName: string | null = null;
+      let kakaoNickname: string | null = null;
 
       try {
         // Supabase 세션에서 provider_token 가져오기
@@ -132,6 +133,16 @@ export async function GET(request: Request) {
             const kakaoUserData = await kakaoUserResponse.json();
             console.log('[auth/callback] 카카오 API 응답:', JSON.stringify(kakaoUserData, null, 2));
 
+            // 실명 추출
+            if (kakaoUserData.kakao_account?.name) {
+              kakaoRealName = kakaoUserData.kakao_account.name;
+            }
+
+            // 닉네임 추출
+            if (kakaoUserData.kakao_account?.profile?.nickname) {
+              kakaoNickname = kakaoUserData.kakao_account.profile.nickname;
+            }
+
             // birthyear 추출
             if (kakaoUserData.kakao_account?.birthyear) {
               kakaoBirthyear = parseInt(kakaoUserData.kakao_account.birthyear, 10);
@@ -140,8 +151,8 @@ export async function GET(request: Request) {
             // phone_number 추출 및 변환: +821012345678 → 01012345678
             if (kakaoUserData.kakao_account?.phone_number) {
               kakaoPhone = kakaoUserData.kakao_account.phone_number
-                .replace(/^\+82/, '0')
-                .replace(/\D/g, '');
+                .replace(/\s/g, '')
+                .replace('+82', '0');
             }
           } else {
             console.warn('[auth/callback] 카카오 API 응답 실패:', kakaoUserResponse.status);
@@ -152,28 +163,37 @@ export async function GET(request: Request) {
       }
 
       // 프로필 저장
-      if (name || kakaoBirthyear || kakaoPhone) {
+      if (kakaoRealName || kakaoNickname || kakaoBirthyear || kakaoPhone) {
         try {
-          const data: {
-            name?: string;
-            birthYear?: number;
-            phone?: string;
-            phoneVerified?: boolean;
-          } = {};
-          if (name) data.name = String(name);
-          if (kakaoBirthyear) data.birthYear = kakaoBirthyear;
-          if (kakaoPhone) {
-            data.phone = kakaoPhone;
-            data.phoneVerified = true;
-          }
-
-          if (Object.keys(data).length > 0) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data,
-            });
-            console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', data);
-          }
+          await prisma.user.upsert({
+            where: { id: user.id },
+            create: {
+              id: user.id,
+              email: user.email ?? null,
+              name: kakaoRealName ?? userName ?? null,
+              nickname: kakaoNickname ?? null,
+              avatarUrl: avatarUrl ?? null,
+              provider,
+              birthYear: kakaoBirthyear,
+              phone: kakaoPhone,
+              phoneVerified: kakaoPhone ? true : false,
+            },
+            update: {
+              email: user.email ?? undefined,
+              name: kakaoRealName ?? userName ?? undefined,
+              nickname: kakaoNickname ?? undefined,
+              avatarUrl: avatarUrl ?? undefined,
+              birthYear: kakaoBirthyear ?? undefined,
+              phone: kakaoPhone ?? undefined,
+              phoneVerified: kakaoPhone ? true : undefined,
+            },
+          });
+          console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', {
+            name: kakaoRealName ?? userName,
+            nickname: kakaoNickname,
+            birthYear: kakaoBirthyear,
+            phone: kakaoPhone,
+          });
         } catch (err) {
           console.error('[auth/callback] 카카오 프로필 저장 오류:', err);
         }
