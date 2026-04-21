@@ -82,7 +82,7 @@ export async function GET(request: Request) {
       console.log('App metadata:', JSON.stringify(user.app_metadata, null, 2));
       console.log('========================');
 
-      const { email, userName, avatarUrl, provider } = prismaPayloadFromAuthUser(user);
+      const { avatarUrl, provider } = prismaPayloadFromAuthUser(user);
 
       // 카카오 API에서 직접 정보 가져오기
       let kakaoBirthyear: number | null = null;
@@ -146,7 +146,7 @@ export async function GET(request: Request) {
             create: {
               id: user.id,
               email: user.email ?? null,
-              name: kakaoRealName ?? userName ?? null,
+              name: kakaoRealName ?? null,
               nickname: kakaoNickname ?? null,
               avatarUrl: avatarUrl ?? null,
               provider,
@@ -155,17 +155,15 @@ export async function GET(request: Request) {
               phoneVerified: kakaoPhone ? true : false,
             },
             update: {
-              email: user.email ?? undefined,
-              name: kakaoRealName ?? userName ?? undefined,
-              nickname: kakaoNickname ?? undefined,
-              avatarUrl: avatarUrl ?? undefined,
-              birthYear: kakaoBirthyear ?? undefined,
-              phone: kakaoPhone ?? undefined,
-              phoneVerified: kakaoPhone ? true : undefined,
+              name: kakaoRealName,
+              nickname: kakaoNickname,
+              birthYear: kakaoBirthyear,
+              phone: kakaoPhone,
+              phoneVerified: kakaoPhone ? true : false,
             },
           });
           console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', {
-            name: kakaoRealName ?? userName,
+            name: kakaoRealName,
             nickname: kakaoNickname,
             birthYear: kakaoBirthyear,
             phone: kakaoPhone,
