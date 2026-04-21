@@ -141,6 +141,18 @@ export async function GET(request: Request) {
       // 프로필 저장
       if (kakaoRealName || kakaoNickname || kakaoBirthyear || kakaoPhone) {
         try {
+          // update 데이터 동적 생성
+          const updateData: any = {};
+
+          if (kakaoRealName) updateData.name = kakaoRealName;
+          if (kakaoNickname) updateData.nickname = kakaoNickname;
+          if (kakaoBirthyear) updateData.birthYear = kakaoBirthyear;
+          if (kakaoPhone) {
+            updateData.phone = kakaoPhone;
+            updateData.phoneVerified = true;
+          }
+          if (avatarUrl) updateData.avatarUrl = avatarUrl;
+
           await prisma.user.upsert({
             where: { id: user.id },
             create: {
@@ -154,19 +166,14 @@ export async function GET(request: Request) {
               phone: kakaoPhone,
               phoneVerified: kakaoPhone ? true : false,
             },
-            update: {
-              name: kakaoRealName,
-              nickname: kakaoNickname,
-              birthYear: kakaoBirthyear,
-              phone: kakaoPhone,
-              phoneVerified: kakaoPhone ? true : false,
-            },
+            update: updateData,
           });
           console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', {
             name: kakaoRealName,
             nickname: kakaoNickname,
             birthYear: kakaoBirthyear,
             phone: kakaoPhone,
+            updateData,
           });
         } catch (err) {
           console.error('[auth/callback] 카카오 프로필 저장 오류:', err);
