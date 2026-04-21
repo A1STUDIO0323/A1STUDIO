@@ -73,7 +73,8 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
 
   // OAuth로 auth.users에 생성된 동일 id로 public.profiles(Prisma User) 동기화
-  if (user?.id) {
+  // 카카오는 별도 처리하므로 제외
+  if (user?.id && user.app_metadata?.provider !== 'kakao') {
     try {
       // 카카오 메타데이터 구조 확인용 디버깅 로그
       console.log('=== OAuth 콜백 디버깅 ===');
@@ -151,8 +152,9 @@ export async function GET(request: Request) {
             // phone_number 추출 및 변환: +821012345678 → 01012345678
             if (kakaoUserData.kakao_account?.phone_number) {
               kakaoPhone = kakaoUserData.kakao_account.phone_number
-                .replace(/\s/g, '')
-                .replace('+82', '0');
+                .replace(/\s/g, '') // 공백 제거
+                .replace(/-/g, '') // 하이픈 제거
+                .replace('+82', '0'); // +82 → 0
             }
           } else {
             console.warn('[auth/callback] 카카오 API 응답 실패:', kakaoUserResponse.status);
