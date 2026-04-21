@@ -156,9 +156,9 @@ export async function signIn(
     console.log("[signIn OAuth] Supabase Key configured:", !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
   }
 
-  // 카카오 로그인 시 필수 동의 항목 설정
-  const scopes = provider === "kakao" 
-    ? "name,birthyear,phone_number" // 필수: 이름(실명), 출생 연도, 전화번호
+  // 카카오 로그인 시 필수 동의 항목 설정 (GoTrue/OAuth는 공백 구분 scope 문자열 사용)
+  const scopes = provider === "kakao"
+    ? "openid name birthyear phone_number"
     : undefined;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
