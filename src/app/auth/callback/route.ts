@@ -72,9 +72,8 @@ export async function GET(request: Request) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // OAuth로 auth.users에 생성된 동일 id로 public.profiles(Prisma User) 동기화
-  // 카카오는 별도 처리하므로 제외
-  if (user?.id && user.app_metadata?.provider !== 'kakao') {
+  // 카카오 OAuth: 카카오 API 직접 호출로 사용자 정보 저장
+  if (user && user.app_metadata?.provider === 'kakao') {
     try {
       // 카카오 메타데이터 구조 확인용 디버깅 로그
       console.log('=== OAuth 콜백 디버깅 ===');
@@ -83,31 +82,6 @@ export async function GET(request: Request) {
       console.log('App metadata:', JSON.stringify(user.app_metadata, null, 2));
       console.log('========================');
 
-      const { email, userName, avatarUrl, provider } = prismaPayloadFromAuthUser(user);
-      await prisma.user.upsert({
-        where: { id: user.id },
-        update: {
-          email,
-          name: userName,
-          avatarUrl,
-          provider,
-        },
-        create: {
-          id: user.id,
-          email,
-          name: userName,
-          avatarUrl,
-          provider,
-        },
-      });
-    } catch (e) {
-      console.error('[auth/callback] Prisma profiles 동기화 실패:', e);
-    }
-  }
-
-  // 카카오 OAuth: 카카오 API 직접 호출로 사용자 정보 저장
-  if (user && user.app_metadata?.provider === 'kakao') {
-    try {
       const { email, userName, avatarUrl, provider } = prismaPayloadFromAuthUser(user);
 
       // 카카오 API에서 직접 정보 가져오기
