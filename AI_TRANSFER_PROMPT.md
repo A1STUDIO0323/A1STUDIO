@@ -1904,8 +1904,22 @@ A1STUDIO/
 
 ---
 
-**작성일**: 2026-04-20  
-**버전**: 2.5 (최신)  
+## 📝 최근 수정 사항 (2026-04-21)
+
+### 1. OAuth 콜백 — `auth.users.id`와 `profiles`(Prisma User) 즉시 정렬 (`src/app/auth/callback/route.ts`)
+- `exchangeCodeForSession` 성공 후 `supabase.auth.getUser()`로 확정된 사용자에 대해, **`user.id` = `auth.users.id`**로 `prisma.user.upsert` 실행 (email, name, avatarUrl, provider — `/api/members/sync`와 동일한 metadata 매핑 헬퍼 사용).
+- **카카오**에서 이름·출생연도·전화번호 등 추가 반영: 서버 내부 `fetch('/api/members/profile')` 호출 **제거** (같은 요청에서 세션 쿠키가 내부 fetch에 안 실려 401이 나기 쉬움) → **`prisma.user.update`**로 동일 핸들러 내 직접 갱신.
+- upsert/update 실패 시 `console.error`만 남기고 **리다이렉트(`next`) 흐름은 유지**.
+
+### 2. 카카오 `signInWithOAuth` — `scopes` 문자열 (`src/lib/auth-client.tsx`, `src/app/signup/page.tsx`)
+- **진입점**: `/login`은 `signIn('kakao', …)` → `auth-client.tsx`의 `signInWithOAuth`; `/signup`은 `signup/page.tsx`에서 직접 `signInWithOAuth`.
+- Supabase Auth(GoTrue)는 `options.scopes`에 **공백으로 구분된 scope 목록**을 기대함. 쉼표-only 문자열은 authorize 단계에서 Kakao와 맞지 않을 수 있어 **`name birthyear phone_number`** 형태(공백 구분)로 통일.
+- **`openid` scope**: Kakao Developers 앱에서 **OpenID Connect가 꺼져 있으면** `openid` 요청 시 **KOE205 / invalid_scope**가 발생할 수 있음 → 운영에서는 **`openid`를 넣지 않음**. ID 토큰·OIDC가 필요하면 **카카오 콘솔에서 OpenID Connect 활성화** 후 코드에 `openid`를 다시 넣는 방식으로 검토.
+
+---
+
+**작성일**: 2026-04-21  
+**버전**: 2.6 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---

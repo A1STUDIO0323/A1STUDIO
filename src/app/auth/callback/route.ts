@@ -75,6 +75,13 @@ export async function GET(request: Request) {
   // OAuth로 auth.users에 생성된 동일 id로 public.profiles(Prisma User) 동기화
   if (user?.id) {
     try {
+      // 카카오 메타데이터 구조 확인용 디버깅 로그
+      console.log('=== OAuth 콜백 디버깅 ===');
+      console.log('Provider:', user.app_metadata?.provider);
+      console.log('User metadata:', JSON.stringify(user.user_metadata, null, 2));
+      console.log('App metadata:', JSON.stringify(user.app_metadata, null, 2));
+      console.log('========================');
+
       const { email, userName, avatarUrl, provider } = prismaPayloadFromAuthUser(user);
       await prisma.user.upsert({
         where: { id: user.id },
