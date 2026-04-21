@@ -3,13 +3,14 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { 
+import {
   calcPartyRoomPoints,
   PartyRoomPackage,
   PARTY_ROOM_PACKAGES,
   PARTY_ROOM_MAX_HEADCOUNT,
 } from "@/lib/pricing";
 import { useIsAdult } from "@/lib/auth-client";
+import { formatPhoneNumber } from "@/lib/phone-utils";
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isBefore, startOfToday, addMonths } from "date-fns";
 import { ko } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Clock, Calendar, Sparkles, AlertCircle, Users, CreditCard, Coins } from "lucide-react";
@@ -59,13 +60,13 @@ function PartyRoomBookingContent() {
   // 초기화
   useEffect(() => {
     const supabase = createClient();
-    
+
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
         router.push("/login?redirect=/party-room/booking");
       } else {
         setUser(user);
-        
+
         // 포인트 잔액 조회
         supabase
           .from("user_points")
@@ -77,7 +78,22 @@ function PartyRoomBookingContent() {
               console.warn('[PartyRoomBooking] 포인트 조회 실패:', error);
             }
             setUserPoints(data?.balance || 0);
-            setLoading(false);
+
+            // 프로필 정보 조회
+            fetch("/api/members/profile")
+              .then((res) => res.json())
+              .then((profileData) => {
+                if (profileData.profile) {
+                  if (profileData.profile.name) {
+                    setGuestName(profileData.profile.name);
+                  }
+                  if (profileData.profile.phone) {
+                    setGuestPhone(formatPhoneNumber(profileData.profile.phone) || profileData.profile.phone);
+                  }
+                }
+              })
+              .catch((err) => console.warn('[PartyRoomBooking] 프로필 조회 실패:', err))
+              .finally(() => setLoading(false));
           });
       }
     });
@@ -564,7 +580,7 @@ function PartyRoomBookingContent() {
             <div className="mb-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[#3B342F] mb-2">
-                  예약자 이름 (선택)
+                  예약자 이름 (자동입력)
                 </label>
                 <input
                   type="text"
@@ -576,7 +592,7 @@ function PartyRoomBookingContent() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#3B342F] mb-2">
-                  연락처 (선택)
+                  연락처 (자동입력)
                 </label>
                 <input
                   type="tel"

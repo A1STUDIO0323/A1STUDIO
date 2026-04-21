@@ -104,48 +104,82 @@ export async function GET(request: Request) {
     }
   }
 
-  // 카카오 OAuth: user_metadata 자동 저장
+  // 카카오 OAuth: 카카오 API 직접 호출로 사용자 정보 저장
   if (user && user.app_metadata?.provider === 'kakao') {
-    const meta = user.user_metadata ?? {};
-    
-    // 카카오에서 받은 데이터 추출
-    const name = meta.name || meta.full_name;
-    const phoneNumber = meta.phone_number; // 예: +821012345678
-    const birthyear = meta.birthyear; // 예: "1991"
-    
-    if (name || phoneNumber || birthyear) {
-      // 전화번호 변환: +821012345678 → 01012345678
-      let phone: string | undefined;
-      if (phoneNumber && typeof phoneNumber === 'string') {
-        phone = phoneNumber.replace(/^\+82/, '0').replace(/\D/g, '');
-      }
+    try {
+      const meta = user.user_metadata ?? {};
+      const name = meta.name || meta.full_name;
+
+      // 카카오 API에서 직접 정보 가져오기
+      let kakaoBirthyear: number | null = null;
+      let kakaoPhone: string | null = null;
 
       try {
-        const data: {
-          name?: string;
-          birthYear?: number;
-          phone?: string;
-          phoneVerified?: boolean;
-        } = {};
-        if (name) data.name = String(name);
-        if (birthyear) {
-          const y = parseInt(String(birthyear), 10);
-          if (!Number.isNaN(y)) data.birthYear = y;
-        }
-        if (phone) {
-          data.phone = phone;
-          data.phoneVerified = true;
-        }
-        if (Object.keys(data).length > 0) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data,
+        // Supabase 세션에서 provider_token 가져오기
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.provider_token;
+
+        if (accessToken) {
+          // 카카오 사용자 정보 API 호출
+          const kakaoUserResponse = await fetch('https://kapi.kakao.com/v2/user/me', {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+            },
           });
-          console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', data);
+
+          if (kakaoUserResponse.ok) {
+            const kakaoUserData = await kakaoUserResponse.json();
+            console.log('[auth/callback] 카카오 API 응답:', JSON.stringify(kakaoUserData, null, 2));
+
+            // birthyear 추출
+            if (kakaoUserData.kakao_account?.birthyear) {
+              kakaoBirthyear = parseInt(kakaoUserData.kakao_account.birthyear, 10);
+            }
+
+            // phone_number 추출 및 변환: +821012345678 → 01012345678
+            if (kakaoUserData.kakao_account?.phone_number) {
+              kakaoPhone = kakaoUserData.kakao_account.phone_number
+                .replace(/^\+82/, '0')
+                .replace(/\D/g, '');
+            }
+          } else {
+            console.warn('[auth/callback] 카카오 API 응답 실패:', kakaoUserResponse.status);
+          }
         }
-      } catch (err) {
-        console.error('[auth/callback] 카카오 프로필 저장 오류:', err);
+      } catch (error) {
+        console.error('[auth/callback] 카카오 API 호출 실패:', error);
       }
+
+      // 프로필 저장
+      if (name || kakaoBirthyear || kakaoPhone) {
+        try {
+          const data: {
+            name?: string;
+            birthYear?: number;
+            phone?: string;
+            phoneVerified?: boolean;
+          } = {};
+          if (name) data.name = String(name);
+          if (kakaoBirthyear) data.birthYear = kakaoBirthyear;
+          if (kakaoPhone) {
+            data.phone = kakaoPhone;
+            data.phoneVerified = true;
+          }
+
+          if (Object.keys(data).length > 0) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data,
+            });
+            console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', data);
+          }
+        } catch (err) {
+          console.error('[auth/callback] 카카오 프로필 저장 오류:', err);
+        }
+      }
+    } catch (err) {
+      console.error('[auth/callback] 카카오 처리 중 오류:', err);
     }
   }
 
