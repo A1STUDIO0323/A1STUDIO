@@ -133,19 +133,41 @@ export async function middleware(request: NextRequest) {
     if (profileRes.ok) {
       const { profile } = JSON.parse(rawText);
 
-      // 디버깅: 프로필 데이터 확인
       console.log("[middleware] profile response:", JSON.stringify(profile));
-      console.log("[middleware] name:", profile?.name, "birthYear:", profile?.birthYear, "phoneVerified:", profile?.phoneVerified);
+      console.log("[middleware] provider:", profile?.provider);
+      console.log(
+        "[middleware] name:",
+        profile?.name,
+        "birthYear:",
+        profile?.birthYear,
+        "phoneVerified:",
+        profile?.phoneVerified
+      );
 
+      // 카카오 사용자는 온보딩 체크 스킵 (이미 정보 수집됨)
+      if (profile?.provider === "kakao") {
+        // 카카오는 /auth/callback에서 모든 정보를 자동으로 설정하므로 통과
+        return response;
+      }
+
+      // 구글 또는 기타 provider: 온보딩 강제
       // 이름 또는 출생연도 없음 → /onboarding/profile
       if (!profile || !profile.name || !profile.birthYear) {
-        console.log("[middleware] Redirecting to /onboarding/profile - name:", profile?.name, "birthYear:", profile?.birthYear);
+        console.log(
+          "[middleware] Redirecting to /onboarding/profile - name:",
+          profile?.name,
+          "birthYear:",
+          profile?.birthYear
+        );
         return NextResponse.redirect(new URL("/onboarding/profile", request.url));
       }
 
       // 전화번호 미인증 → /onboarding/phone
       if (!profile.phoneVerified) {
-        console.log("[middleware] Redirecting to /onboarding/phone - phoneVerified:", profile.phoneVerified);
+        console.log(
+          "[middleware] Redirecting to /onboarding/phone - phoneVerified:",
+          profile.phoneVerified
+        );
         return NextResponse.redirect(new URL("/onboarding/phone", request.url));
       }
     }
