@@ -93,23 +93,29 @@ function PartyRoomBookingContent() {
                 }
               })
               .catch((err) => console.warn('[PartyRoomBooking] 프로필 조회 실패:', err))
-              .finally(() => setLoading(false));
+              .finally(() => {
+                // 프로필 조회 완료 후 약간의 딜레이를 주어 isAdultUser 확정 대기
+                setTimeout(() => setLoading(false), 100);
+              });
           });
       }
     });
   }, [router]);
 
-  // 성인 체크
+  // 성인 체크 - 로딩 완료 후 최종 값으로 판단
   useEffect(() => {
+    // 로딩 중이거나 isAdultUser가 아직 확정되지 않았으면 대기
     if (loading) return;
     
+    // isAdultUser가 확정된 후 체크 (null 또는 false만 팝업)
     if (isAdultUser === null) {
-      alert("파티룸 예약을 위해 생년월일 정보가 필요합니다.\n마이페이지에서 생년월일을 입력해 주세요.");
+      alert("파티룸 예약을 위해 출생연도 정보가 필요합니다.\n마이페이지에서 출생연도를 입력해 주세요.");
       router.push("/mypage?tab=account&returnTo=party-room");
     } else if (isAdultUser === false) {
       alert("파티룸은 만 19세 이상 성인 회원만 예약할 수 있습니다.");
       router.push("/party-room");
     }
+    // isAdultUser === true 인 경우 아무것도 안 함 (정상 진행)
   }, [isAdultUser, loading, router]);
 
   // 패키지 선택 시 예약 가능 날짜 조회
