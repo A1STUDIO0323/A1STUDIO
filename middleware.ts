@@ -34,7 +34,7 @@ const PUBLIC_PATHS = [
   "/api",
 ];
 
-// 온보딩 중에만 접근 가능한 경로 (가드 스킵)
+// 온보딩 전용 경로 (로그인 후 isOnboardingPath로 식별, 완료 전 본인 확인·정보 입력)
 const ONBOARDING_PATHS = ["/onboarding/profile", "/onboarding/phone"];
 
 // 로그인 후 접근 불필요한 경로 (리다이렉트 대상)
@@ -42,6 +42,11 @@ const AUTH_ONLY_PATHS = ["/login", "/signup"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // 온보딩 경로: 인증만 있으면 본인 확인용 페이지 접근(프로필 완성·전화 이전 단계)
+  const isOnboardingPath = ONBOARDING_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
 
   console.log("[middleware] 실행됨:", request.nextUrl.pathname);
 
@@ -103,11 +108,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // ── 온보딩 경로는 추가 가드 없이 통과 ──────────────────
-  if (ONBOARDING_PATHS.some((p) => pathname.startsWith(p))) {
-    return response;
-  }
-
   // ── 프로필 완성 여부 확인 (보호된 경로 접근 시) ─────────
   // 공개 경로는 프로필 체크 스킵
   const isPublicPath = PUBLIC_PATHS.some(
@@ -144,6 +144,12 @@ export async function middleware(request: NextRequest) {
         profile?.phoneVerified
       );
 
+      // 온보딩 페이지 자체는 접근 허용 (여기서 정보 입력하도록)
+      if (isOnboardingPath) {
+        return response;
+      }
+
+      // 온보딩 페이지가 아닌 경우에만 프로필 완성 체크
       // 카카오 사용자는 온보딩 체크 스킵 (이미 정보 수집됨)
       if (profile?.provider === "kakao") {
         // 카카오는 /auth/callback에서 모든 정보를 자동으로 설정하므로 통과
@@ -153,21 +159,13 @@ export async function middleware(request: NextRequest) {
       // 구글 또는 기타 provider: 온보딩 강제
       // 이름 또는 출생연도 없음 → /onboarding/profile
       if (!profile || !profile.name || !profile.birthYear) {
-        console.log(
-          "[middleware] Redirecting to /onboarding/profile - name:",
-          profile?.name,
-          "birthYear:",
-          profile?.birthYear
-        );
+        console.log("[middleware] Redirecting to /onboarding/profile");
         return NextResponse.redirect(new URL("/onboarding/profile", request.url));
       }
 
       // 전화번호 미인증 → /onboarding/phone
       if (!profile.phoneVerified) {
-        console.log(
-          "[middleware] Redirecting to /onboarding/phone - phoneVerified:",
-          profile.phoneVerified
-        );
+        console.log("[middleware] Redirecting to /onboarding/phone");
         return NextResponse.redirect(new URL("/onboarding/phone", request.url));
       }
     }
