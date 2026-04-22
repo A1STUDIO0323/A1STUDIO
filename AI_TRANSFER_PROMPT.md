@@ -1910,16 +1910,39 @@ A1STUDIO/
 - `exchangeCodeForSession` 성공 후 `supabase.auth.getUser()`로 확정된 사용자에 대해, **`user.id` = `auth.users.id`**로 `prisma.user.upsert` 실행 (email, name, avatarUrl, provider — `/api/members/sync`와 동일한 metadata 매핑 헬퍼 사용).
 - **카카오**에서 이름·출생연도·전화번호 등 추가 반영: 서버 내부 `fetch('/api/members/profile')` 호출 **제거** (같은 요청에서 세션 쿠키가 내부 fetch에 안 실려 401이 나기 쉬움) → **`prisma.user.update`**로 동일 핸들러 내 직접 갱신.
 - upsert/update 실패 시 `console.error`만 남기고 **리다이렉트(`next`) 흐름은 유지**.
+- **(2026-04-20 후속)** 위 범용 콜백 `upsert`는 **삭제**됨. 현재는 **카카오만** 콜백에서 Kakao API + 조건부 `upsert`로 동기화 — 상세는 **아래 §5** 참고.
 
 ### 2. 카카오 `signInWithOAuth` — `scopes` 문자열 (`src/lib/auth-client.tsx`, `src/app/signup/page.tsx`)
 - **진입점**: `/login`은 `signIn('kakao', …)` → `auth-client.tsx`의 `signInWithOAuth`; `/signup`은 `signup/page.tsx`에서 직접 `signInWithOAuth`.
 - Supabase Auth(GoTrue)는 `options.scopes`에 **공백으로 구분된 scope 목록**을 기대함. 쉼표-only 문자열은 authorize 단계에서 Kakao와 맞지 않을 수 있어 **`name birthyear phone_number`** 형태(공백 구분)로 통일.
 - **`openid` scope**: Kakao Developers 앱에서 **OpenID Connect가 꺼져 있으면** `openid` 요청 시 **KOE205 / invalid_scope**가 발생할 수 있음 → 운영에서는 **`openid`를 넣지 않음**. ID 토큰·OIDC가 필요하면 **카카오 콘솔에서 OpenID Connect 활성화** 후 코드에 `openid`를 다시 넣는 방식으로 검토.
 
+### 3. 카카오 OAuth scopes 확정 (`src/lib/auth-client.tsx`, `src/app/signup/page.tsx`)
+- 로그인·회원가입 모두 Supabase `signInWithOAuth`의 `options.scopes`에 **공백 구분** 문자열 사용.
+- 현재 값: **`profile_nickname account_email name birthyear phone_number`** (닉네임·이메일·이름·출생연도·전화번호; 카카오 Developers 필수 동의 항목과 맞출 것).
+
+### 4. Prisma 7 — datasource & 멀티 스키마 (`prisma/schema.prisma`, `prisma.config.ts`)
+- **Prisma 7**: `schema.prisma`의 `datasource`에서 **`url = env("DATABASE_URL")` 제거** — DB URL은 **`prisma.config.ts`**에서만 관리.
+- `schemas = ["public", "auth"]` + 전 모델 `@@schema("public")` 조합은 **Supabase `auth` 스키마까지 Prisma가 건드릴 여지**가 있어, 운영方針에 따라 **datasource는 `provider = "postgresql"`만 유지**하는 형태로 정리.
+- Prisma 규칙상 **`datasource`에 `schemas` 배열이 없으면 `@@schema(...)`를 쓸 수 없음** → 기존에 추가했던 **`@@schema("public")` 줄은 제거**됨. 앱 테이블은 여전히 Postgres 기본 스키마 `public`을 사용.
+
+### 5. OAuth 콜백 — 카카오 전용 프로필 동기화 (`src/app/auth/callback/route.ts`)
+- **첫 번째(범용) `prisma.user.upsert` 전체 제거** — 메타데이터 `name`이 닉네임으로 잘못 들어가는 문제 방지. **카카오는 이 파일의 카카오 분기에서만** Prisma 프로필을 맞춤.
+- **디버깅 로그** (`Provider`, `user_metadata`, `app_metadata` JSON)은 **`user.app_metadata?.provider === 'kakao'` 분기** 안, `try` 시작 직후에만 출력.
+- **카카오 사용자 정보**: `getSession()`의 **`provider_token`**으로 `GET https://kapi.kakao.com/v2/user/me` 호출 → `kakao_account`에서 실명·닉네임·출생연도·전화번호 추출.
+- **전화번호 정규화**: 공백 제거 → **하이픈 제거** → `+82` → 선행 `0` (예: `010…`).
+- **`upsert`**: `create`는 기존 필드 구조 유지. **`update`는 `updateData` 객체를 조건부로 구성** — 값이 있을 때만 `name`, `nickname`, `birthYear`, `phone`/`phoneVerified`, `avatarUrl`를 넣어 **null로 기존 행을 덮어쓰지 않음**. 성공 로그에 `updateData` 포함(디버깅용).
+
+### 6. 회원 동기화 API — 카카오 `name` 보호 (`src/app/api/members/sync/route.ts`)
+- **`provider === 'kakao'`** 인 경우 **`update`에서만 `name` 제외**:  
+  `...(isKakao ? {} : { name: userName })`  
+  실명·프로필명은 **`/auth/callback`에서 이미 반영**하므로 sync가 메타데이터로 다시 덮어쓰지 않음.
+- **`create`**(최초 행 생성)은 기존처럼 `name: userName` 유지.
+
 ---
 
-**작성일**: 2026-04-21  
-**버전**: 2.6 (최신)  
+**작성일**: 2026-04-20  
+**버전**: 2.7 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---

@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import type { User } from "@prisma/client";
+
+/** JSON 응답용 — DB @map(snake)과 무관하게 항상 camelCase */
+function serializeProfile(row: User) {
+  const r = row as User & { nickname?: string | null };
+  return {
+    id: r.id,
+    email: r.email,
+    name: r.name,
+    nickname: r.nickname ?? null,
+    avatarUrl: r.avatarUrl,
+    provider: r.provider,
+    birthYear: r.birthYear,
+    phone: r.phone,
+    phoneVerified: r.phoneVerified,
+    marketingAgreed: r.marketingAgreed,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  };
+}
 
 // ── 유효성 검사 스키마 ──────────────────────────────────────
 const profileUpdateSchema = z.object({
@@ -41,10 +61,13 @@ export async function GET(request: NextRequest) {
     });
 
     if (!profile) {
-      return NextResponse.json({ profile: null }, { status: 200 });
+      return NextResponse.json({ success: true, profile: null }, { status: 200 });
     }
 
-    return NextResponse.json({ profile }, { status: 200 });
+    return NextResponse.json(
+      { success: true, profile: serializeProfile(profile) },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("[GET /api/members/profile]", error);
     return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
@@ -97,7 +120,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ profile: updatedProfile }, { status: 200 });
+    return NextResponse.json(
+      { success: true, profile: serializeProfile(updatedProfile) },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("[POST /api/members/profile]", error);
     return NextResponse.json({ error: "프로필 저장 중 오류가 발생했습니다." }, { status: 500 });
