@@ -231,20 +231,17 @@ export function useIsAdult(): boolean | null {
     })
       .then((res) => res.json())
       .then((data) => {
-        if (!data.success || !data.profile?.birthDate) {
+        if (!data.success || !data.profile?.birthYear) {
           setIsAdult(null);
           return;
         }
-        
-        // 나이 계산
-        const birth = new Date(data.profile.birthDate);
-        const today = new Date();
-        const age = today.getFullYear() - birth.getFullYear();
-        const isBirthdayPassed =
-          today.getMonth() > birth.getMonth() ||
-          (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
-        
-        setIsAdult(age - (isBirthdayPassed ? 0 : 1) >= 19);
+
+        // 나이 계산 (birthYear는 숫자: 1991)
+        const birthYear = data.profile.birthYear;
+        const currentYear = new Date().getFullYear();
+        const age = currentYear - birthYear;
+
+        setIsAdult(age >= 19);
       })
       .catch(() => {
         setIsAdult(null);
