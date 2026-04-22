@@ -16,6 +16,47 @@ export default function OnboardingProfilePage() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [birthYearError, setBirthYearError] = useState<string | null>(null);
 
+  // 온보딩 완료 전 모든 이동 차단
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      window.history.pushState(null, "", window.location.pathname);
+      alert("프로필 입력을 완료해주세요.");
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest("a");
+
+      if (link && !link.getAttribute("href")?.startsWith("#")) {
+        const href = link.getAttribute("href");
+        if (href && !href.includes("/onboarding/phone")) {
+          e.preventDefault();
+          e.stopPropagation();
+          alert("프로필 입력을 완료해주세요.");
+          return false;
+        }
+      }
+    };
+
+    window.history.pushState(null, "", window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("click", handleClick, true);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("click", handleClick, true);
+    };
+  }, []);
+
   // 로그인 여부 확인
   useEffect(() => {
     const checkSession = async () => {
