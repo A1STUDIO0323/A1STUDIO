@@ -180,11 +180,8 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * 다음 경로를 제외한 모든 경로에 적용:
-     * - _next/static (정적 파일)
-     * - _next/image (이미지 최적화)
-     * - favicon.ico
+     * 모든 요청에 적용 (API routes, static files, images 제외)
      */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/|_next/|static/|favicon.ico|.*\\.).*)",
   ],
 };
