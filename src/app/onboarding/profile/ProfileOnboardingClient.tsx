@@ -24,7 +24,10 @@ export default function ProfileOnboardingClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextUrl = useMemo(
-    () => sanitizePostAuthRedirect(searchParams.get("next")),
+    () =>
+      sanitizePostAuthRedirect(
+        searchParams.get("next") ?? searchParams.get("returnTo")
+      ),
     [searchParams]
   );
   const onboardingEntryPath = PHONE_OTP_ENABLED ? "/onboarding/phone" : "/onboarding/profile";
