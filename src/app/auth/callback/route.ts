@@ -222,6 +222,8 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(redirectPath, request.url));
     } catch (err) {
       console.error('[auth/callback] 카카오 처리 중 오류:', err);
+      // 에러 발생 시에도 리다이렉트 처리
+      return NextResponse.redirect(new URL(next || '/', request.url));
     }
   }
 
