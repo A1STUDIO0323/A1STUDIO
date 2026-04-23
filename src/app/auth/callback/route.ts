@@ -198,24 +198,22 @@ export async function GET(request: Request) {
 
       let redirectPath = next || '/';
 
+      console.log('[auth/callback] === 온보딩 체크 시작 ===');
+      console.log('[auth/callback] profile:', JSON.stringify(profile));
+      console.log('[auth/callback] !name:', !profile?.name, '!birthYear:', !profile?.birthYear, '!phoneVerified:', !profile?.phoneVerified);
+
       if (!profile?.name || !profile?.birthYear) {
         redirectPath = '/onboarding/profile';
+        console.log('[auth/callback] → /onboarding/profile (이름 또는 출생연도 없음)');
       } else if (!profile?.phoneVerified) {
         redirectPath = '/onboarding/phone';
+        console.log('[auth/callback] → /onboarding/phone (전화번호 미인증)');
       } else {
         redirectPath = next || '/';
+        console.log('[auth/callback] → 홈 (온보딩 완료)', redirectPath);
       }
 
-      // 온보딩 체크 상세 로그
-      console.log('[auth/callback] === 온보딩 체크 ===');
-      console.log('[auth/callback] profile:', JSON.stringify(profile));
-      console.log('[auth/callback] name:', profile?.name, 'type:', typeof profile?.name);
-      console.log('[auth/callback] birthYear:', profile?.birthYear, 'type:', typeof profile?.birthYear);
-      console.log('[auth/callback] phoneVerified:', profile?.phoneVerified, 'type:', typeof profile?.phoneVerified);
-      console.log('[auth/callback] !name:', !profile?.name);
-      console.log('[auth/callback] !birthYear:', !profile?.birthYear);
-      console.log('[auth/callback] !phoneVerified:', !profile?.phoneVerified);
-      console.log('[auth/callback] redirectPath:', redirectPath);
+      console.log('[auth/callback] 최종 redirectPath:', redirectPath);
       console.log('[auth/callback] ========================');
 
       console.log('[auth/callback] 카카오 리다이렉트:', redirectPath, '프로필:', profile);
