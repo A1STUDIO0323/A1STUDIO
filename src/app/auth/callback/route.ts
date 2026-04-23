@@ -153,22 +153,31 @@ export async function GET(request: Request) {
           }
           if (avatarUrl) updateData.avatarUrl = avatarUrl;
 
-          // upsert 사용 (트리거 실패 대비)
-          await prisma.user.upsert({
+          // 트리거 실행 여부와 무관하게 안전하게 처리
+          const existing = await prisma.user.findUnique({
             where: { id: user.id },
-            create: {
-              id: user.id,
-              email: user.email ?? null,
-              name: kakaoRealName ?? null,
-              nickname: kakaoNickname ?? null,
-              avatarUrl: avatarUrl ?? null,
-              provider,
-              birthYear: kakaoBirthyear,
-              phone: kakaoPhone,
-              phoneVerified: kakaoPhone ? true : false,
-            },
-            update: updateData,
           });
+
+          if (existing) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: updateData,
+            });
+          } else {
+            await prisma.user.create({
+              data: {
+                id: user.id,
+                email: user.email ?? null,
+                name: kakaoRealName ?? null,
+                nickname: kakaoNickname ?? null,
+                avatarUrl: avatarUrl ?? null,
+                provider,
+                birthYear: kakaoBirthyear,
+                phone: kakaoPhone,
+                phoneVerified: kakaoPhone ? true : false,
+              },
+            });
+          }
           console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', {
             name: kakaoRealName,
             nickname: kakaoNickname,
