@@ -209,8 +209,10 @@ export async function GET(request: Request) {
         redirectPath = '/onboarding/phone';
         console.log('[auth/callback] → /onboarding/phone (전화번호 미인증)');
       } else {
-        redirectPath = next || '/';
-        console.log('[auth/callback] → 홈 (온보딩 완료)', redirectPath);
+        // 온보딩 완료: next가 온보딩 경로면 무시하고 홈으로
+        const isOnboardingPath = next?.startsWith('/onboarding');
+        redirectPath = isOnboardingPath ? '/' : (next || '/');
+        console.log('[auth/callback] → 홈 (온보딩 완료)', 'next:', next, '→', redirectPath);
       }
 
       console.log('[auth/callback] 최종 redirectPath:', redirectPath);
