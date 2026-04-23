@@ -163,6 +163,15 @@ function LoginContent() {
           )}
         </div>
 
+        <div className="mt-5 text-center">
+          <Link
+            href="/find-account"
+            className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+          >
+            가입한 계정을 잊으셨나요?
+          </Link>
+        </div>
+
         {/* 회원가입 링크 */}
         <p className="mt-6 text-center text-sm text-[#6f655d]">
           아직 계정이 없으신가요?{" "}
