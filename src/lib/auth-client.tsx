@@ -218,10 +218,11 @@ export function useIsAdult(): boolean | null {
   
   useEffect(() => {
     if (!session?.user?.email) {
+      console.log('[useIsAdult] 세션 이메일 없음 → isAdult: null');
       setIsAdult(null);
       return;
     }
-    
+
     // 프로필에서 생년월일 가져오기
     fetch("/api/members/profile", {
       cache: 'no-store',
@@ -229,13 +230,20 @@ export function useIsAdult(): boolean | null {
         'Cache-Control': 'no-cache',
       },
     })
-      .then((res) => res.json())
+      .then((res) => {
+        console.log('[useIsAdult] HTTP:', res.status, res.ok);
+        return res.json();
+      })
       .then((data) => {
         console.log('[useIsAdult] API 응답:', data);
         console.log('[useIsAdult] birthYear:', data.profile?.birthYear);
 
         if (!data.success || !data.profile?.birthYear) {
-          console.log('[useIsAdult] birthYear 없음 → isAdult: null');
+          console.log('[useIsAdult] 성인 판단 불가:', {
+            success: data.success,
+            hasProfile: !!data.profile,
+            birthYear: data.profile?.birthYear,
+          });
           setIsAdult(null);
           return;
         }
