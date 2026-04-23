@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, type MouseEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { 
@@ -12,7 +12,6 @@ import {
   PartyRoomPackage,
   PARTY_ROOM_PACKAGES,
 } from "@/lib/pricing";
-import { useIsAdult } from "@/lib/auth-client";
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isBefore, startOfToday } from "date-fns";
 import { ko } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Clock, Calendar, Sparkles, AlertCircle, Users } from "lucide-react";
@@ -33,8 +32,7 @@ function BookingContent() {
   const [user, setUser] = useState<any>(null);
   const [userPoints, setUserPoints] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const isAdultUser = useIsAdult();
-  
+
   // Step 0: 탭 선택
   const [selectedType, setSelectedType] = useState<ReservationType>(reservationType);
   
@@ -53,8 +51,6 @@ function BookingContent() {
   const [priceInfo, setPriceInfo] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [adultConfirmed, setAdultConfirmed] = useState(false);
-  const [showAdultModal, setShowAdultModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // 초기화
   useEffect(() => {
@@ -83,17 +79,44 @@ function BookingContent() {
     });
   }, [router]);
 
-  // 탭 변경 시 성인 체크
-  useEffect(() => {
-    if (selectedType === 'party-room') {
-      if (isAdultUser === null) {
-        setShowProfileModal(true);
-      } else if (isAdultUser === false) {
-        setShowAdultModal(true);
-        setSelectedType('room'); // 다시 연습실로
+  const handlePartyRoomClick = async (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch("/api/members/profile", { cache: "no-store" });
+      const data = await res.json();
+
+      if (!data.success || !data.profile) {
+        window.location.href = "/login?redirect=/party-room/booking";
+        return;
       }
+
+      const birthYear = data.profile.birthYear;
+
+      if (!birthYear) {
+        alert(
+          "파티룸 예약을 위해 출생연도 정보가 필요합니다.\n출생연도를 입력해 주세요."
+        );
+        window.location.href =
+          "/onboarding/profile?returnTo=/party-room/booking";
+        return;
+      }
+
+      const currentYear = new Date().getFullYear();
+      const age = currentYear - birthYear;
+      const isAdult = age >= 19;
+
+      if (!isAdult) {
+        alert("파티룸은 만 19세 이상 성인 회원만 예약할 수 있습니다.");
+        return;
+      }
+
+      window.location.href = "/party-room/booking";
+    } catch (error) {
+      console.error("프로필 조회 에러:", error);
+      alert("오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     }
-  }, [selectedType, isAdultUser]);
+  };
 
   // 날짜 선택 시 예약된 시간 조회 및 시간 초기화
   useEffect(() => {
@@ -317,7 +340,8 @@ function BookingContent() {
             연습실 예약
           </button>
           <button
-            onClick={() => setSelectedType('party-room')}
+            type="button"
+            onClick={handlePartyRoomClick}
             className={`rounded-xl px-8 py-4 text-base font-bold transition-all ${
               selectedType === 'party-room'
                 ? 'bg-[#B98768] text-white'
@@ -646,54 +670,6 @@ function BookingContent() {
           </div>
         )}
       </div>
-
-      {/* 성인 전용 모달 */}
-      {showAdultModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="rounded-2xl bg-white p-6 max-w-md">
-            <h3 className="text-xl font-bold text-[#3B342F] mb-4">
-              성인 전용 공간
-            </h3>
-            <p className="text-[#6f655d] mb-6">
-              파티룸은 만 19세 이상 성인 회원만 예약할 수 있습니다.
-            </p>
-            <button
-              onClick={() => setShowAdultModal(false)}
-              className="w-full rounded-xl bg-[#B98768] px-6 py-3 font-bold text-white hover:bg-[#a9785c]"
-            >
-              확인
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 프로필 완성 모달 */}
-      {showProfileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="rounded-2xl bg-white p-6 max-w-md">
-            <h3 className="text-xl font-bold text-[#3B342F] mb-4">
-              생년월일 입력 필요
-            </h3>
-            <p className="text-[#6f655d] mb-6">
-              파티룸 예약을 위해 생년월일 정보가 필요합니다. 마이페이지에서 생년월일을 입력해 주세요.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowProfileModal(false)}
-                className="flex-1 rounded-xl border border-[#D8CCBC] px-6 py-3 font-bold text-[#3B342F] hover:bg-[#F7F3EB]"
-              >
-                취소
-              </button>
-              <button
-                onClick={() => router.push("/mypage?tab=account&returnTo=party-room")}
-                className="flex-1 rounded-xl bg-[#B98768] px-6 py-3 font-bold text-white hover:bg-[#a9785c]"
-              >
-                생년월일 입력하기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
