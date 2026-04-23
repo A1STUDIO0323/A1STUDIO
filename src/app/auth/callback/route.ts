@@ -179,11 +179,31 @@ export async function GET(request: Request) {
           console.error('[auth/callback] 카카오 프로필 저장 오류:', err);
         }
       }
+
+      // 카카오: 저장 직후 프로필 다시 조회
+      const profile = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { name: true, birthYear: true, phone: true, phoneVerified: true },
+      });
+
+      let redirectPath = next || '/';
+
+      if (!profile?.name || !profile?.birthYear) {
+        redirectPath = '/onboarding/profile';
+      } else if (!profile?.phoneVerified) {
+        redirectPath = '/onboarding/phone';
+      } else {
+        redirectPath = next || '/';
+      }
+
+      console.log('[auth/callback] 카카오 리다이렉트:', redirectPath, '프로필:', profile);
+      return NextResponse.redirect(new URL(redirectPath, request.url));
     } catch (err) {
       console.error('[auth/callback] 카카오 처리 중 오류:', err);
     }
   }
 
+  // 구글 등 다른 OAuth는 기존 로직 사용
   // 온보딩 플로우: 프로필 완성도에 따라 리다이렉트
   if (user?.id) {
     try {
