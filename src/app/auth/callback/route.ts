@@ -206,6 +206,18 @@ export async function GET(request: Request) {
         redirectPath = next || '/';
       }
 
+      // 온보딩 체크 상세 로그
+      console.log('[auth/callback] === 온보딩 체크 ===');
+      console.log('[auth/callback] profile:', JSON.stringify(profile));
+      console.log('[auth/callback] name:', profile?.name, 'type:', typeof profile?.name);
+      console.log('[auth/callback] birthYear:', profile?.birthYear, 'type:', typeof profile?.birthYear);
+      console.log('[auth/callback] phoneVerified:', profile?.phoneVerified, 'type:', typeof profile?.phoneVerified);
+      console.log('[auth/callback] !name:', !profile?.name);
+      console.log('[auth/callback] !birthYear:', !profile?.birthYear);
+      console.log('[auth/callback] !phoneVerified:', !profile?.phoneVerified);
+      console.log('[auth/callback] redirectPath:', redirectPath);
+      console.log('[auth/callback] ========================');
+
       console.log('[auth/callback] 카카오 리다이렉트:', redirectPath, '프로필:', profile);
       return NextResponse.redirect(new URL(redirectPath, request.url));
     } catch (err) {

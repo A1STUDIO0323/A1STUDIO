@@ -1977,6 +1977,15 @@ A1STUDIO/
 - **그 외 OAuth**(예: Google): 기존과 같이 `// 구글 등 다른 OAuth는 기존 로직 사용` 아래 공통 `if (user?.id) { findUnique ... }` 블록.
 - **Git** (예): `fix: 카카오 OAuth 온보딩 체크 타이밍 수정` 커밋에 해당.
 
+**Supabase — `public.profiles`와 `auth.users` 트리거 (운영 수동 SQL)**
+
+- 앱은 카카오 콜백에서 **`prisma.user.upsert`** (`where: { id: user.id }`, `create`에 전체·`update`는 조건부 `updateData`)로 `profiles`를 맞춤.
+- Supabase에 **`on_auth_user_created` 등으로 `auth.users` INSERT 시 `profiles`를 만드는 트리거**가 있으면, **행 생성 타이밍**과 콜백 `update`-only/upsert 정책이 어긋날 수 있음. 콜백 upsert를 **단일 생성 경로**로 쓰려면 SQL Editor 등에서 (필요할 때만) 트리거를 끔:
+  ```sql
+  ALTER TABLE auth.users DISABLE TRIGGER on_auth_user_created;
+  ```
+- 되돌리기: `ALTER TABLE auth.users ENABLE TRIGGER on_auth_user_created;` — **트리거를 끄면** 그 시점 이후 가입에 트리거 쪽 효과가 없으므로, 앱/API에서 `profiles` 생성·동기화를 **반드시** 보장할 것. 프로덕션은 백업·검토 후 적용.
+
 ### 5. `User` 문서·스키마
 
 - `User`에 `nickname` 필드(문서 본문 상단 Prisma 스니펫·실제 `schema.prisma` 기준) 반영.
@@ -1984,7 +1993,7 @@ A1STUDIO/
 ---
 
 **작성일**: 2026-04-22  
-**버전**: 2.8 (최신)  
+**버전**: 2.9 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
