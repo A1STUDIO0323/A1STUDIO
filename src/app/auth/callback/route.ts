@@ -153,10 +153,21 @@ export async function GET(request: Request) {
           }
           if (avatarUrl) updateData.avatarUrl = avatarUrl;
 
-          // 트리거가 이미 profiles 행을 생성하므로 update만 사용
-          await prisma.user.update({
+          // upsert 사용 (트리거 실패 대비)
+          await prisma.user.upsert({
             where: { id: user.id },
-            data: updateData,
+            create: {
+              id: user.id,
+              email: user.email ?? null,
+              name: kakaoRealName ?? null,
+              nickname: kakaoNickname ?? null,
+              avatarUrl: avatarUrl ?? null,
+              provider,
+              birthYear: kakaoBirthyear,
+              phone: kakaoPhone,
+              phoneVerified: kakaoPhone ? true : false,
+            },
+            update: updateData,
           });
           console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', {
             name: kakaoRealName,

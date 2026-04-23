@@ -2,6 +2,13 @@
 
 > 이 문서는 A1 STUDIO 웹사이트의 전체 구조, 기능, 코드베이스를 다른 AI 어시스턴트(GPT, Claude 등)에게 전달하기 위한 포괄적인 가이드입니다.
 
+## 📌 문서 갱신 규칙 (AI / 개발자)
+
+- **의미 있는 변경 직후**: 이 저장소의 코드·`prisma/schema.prisma`·API·인증·환경·배포와 관련된 작업을 끝낸 뒤, **`AI_TRANSFER_PROMPT.md`의 `## 📝 최근 수정 사항 (YYYY-MM-DD)`**에 **같은 날짜 블록을 새로 쓰거나, 같은 날짜 블록에 항목을 추가**한다. (대상 경로, 한 줄 요약, 주의할 점)
+- **날짜**: 시스템/대화에 주어진 오늘 날짜(예: 2026-04-22)를 쓴다.
+- **문서 끝 메타**: 작업이 이 문서를 건드릴 때마다 `**작성일**`·`**버전**`을 갱신한다. (이전 `최근 수정 사항`의 구체 서술은 **삭제하지 말고** 누적한다.)
+- **자동 강제(에이전트)**: 이 저장소 루트의 `.cursor/rules/ai-transfer-prompt-sync.mdc`에 동일 취지의 규칙을 둔다. Cursor/에이전트는 코드 변경 수행 시 위 절차를 **기본 수행**으로 둔다.
+
 ---
 
 ## 📋 프로젝트 개요
@@ -99,6 +106,7 @@ model User {
   id              String   @id @db.Uuid  // Supabase auth.users.id와 동일
   email           String?  @unique
   name            String?
+  nickname        String?  @map("nickname")
   avatarUrl       String?
   provider        String?  // "google", "kakao", "email"
   createdAt       DateTime @default(now()) @map("created_at")
@@ -1925,6 +1933,7 @@ A1STUDIO/
 - **Prisma 7**: `schema.prisma`의 `datasource`에서 **`url = env("DATABASE_URL")` 제거** — DB URL은 **`prisma.config.ts`**에서만 관리.
 - `schemas = ["public", "auth"]` + 전 모델 `@@schema("public")` 조합은 **Supabase `auth` 스키마까지 Prisma가 건드릴 여지**가 있어, 운영方針에 따라 **datasource는 `provider = "postgresql"`만 유지**하는 형태로 정리.
 - Prisma 규칙상 **`datasource`에 `schemas` 배열이 없으면 `@@schema(...)`를 쓸 수 없음** → 기존에 추가했던 **`@@schema("public")` 줄은 제거**됨. 앱 테이블은 여전히 Postgres 기본 스키마 `public`을 사용.
+- **(후속, 2026-04-22)**: `schemas = ["public"]` + **전 모델/enum** `@@schema("public")` 로 다시 통일. 이 문서의 `## 📝 최근 수정 사항 (2026-04-22)` §1 참고.
 
 ### 5. OAuth 콜백 — 카카오 전용 프로필 동기화 (`src/app/auth/callback/route.ts`)
 - **첫 번째(범용) `prisma.user.upsert` 전체 제거** — 메타데이터 `name`이 닉네임으로 잘못 들어가는 문제 방지. **카카오는 이 파일의 카카오 분기에서만** Prisma 프로필을 맞춤.
@@ -1941,8 +1950,41 @@ A1STUDIO/
 
 ---
 
-**작성일**: 2026-04-20  
-**버전**: 2.7 (최신)  
+## 📝 최근 수정 사항 (2026-04-22)
+
+### 1. Prisma 멀티 스키마 (현행 `prisma/schema.prisma`와 정렬)
+
+- `datasource db`에 **`schemas = ["public"]`** 사용.
+- **모델·enum**마다 **`@@map("...")`와 함께 `@@schema("public")`** 를 둔다.  
+  (2026-04-21 기록에 있었던 *「`@@schema` 제거·datasource `schemas` 없음」* 은 **이후** 위 형태로 다시 맞춘 상태임.)
+
+### 2. 예약·충전·권한 테이블 (Prisma)
+
+- **`Reservation`**: `packageType`(`package_type`), `reservationType`(`reservation_type`) — 선택(String?, 예약·패키지 구분용).
+- **`ChargePackage`**: `charge_packages` 매핑, 포인트 충전 플랜(금액·보너스·정렬·`is_active` 등), **`createdAt`(`created_at`)** 포함. `bonusRate` / `bonusPoints`는 **선택**(`Float?` / `Int?`).
+- **`MemberRole`**: `member_roles` — `email` PK, `role`(예: `"CM"`), `created_at` / `updated_at`.  
+- **`prisma db push`**: Supabase·기존 데이터에 따라 `reviews` 유니크·`blocked_slots` PK 등 **데이터 손실 경고**가 날 수 있음 — `--accept-data-loss` 여부는 별도 검토.
+
+### 3. 자유게시판 — Prisma 모델 없이 Raw SQL
+
+- `public.board_posts` + `public.profiles` 조인: **`src/lib/board-db.ts`** (`Prisma.$queryRaw` / `$executeRaw`).
+- `src/app/board/page.tsx`, `src/app/board/[id]/page.tsx`, `src/app/api/board/route.ts`에서 위 헬퍼 사용. (게시 `id` 생성: `randomUUID()`.)
+- *참고*: 스키마에 `BoardPost` **모델이 없을 수 있음** — 문서/코드는 **테이블이 DB에 있고 Raw로만 접근**하는 전제에 맞춤.
+
+### 4. OAuth 콜백 — 카카오 온보딩 리다이렉트 타이밍 (`src/app/auth/callback/route.ts`)
+
+- **카카오** 분기: Kakao API + `prisma.user.upsert` 등 처리 **끝난 뒤**, `prisma.user.findUnique`로 **프로필을 다시 읽고** 온보딩 경로(`/onboarding/profile` · `/onboarding/phone`)를 결정한 뒤 **`return NextResponse.redirect(...)`** — 저장 직후 DB 반영이 온보딩 판단에 쓰이도록.
+- **그 외 OAuth**(예: Google): 기존과 같이 `// 구글 등 다른 OAuth는 기존 로직 사용` 아래 공통 `if (user?.id) { findUnique ... }` 블록.
+- **Git** (예): `fix: 카카오 OAuth 온보딩 체크 타이밍 수정` 커밋에 해당.
+
+### 5. `User` 문서·스키마
+
+- `User`에 `nickname` 필드(문서 본문 상단 Prisma 스니펫·실제 `schema.prisma` 기준) 반영.
+
+---
+
+**작성일**: 2026-04-22  
+**버전**: 2.8 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
