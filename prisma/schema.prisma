@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["public"]
 }
 
 model User {
@@ -25,6 +26,7 @@ model User {
   oneDayClassApps OneDayClassApplication[]
 
   @@map("profiles")
+  @@schema("public")
 }
 
 model Account {
@@ -44,6 +46,7 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
+  @@schema("public")
 }
 
 model Session {
@@ -54,6 +57,7 @@ model Session {
   expires      DateTime
 
   @@map("sessions")
+  @@schema("public")
 }
 
 model VerificationToken {
@@ -63,6 +67,7 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+  @@schema("public")
 }
 
 model EmailAuthUser {
@@ -73,6 +78,7 @@ model EmailAuthUser {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("email_auth_users")
+  @@schema("public")
 }
 
 model PasswordResetToken {
@@ -85,6 +91,7 @@ model PasswordResetToken {
   @@index([email])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+  @@schema("public")
 }
 
 // ─── 원데이클래스 모델 ─────────────────────────────────────────
@@ -94,6 +101,7 @@ enum OneDayClassStatus {
   CANCELLED // 취소됨
   COMPLETED // 진행 완료
 
+  @@schema("public")
 }
 
 model OneDayClass {
@@ -118,6 +126,7 @@ model OneDayClass {
   applications OneDayClassApplication[]
 
   @@map("one_day_classes")
+  @@schema("public")
 }
 
 model OneDayClassApplication {
@@ -135,6 +144,7 @@ model OneDayClassApplication {
   createdAt   DateTime    @default(now()) @map("created_at")
 
   @@map("one_day_class_applications")
+  @@schema("public")
 }
 
 model Room {
@@ -155,6 +165,7 @@ model Room {
   holds        ReservationHold[]
 
   @@map("rooms")
+  @@schema("public")
 }
 
 model PricingRule {
@@ -175,6 +186,7 @@ model PricingRule {
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@map("pricing_rules")
+  @@schema("public")
 }
 
 enum ReservationStatus {
@@ -185,6 +197,7 @@ enum ReservationStatus {
   EXPIRED
   REFUNDED
 
+  @@schema("public")
 }
 
 model Reservation {
@@ -199,6 +212,8 @@ model Reservation {
   startTime   String            @map("start_time") // "HH:MM"
   endTime     String            @map("end_time") // "HH:MM"
   headcount   Int               @default(1)
+  packageType     String?           @map("package_type")
+  reservationType String?           @map("reservation_type")
   status      ReservationStatus @default(HOLD)
   totalAmount Int               @map("total_amount")
   memo        String?
@@ -213,6 +228,23 @@ model Reservation {
   @@index([roomId, date])
   @@index([guestPhone])
   @@map("reservations")
+  @@schema("public")
+}
+
+model ChargePackage {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  amount      Int
+  bonusRate   Float?   @map("bonus_rate")
+  bonusPoints Int?     @map("bonus_points")
+  totalPoints Int      @map("total_points")
+  isPopular   Boolean  @default(false) @map("is_popular")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("charge_packages")
+  @@schema("public")
 }
 
 model ReservationHold {
@@ -229,6 +261,7 @@ model ReservationHold {
 
   @@unique([roomId, date, startTime, endTime], name: "unique_slot")
   @@map("reservation_holds")
+  @@schema("public")
 }
 
 enum PaymentStatus {
@@ -239,6 +272,7 @@ enum PaymentStatus {
   PARTIAL_REFUNDED
   REFUNDED
 
+  @@schema("public")
 }
 
 model Payment {
@@ -257,6 +291,7 @@ model Payment {
   refunds Refund[]
 
   @@map("payments")
+  @@schema("public")
 }
 
 enum RefundStatus {
@@ -264,6 +299,7 @@ enum RefundStatus {
   APPROVED
   REJECTED
 
+  @@schema("public")
 }
 
 model Refund {
@@ -277,6 +313,7 @@ model Refund {
   createdAt   DateTime     @default(now()) @map("created_at")
 
   @@map("refunds")
+  @@schema("public")
 }
 
 model Review {
@@ -290,6 +327,7 @@ model Review {
   createdAt     DateTime    @default(now()) @map("created_at")
 
   @@map("reviews")
+  @@schema("public")
 }
 
 model Notice {
@@ -302,6 +340,7 @@ model Notice {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("notices")
+  @@schema("public")
 }
 
 model Event {
@@ -316,6 +355,7 @@ model Event {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@map("events")
+  @@schema("public")
 }
 
 model BlockedSlot {
@@ -329,6 +369,7 @@ model BlockedSlot {
 
   @@index([roomId, date])
   @@map("blocked_slots")
+  @@schema("public")
 }
 
 // 외부 플랫폼 예약 (스페이스클라우드, 네이버 플레이스 등)
@@ -352,6 +393,7 @@ model ExternalReservation {
   @@index([platform, date])
   @@index([date])
   @@map("external_reservations")
+  @@schema("public")
 }
 
 // 결제 중복 방지를 위한 락 테이블
@@ -367,6 +409,7 @@ model PaymentLock {
   @@index([userId, lockType])
   @@index([expiresAt])
   @@map("payment_locks")
+  @@schema("public")
 }
 
 // 메시지 발송 로그
@@ -386,4 +429,15 @@ model MessageLog {
   @@index([reservationId])
   @@index([createdAt(sort: Desc)])
   @@map("message_logs")
+  @@schema("public")
+}
+
+model MemberRole {
+  email     String   @id
+  role      String // "CM" 등
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("member_roles")
+  @@schema("public")
 }

@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronRight, Music2, LogIn, LogOut, User, ShieldCheck, Menu, X, Wallet } from "lucide-react";
 import { signIn, signOut, useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+// 메인/모바일 메뉴 항목(비품 및 시설 `/equipment` 등)은 `NAV_LINKS`에서 정의
 import { NAV_LINKS, STUDIO_NAME } from "@/lib/constants";
 import { useAdmin } from "@/lib/admin-context";
 import { registerMemberProfile, useMemberRole } from "@/lib/member-role";

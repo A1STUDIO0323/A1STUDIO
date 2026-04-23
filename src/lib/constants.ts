@@ -34,9 +34,10 @@ export const NAV_LINKS = [
     label: "소개",
     href: "/#about",
     children: [
-      { label: "회사 소개", href: "/#about" },
-      { label: "대표 소개", href: "/#director" },
-      { label: "공간 소개", href: "/spaces" },
+      { label: "회사 소개", href: "/#studio-intro" },
+      { label: "대표 소개", href: "/#about" },
+      { label: "공간 소개", href: "/#gallery" },
+      { label: "비품 및 시설", href: "/equipment" },
     ],
   },
   { label: "예약하기", href: "/booking" },
@@ -68,8 +69,15 @@ export const NAV_LINKS = [
       { label: "FAQ", href: "/guide#faq" },
     ],
   },
-  { label: "후기", href: "/reviews" },
-  { label: "공지·이벤트", href: "/notices" },
+  {
+    label: "게시판",
+    href: "/board",
+    children: [
+      { label: "공지·이벤트", href: "/notices" },
+      { label: "자유게시판", href: "/board" },
+      { label: "후기", href: "/reviews" },
+    ],
+  },
   { label: "오시는길", href: "/location" },
   { label: "문의", href: "/contact" },
 ];
