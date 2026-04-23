@@ -138,6 +138,27 @@ export async function GET(request: Request) {
         console.error('[auth/callback] 카카오 API 호출 실패:', error);
       }
 
+      // 전화번호 중복 체크 (다른 사용자가 이미 사용 중인지)
+      if (kakaoPhone) {
+        const existingByPhone = await prisma.user.findUnique({
+          where: { phone: kakaoPhone },
+          select: { id: true, email: true },
+        });
+
+        // 다른 사용자가 이미 이 전화번호 사용 중
+        if (existingByPhone && existingByPhone.id !== user.id) {
+          console.error('[auth/callback] 전화번호 중복:', {
+            kakaoPhone,
+            existingEmail: existingByPhone.email,
+            newEmail: user.email,
+          });
+
+          return NextResponse.redirect(
+            new URL('/signup/error?reason=phone_duplicate', request.url)
+          );
+        }
+      }
+
       // 프로필 저장
       if (kakaoRealName || kakaoNickname || kakaoBirthyear || kakaoPhone) {
         try {

@@ -231,19 +231,23 @@ export function useIsAdult(): boolean | null {
     })
       .then((res) => res.json())
       .then((data) => {
+        console.log('[useIsAdult] API 응답:', data);
+        console.log('[useIsAdult] birthYear:', data.profile?.birthYear);
+
         if (!data.success || !data.profile?.birthYear) {
+          console.log('[useIsAdult] birthYear 없음 → isAdult: null');
           setIsAdult(null);
           return;
         }
 
-        // 나이 계산 (birthYear는 숫자: 1991)
         const birthYear = data.profile.birthYear;
         const currentYear = new Date().getFullYear();
         const age = currentYear - birthYear;
-
+        console.log('[useIsAdult] age:', age, '→ isAdult:', age >= 19);
         setIsAdult(age >= 19);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[useIsAdult] fetch 에러:', err);
         setIsAdult(null);
       });
   }, [session?.user?.email, refreshKey]);
