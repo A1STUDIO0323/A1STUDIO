@@ -160,7 +160,7 @@ function PartyRoomCompleteContent() {
               )}
             </div>
             <div>
-              <p className="font-semibold text-[#3B342F]">· 이후: 환불 불가</p>
+              <p className="font-semibold text-[#3B342F]">· 이후: 취소 불가</p>
             </div>
           </div>
         </div>

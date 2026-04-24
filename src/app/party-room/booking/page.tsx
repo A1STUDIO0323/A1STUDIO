@@ -652,7 +652,7 @@ function PartyRoomBookingContent() {
                     (카드 결제 시 카드 전액 취소 후 결제금액의 50%가 포인트로 적립됩니다)
                   </div>
                 </li>
-                <li>· <span className="font-semibold">3일 이내:</span> 환불 불가</li>
+                <li>· <span className="font-semibold">3일 이내:</span> 취소 불가</li>
               </ul>
             </div>
 

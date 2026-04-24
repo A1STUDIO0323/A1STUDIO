@@ -838,24 +838,53 @@ export async function approvePayment(params: {
 
 ### 6. 예약 취소 & 환불 정책
 
+**단일 소스:** `src/lib/refund-policy.ts` (연습실·파티룸 분리, API·마이페이지·UI 문구와 동기화)
+
 ```typescript
-// src/lib/refund-policy.ts
+// src/lib/refund-policy.ts (요약)
 
-export const REFUND_POLICY = {
-  cancellationDeadlineHours: 2,  // 예약 시작 2시간 전까지만 취소 가능
-};
+// 예약일·오늘을 각각 00:00:00으로 맞춘 뒤 일수 차이 (시각 무시)
+export function getDaysDifference(futureDate: Date, currentDate?: Date): number
 
-// src/app/api/reservations/cancel/route.ts
-// 프로세스:
-// 1. 예약 조회 (status === 'confirmed' 확인)
-// 2. 시작 시간 체크 (now + 2시간 < reservation_start)
-// 3. 예약 업데이트 (status = 'cancelled', refund_points = points_used)
-// 4. 포인트 환불:
-//    - user_points.balance += points_used
-//    - user_points.total_used -= points_used
-//    - point_transactions INSERT (type: 'refund')
-// 5. SMS 발송 (취소 확인)
+// 연습실 환불 구간: getDaysDifference 기준 — 3일 이상 100%, 2일 50%, 전날·당일 0%
+export const PRACTICE_ROOM_REFUND_POLICY = { threeDaysBefore: 1.0, twoDaysBefore: 0.5, ... };
+
+// 파티룸 환불 구간: 동일하게 달력 일수 — 7일 이상 100%, 3~6일 50%, 3일 미만 0%
+export const PARTY_ROOM_REFUND_POLICY = { sevenDaysBefore: 1.0, threeDaysBefore: 0.5, withinThreeDays: 0 };
+
+export function calculatePracticeRoomRefundRate(reservationDateTime: Date): { refundRate; description }
+export function calculatePracticeRoomRefund(reservationDateTime: Date, totalAmount: number): { refundRate; refundAmount; reason }
+export function calculatePartyRoomRefundRate(reservationDateTime: Date): ...
+export function calculatePartyRoomRefund(reservationDateTime: Date, totalAmount: number): ... // 100%일 때 refundAmount = totalAmount
+
+// 취소 가능 여부 (API·클라이언트 공통)
+export function canCancelReservation(
+  reservationDate: Date,
+  roomType: "practice" | "party" | "practice-room" | "party-room"
+): { canCancel: boolean; message: string }
+// - practice*: 달력 일수 차이 < 2 → 불가 (전날·당일)
+// - party*: 일수 차이 < 3 → 불가 (문구: 3일 이내 취소 불가)
+
+export const REFUND_POLICY = { cancellationDeadlineHours: 48 }; // 레거시 힌트
 ```
+
+**연습실 취소 API** `POST src/app/api/reservations/cancel/route.ts`
+
+1. 세션·본인 `reservations` 행 조회, 상태 `PAID` / `CONFIRMED` / `confirmed` 만 허용  
+2. `canCancelReservation(..., "practice")` — 불가 시 400  
+3. `calculatePracticeRoomRefund(시작일시, total_amount)` — 환불율·금액·사유 (100%일 때 `refundAmount === totalAmount`)  
+4. 예약 `status: "CANCELLED"` 업데이트  
+5. `refundAmount > 0` 이면 `refundPointsDB` (`description`에 환불 사유 포함), 잔액은 `getPointBalance` 등으로 응답
+
+**파티룸 취소 API** `POST src/app/api/party-room/reservations/cancel/route.ts`
+
+- `calculatePartyRoomRefund` / 포인트 결제 시 `refundPointsDB` 등 (카드·포인트 분기는 라우트 구현 따름)
+
+**UI**
+
+- `/pricing`: 환불 규정 — 연습실(3일 전 100%, 2일 전 50%, 전날·당일 **취소 불가**) / 파티룸(7일 전 전액, 3일 전까지 50%, 3일 이내 **취소 불가**)  
+- `/booking`: 연습실 예약 확인 단계에서 **「예약 전 안내」**(환불·예약 확정 문자·변경 안내) — 예약 확정 버튼 위  
+- `/mypage`: 취소 모달에서 `calculatePracticeRoomRefundRate` / `calculatePartyRoomRefundRate`로 안내 문구·환불액 표시
 
 ### 7. SMS 발송 시스템
 
@@ -2184,7 +2213,7 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 - **만 19세 미만**: 알림만, 이동 없음.
 - **성인**: **`/party-room/booking`** 로 이동 — 탭으로 `selectedType === 'party-room'` 전환하지 않음(전용 예약 페이지로 통일).
 - **제거**: 이전 **`useIsAdult`** 의존 탭 `useEffect`, **`showAdultModal` / `showProfileModal`** 및 관련 모달 UI.
-- **연습실** 탭·예약 플로우는 변경 없음.
+- **연습실** 탭·예약 플로우: 본 절 시점 이후 **예약 확인 단계에 「예약 전 안내」(환불·확정·변경)** 가 추가됨(`src/app/booking/page.tsx`). 그 외 단계 흐름은 동일.
 - *참고*: URL **`/booking?type=party-room`** 으로 들어온 경우에만 기존처럼 **같은 페이지 안의 인라인 파티룸** UI가 열림; 일반 `/booking` 사용자는 파티룸 탭 → 검증 후 **`/party-room/booking`**.
 - **Git (예)**: `feat: /booking 파티룸 탭에 독립적인 성인 체크 추가` — 위 동작 반영.
 
@@ -2220,6 +2249,23 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 - **서버 로그**: `[Charge Approve] Step 1~8` — 세션, users 프로브, 패키지, 카카오 승인, `chargePointsDB` 호출 전·응답 후.
 - **`logErrorDetails`**: `chargePointsDB` **try/catch** 예외와 **바깥 catch**에서 `message` / `code` / `details` / `hint` / `stack` 출력.
 - **실패 시**: RPC 실패·예외는 `/charge/fail?error=…` 로 리다이렉트; 일부 실패 경로에서는 결제 관련 쿠키를 삭제한다.
+
+### 10. 연습실·파티룸 환불 정책 정리 (`src/lib/refund-policy.ts`, pricing/booking/mypage, 취소 API)
+
+- **`PRACTICE_ROOM_REFUND_POLICY` + `calculatePracticeRoomRefund*`**: **달력 일수(`getDaysDifference`)** — **3일 이상 100%**, **2일 50%**, **전날·당일 0%**. 전액 환불 시 `refundAmount`는 `totalAmount` 그대로. (상세·문구·마이페이지 동기화는 아래 **§11**.)
+- **`PARTY_ROOM_REFUND_POLICY` + `calculatePartyRoomRefund*`**: 동일 **달력 일수** — **7일 이상 100%**, **3~6일 50%**, **3일 미만 0%** (취소 불가 구간).
+- **`canCancelReservation`**: 연습실 **예약일까지 달력 일수가 2일 미만**이면 불가; 파티룸은 **3일 미만**이면 불가. (`POST /api/reservations/cancel` 등)
+- **레거시** `REFUND_POLICY.cancellationDeadlineHours: 48` — 주석상 힌트; 실제 취소·환불은 위 함수들이 기준.
+- **연결 파일**: `src/app/api/reservations/cancel/route.ts`, `src/app/api/party-room/reservations/cancel/route.ts`, `src/app/pricing/page.tsx`, `src/app/booking/page.tsx`(연습실 **예약 전 안내**), `src/app/mypage/page.tsx`(취소 모달 환불 안내).
+- **커밋 예**: `feat: 환불 규정 업데이트 및 연습실 예약 페이지에 정책 추가`, `fix: 연습실 환불 정책 3일 전 100% 환불 추가`.
+
+### 11. 환불·취소 일수 = 달력 기준 + 파티룸 문구 (`getDaysDifference`, 2026-04-23)
+
+- **`getDaysDifference`**: 예약 시각·현재 시각을 **로컬 날짜 00:00**으로 맞춘 뒤 일수 차이 계산 — 시·분 때문에 깨지던 구간(연습실 2일 전/3일 전, 파티룸 3·7일 경계) 정리.
+- **`calculatePartyRoomRefund*`**: 파티룸도 **연속 시간(시간/24h)** 대신 **`getDaysDifference`와 동일한 달력 규칙**으로 7일/3일 구간 적용.
+- **`canCancelReservation`**: `practice` / `party` 외 **`practice-room` · `party-room` 별칭** 허용; 메시지는 「전날·당일 취소 불가」「3일 이내 취소 불가」 등으로 통일.
+- **UI**: 파티룸 `/pricing`, `/party-room/booking`, `/party-room/booking/complete` 등 **「3일 이내 환불 불가」→「취소 불가」**; 연습실 안내는 전날·당일 **취소 불가** 표기.
+- **`/mypage`**: `getCancelPolicy`(= `canCancelReservation`)로 **취소 버튼 비활성화** + 안내 문구; 모달·확인 시에도 동일 정책 재검증. 전액 환불 표시 시 `refundRate === 1`이면 `floor` 없이 전액.
 
 ---
 
@@ -2437,8 +2483,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 ---
 
-**작성일**: 2026-04-24  
-**버전**: 2.19 (최신)  
+**작성일**: 2026-04-23  
+**버전**: 2.21 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---

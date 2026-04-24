@@ -7,9 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { formatPhoneNumber } from "@/lib/phone-utils";
-import { 
-  calculatePracticeRoomRefundRate, 
-  calculatePartyRoomRefundRate 
+import {
+  calculatePracticeRoomRefundRate,
+  calculatePartyRoomRefundRate,
+  canCancelReservation as getCancelPolicy,
 } from "@/lib/refund-policy";
 import { 
   Wallet, 
@@ -200,6 +201,18 @@ function MyPageContent() {
   const handleCancelReservation = async () => {
     if (!selectedReservation) return;
 
+    const selDt = new Date(
+      `${selectedReservation.date}T${selectedReservation.start_time}`
+    );
+    const selPolicy = getCancelPolicy(
+      selDt,
+      selectedReservation.reservation_type === "party-room" ? "party" : "practice"
+    );
+    if (!selPolicy.canCancel) {
+      alert(selPolicy.message);
+      return;
+    }
+
     setCancellingId(selectedReservation.id);
 
     try {
@@ -303,21 +316,25 @@ function MyPageContent() {
     }
   };
 
-  const canCancelReservation = (reservation: Reservation): boolean => {
-    // PAID, CONFIRMED, confirmed 상태의 예약만 취소 가능
+  /** 결제 완료 예약만 취소 UI 노출. 날짜 규칙은 `getDaysDifference`와 동일(달력 기준). */
+  const getReservationCancelUi = (reservation: Reservation) => {
     const cancellableStatuses = ["PAID", "CONFIRMED", "confirmed"];
-    if (!cancellableStatuses.includes(reservation.status)) return false;
-    
-    const reservationDateTime = new Date(`${reservation.date}T${reservation.start_time}`);
-    const now = new Date();
-    const diffMs = reservationDateTime.getTime() - now.getTime();
-    
-    // 연습실: 2일 전까지, 파티룸: 3일 전까지 취소 가능
-    const isPartyRoom = reservation.reservation_type === 'party-room';
-    const daysUntilReservation = diffMs / (1000 * 60 * 60 * 24);
-    const minDays = isPartyRoom ? 3 : 2;
-    
-    return daysUntilReservation >= minDays;
+    if (!cancellableStatuses.includes(reservation.status)) {
+      return { showCancelRow: false, canOpenCancel: false, policyMessage: "" };
+    }
+    const reservationDateTime = new Date(
+      `${reservation.date}T${reservation.start_time}`
+    );
+    const isPartyRoom = reservation.reservation_type === "party-room";
+    const policy = getCancelPolicy(
+      reservationDateTime,
+      isPartyRoom ? "party" : "practice"
+    );
+    return {
+      showCancelRow: true,
+      canOpenCancel: policy.canCancel,
+      policyMessage: policy.message,
+    };
   };
 
   const getTransactionColor = (type: PointTransaction["type"]) => {
@@ -550,6 +567,7 @@ function MyPageContent() {
                   ? '결제금액' 
                   : '사용 포인트';
                 const displayUnit = isPartyRoom && reservation.payment_method === 'kakaopay' ? '원' : 'P';
+                const cancelUi = getReservationCancelUi(reservation);
 
                 return (
                   <div
@@ -604,18 +622,31 @@ function MyPageContent() {
                       </div>
                     </div>
 
-                    {canCancelReservation(reservation) && (
+                    {cancelUi.showCancelRow && (
                       <div className="pt-4 border-t border-[#D8CCBC]">
                         <button
                           onClick={() => {
+                            if (!cancelUi.canOpenCancel) return;
                             setSelectedReservation(reservation);
                             setShowCancelModal(true);
                           }}
-                          disabled={cancellingId === reservation.id}
-                          className="w-full rounded-lg border border-red-300 px-4 py-2 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={
+                            cancellingId === reservation.id ||
+                            !cancelUi.canOpenCancel
+                          }
+                          className={`w-full rounded-lg border border-red-300 px-4 py-2 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            !cancelUi.canOpenCancel
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }`}
                         >
                           {cancellingId === reservation.id ? "취소 중..." : "예약 취소"}
                         </button>
+                        {!cancelUi.canOpenCancel && (
+                          <p className="mt-2 text-xs text-red-600">
+                            {cancelUi.policyMessage}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -732,8 +763,14 @@ function MyPageContent() {
                   ? calculatePartyRoomRefundRate(startDateTime)
                   : calculatePracticeRoomRefundRate(startDateTime);
                 
-                const originalAmount = selectedReservation.total_amount || 0;
-                const refundAmount = Math.floor(originalAmount * refundPolicy.refundRate);
+                const originalAmount =
+                  selectedReservation.total_amount ||
+                  selectedReservation.points_used ||
+                  0;
+                const refundAmount =
+                  refundPolicy.refundRate === 1.0
+                    ? originalAmount
+                    : Math.floor(originalAmount * refundPolicy.refundRate);
 
                 // 결제 금액 표시
                 if (isPartyRoom && isKakaoPay) {
@@ -758,7 +795,7 @@ function MyPageContent() {
                         ) : refundPolicy.refundRate === 0.5 ? (
                           <p className="text-xs">⚠️ 카드 전액 취소 후 {refundAmount.toLocaleString("ko-KR")}원이 포인트로 적립됩니다.</p>
                         ) : (
-                          <p>환불 불가</p>
+                          <p>취소 불가</p>
                         )}
                       </div>
                     </>

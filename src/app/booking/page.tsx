@@ -629,8 +629,8 @@ function BookingContent() {
                     <ul className="mt-2 space-y-1 ml-4 list-disc">
                       <li>이용 3일 전: 100% 환불</li>
                       <li>이용 2일 전: 50% 환불</li>
-                      <li>이용 전날: 환불 불가</li>
-                      <li>이용 당일: 환불 불가</li>
+                      <li>이용 전날: 취소 불가</li>
+                      <li>이용 당일: 취소 불가</li>
                     </ul>
                   </div>
                   <div>
