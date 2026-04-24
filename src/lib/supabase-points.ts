@@ -10,19 +10,33 @@ export interface PointResult {
   error?: string;
 }
 
-/** Supabase RPC `use_points` / `charge_points` / `refund_points` 공통 OUT 필드 (DB 정의와 맞출 것) */
-interface PointsRpcRow {
+/** Supabase RPC `charge_points` / `refund_points` OUT 파라미터 행 */
+interface PointsOutRpcRow {
   o_success?: boolean;
   o_new_balance?: number;
   o_transaction_id?: string;
 }
 
-function parseRpcRow(data: unknown): PointsRpcRow | null {
+/** PostgREST가 단일 행을 배열로 줄 때 첫 행만 사용 */
+function unwrapRpcFirstRow(data: unknown): Record<string, unknown> | null {
   if (data == null) return null;
+  if (Array.isArray(data)) {
+    const first = data[0];
+    if (first != null && typeof first === "object" && !Array.isArray(first)) {
+      return first as Record<string, unknown>;
+    }
+    return null;
+  }
   if (typeof data === "object" && !Array.isArray(data)) {
-    return data as PointsRpcRow;
+    return data as Record<string, unknown>;
   }
   return null;
+}
+
+function parseRpcRow(data: unknown): PointsOutRpcRow | null {
+  const row = unwrapRpcFirstRow(data);
+  if (!row) return null;
+  return row as unknown as PointsOutRpcRow;
 }
 
 /**
@@ -78,24 +92,42 @@ export async function deductPointsDB(params: {
       console.log("[Deduct Points] data[0]:", data[0]);
     }
 
-    const row = parseRpcRow(data);
+    const row = unwrapRpcFirstRow(data);
     console.log("[Deduct Points] Parsed row:", row);
 
-    if (!row?.o_success) {
-      console.error("[Deduct Points] RPC returned o_success=false or missing:", row);
+    if (!row) {
+      console.error("[Deduct Points] Empty or unparseable RPC data");
       return {
         success: false,
         newBalance: 0,
-        error: "포인트가 부족합니다",
+        error: "포인트 차감 실패",
       };
     }
 
-    console.log("[Deduct Points] Success! New balance:", row.o_new_balance);
+    const rpcSuccess = Boolean(row.success ?? row.o_success);
+    if (!rpcSuccess) {
+      console.error("[Deduct Points] RPC returned success=false:", row);
+      const errMsg =
+        typeof row.error === "string" && row.error
+          ? row.error
+          : "포인트가 부족합니다";
+      return {
+        success: false,
+        newBalance: 0,
+        error: errMsg,
+      };
+    }
+
+    const newBal = Number(row.new_balance ?? row.o_new_balance ?? 0);
+    const txIdRaw = row.transaction_id ?? row.o_transaction_id;
+    const txId = typeof txIdRaw === "string" ? txIdRaw : undefined;
+
+    console.log("[Deduct Points] Success! New balance:", newBal);
 
     return {
       success: true,
-      newBalance: row.o_new_balance ?? 0,
-      transactionId: row.o_transaction_id,
+      newBalance: newBal,
+      transactionId: txId,
     };
   } catch (err) {
     console.error("[Deduct Points Exception]", err);
