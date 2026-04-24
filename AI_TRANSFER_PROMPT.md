@@ -2339,7 +2339,43 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 
 ### 1. party_reservations 테이블 스키마 확장
 
-**추가된 컬럼:**
+#### 파티룸 예약 (Supabase)
+
+**문서·신규 구축 참고용 전체 DDL** (운영 DB는 아래 `ALTER`로 누적 추가된 컬럼과 병합될 수 있음 — 대시보드·`prisma db pull`로 확인).
+
+```sql
+CREATE TABLE party_reservations (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id),
+  date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  duration_hours NUMERIC(4,2),
+  package_type TEXT,
+  end_date DATE,
+  guest_name TEXT NOT NULL,
+  guest_phone TEXT NOT NULL,
+  total_amount INTEGER NOT NULL,
+  status TEXT DEFAULT 'confirmed',
+  is_event_price BOOLEAN DEFAULT true,
+  memo TEXT,
+  payment_method TEXT DEFAULT 'points',
+  points_used INTEGER DEFAULT 0,
+  refund_points INTEGER DEFAULT 0,
+  refund_amount INTEGER DEFAULT 0,
+  
+  -- 카카오페이 관련 (2026-04-24 추가)
+  kakaopay_order_id TEXT,
+  kakaopay_tid TEXT,
+  kakaopay_payment_status TEXT DEFAULT 'pending',
+  kakaopay_approved_at TIMESTAMPTZ,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**기존 테이블에 컬럼 추가 (마이그레이션 예시):**
 
 ```sql
 ALTER TABLE public.party_reservations
@@ -2355,10 +2391,14 @@ ADD COLUMN IF NOT EXISTS refund_method TEXT,
 ADD COLUMN IF NOT EXISTS auth_code TEXT,
 ADD COLUMN IF NOT EXISTS room_options JSONB DEFAULT '[]'::jsonb,
 ADD COLUMN IF NOT EXISTS special_requests TEXT,
-ADD COLUMN IF NOT EXISTS price_type TEXT;
+ADD COLUMN IF NOT EXISTS price_type TEXT,
+ADD COLUMN IF NOT EXISTS kakaopay_order_id TEXT,
+ADD COLUMN IF NOT EXISTS kakaopay_tid TEXT,
+ADD COLUMN IF NOT EXISTS kakaopay_payment_status TEXT DEFAULT 'pending',
+ADD COLUMN IF NOT EXISTS kakaopay_approved_at TIMESTAMPTZ;
 ```
 
-**컬럼 구조 (참고):** 위 ALTER에 나열한 신규 필드 + 기존 컬럼(`id`, `user_id`, `date`, `start_time`, `end_time`, `duration_hours`, `total_amount`, `guest_*`, `headcount`, `status`, 결제·메타, `created_at`, `cancelled_at` 등). **실제 개수·이름은 Supabase / `prisma db pull` 기준으로 확인**할 것.
+**컬럼 구조 (참고):** 위 CREATE·ALTER에 나열한 필드 외, 환경에 따라 `guest_email`, `headcount`, `cancelled_at`, `payment_provider`, `payment_key`, `order_id` 등이 **병존**할 수 있음. **실제 개수·이름은 Supabase / `prisma db pull` 기준으로 확인**할 것.
 
 ---
 
@@ -2550,7 +2590,7 @@ DISABLE TRIGGER validate_reservation_user;
 ---
 
 **작성일**: 2026-04-26  
-**버전**: 2.25 (최신)  
+**버전**: 2.26 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -2979,6 +3019,7 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 
 - **「최근 수정 사항 (2026-04-21)」 직후**에 **환불 정책 시스템 완성** 요약(타임존·정책 문구·SMS 테스트·party_reservations·마이페이지·Prisma) 추가.
 - 기존 긴 **2026-04-24** 기술 절 제목을 **`(2026-04-24) — 부록: 스키마·RPC 상세`** 로 구분(동일 날짜 중복 `##` 방지).
+- **부록 §1**에 **`party_reservations` Supabase 전체 `CREATE TABLE` 예시** 및 **`kakaopay_*` 컬럼 `ALTER` 보강** 반영.
 
 ### 1. 환불·취소 일수(서울) 및 마이페이지 동기화
 
