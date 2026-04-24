@@ -14,7 +14,7 @@ import {
 } from "@/lib/pricing";
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isBefore, startOfToday } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Clock, Calendar, Sparkles, AlertCircle, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Calendar, Sparkles, AlertCircle, Users, Coins, CreditCard, Check } from "lucide-react";
 
 interface TimeSlot {
   time: string;
@@ -51,6 +51,7 @@ function BookingContent() {
   const [priceInfo, setPriceInfo] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [adultConfirmed, setAdultConfirmed] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"points" | "kakaopay">("points");
 
   // 초기화
   useEffect(() => {
@@ -225,24 +226,23 @@ function BookingContent() {
 
   const timeSlots = selectedDate ? generateTimeSlots() : [];
 
-  // 예약 제출
-  const handleSubmit = async () => {
+  const handlePointsReservation = async () => {
     if (!selectedDate) {
       alert("날짜를 선택해주세요");
       return;
     }
 
-    if (selectedType === 'room' && (!startTime || !endTime)) {
+    if (selectedType === "room" && (!startTime || !endTime)) {
       alert("시간을 선택해주세요");
       return;
     }
 
-    if (selectedType === 'party-room' && !selectedPackage) {
+    if (selectedType === "party-room" && !selectedPackage) {
       alert("패키지를 선택해주세요");
       return;
     }
 
-    if (selectedType === 'party-room' && !adultConfirmed) {
+    if (selectedType === "party-room" && !adultConfirmed) {
       alert("성인 확인 체크박스를 선택해주세요");
       return;
     }
@@ -255,21 +255,20 @@ function BookingContent() {
     setSubmitting(true);
 
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         date: format(selectedDate, "yyyy-MM-dd"),
         reservation_type: selectedType,
       };
 
-      if (selectedType === 'room') {
+      if (selectedType === "room") {
         payload.start_time = startTime;
         payload.end_time = endTime;
       } else {
-        // 파티룸
         payload.package_type = selectedPackage;
         const pkg = PARTY_ROOM_PACKAGES[selectedPackage!];
         payload.start_time = pkg.start;
         payload.end_time = pkg.end;
-        payload.headcount = 10; // 기본값
+        payload.headcount = 10;
       }
 
       const response = await fetch("/api/reservations/create", {
@@ -284,12 +283,69 @@ function BookingContent() {
         throw new Error(data.error || "예약에 실패했습니다");
       }
 
-      router.push(`/booking/complete?id=${data.reservation_id}&points=${data.points_used}`);
+      router.push(
+        `/booking/complete?id=${data.reservation_id}&points=${data.points_used}`
+      );
     } catch (error) {
       console.error("예약 오류:", error);
       alert(error instanceof Error ? error.message : "예약에 실패했습니다");
       setSubmitting(false);
     }
+  };
+
+  const handleKakaoPayReservation = async () => {
+    if (!selectedDate || !startTime || !endTime) {
+      alert("날짜와 시간을 선택해주세요");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/reservations/payments/kakao/ready", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: format(selectedDate, "yyyy-MM-dd"),
+          startTime,
+          endTime,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "결제 준비에 실패했습니다");
+      }
+
+      const isMobile =
+        typeof navigator !== "undefined" &&
+        /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const redirect = isMobile
+        ? data.next_redirect_mobile_url || data.redirect_url
+        : data.redirect_url || data.next_redirect_pc_url;
+
+      if (!redirect) {
+        throw new Error("결제 URL을 받지 못했습니다");
+      }
+
+      window.location.href = redirect;
+    } catch (error) {
+      console.error("[연습실 카카오페이] 오류:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "결제 요청 중 오류가 발생했습니다"
+      );
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (selectedType === "room" && paymentMethod === "kakaopay") {
+      await handleKakaoPayReservation();
+      return;
+    }
+    await handlePointsReservation();
   };
 
   if (loading) {
@@ -605,18 +661,88 @@ function BookingContent() {
                 </span>
               </div>
               <div className="flex justify-between py-2 border-b border-[#D8CCBC]">
-                <span className="text-[#6f655d]">사용 포인트</span>
+                <span className="text-[#6f655d]">
+                  {selectedType === "room" && paymentMethod === "kakaopay"
+                    ? "결제 금액"
+                    : "사용 포인트"}
+                </span>
                 <span className="font-bold text-[#B98768] text-lg">
-                  {totalPoints.toLocaleString("ko-KR")}{selectedType === 'room' ? 'P' : '원'}
+                  {totalPoints.toLocaleString("ko-KR")}
+                  {selectedType === "room" && paymentMethod === "kakaopay"
+                    ? "원"
+                    : selectedType === "room"
+                      ? "P"
+                      : "원"}
                 </span>
               </div>
-              <div className="flex justify-between py-2">
-                <span className="text-[#6f655d]">예약 후 잔액</span>
-                <span className="font-semibold text-[#3B342F]">
-                  {(userPoints - totalPoints).toLocaleString("ko-KR")}P
-                </span>
-              </div>
+              {(selectedType === "party-room" ||
+                (selectedType === "room" && paymentMethod === "points")) && (
+                <div className="flex justify-between py-2">
+                  <span className="text-[#6f655d]">예약 후 잔액</span>
+                  <span className="font-semibold text-[#3B342F]">
+                    {(userPoints - totalPoints).toLocaleString("ko-KR")}P
+                  </span>
+                </div>
+              )}
             </div>
+
+            {selectedType === "room" && (
+              <div className="mb-6 space-y-4">
+                <h3 className="font-semibold text-lg text-[#3B342F]">
+                  결제 수단 선택
+                </h3>
+                <div className="grid gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("points")}
+                    className={`p-4 border-2 rounded-xl transition-all text-left ${
+                      paymentMethod === "points"
+                        ? "border-[#B98768] bg-[#B98768]/5"
+                        : "border-[#D8CCBC] hover:border-[#B98768]/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Coins className="w-5 h-5 text-[#B98768] shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-[#3B342F]">
+                          포인트 결제
+                        </div>
+                        <div className="text-sm text-[#6f655d]">
+                          현재 잔액: {userPoints.toLocaleString("ko-KR")}P
+                        </div>
+                      </div>
+                      {paymentMethod === "points" && (
+                        <Check className="w-5 h-5 text-[#B98768] shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("kakaopay")}
+                    className={`p-4 border-2 rounded-xl transition-all text-left ${
+                      paymentMethod === "kakaopay"
+                        ? "border-[#B98768] bg-[#B98768]/5"
+                        : "border-[#D8CCBC] hover:border-[#B98768]/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="w-5 h-5 text-[#B98768] shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-[#3B342F]">
+                          카카오페이
+                        </div>
+                        <div className="text-sm text-[#6f655d]">
+                          신용/체크카드 및 카카오페이머니
+                        </div>
+                      </div>
+                      {paymentMethod === "kakaopay" && (
+                        <Check className="w-5 h-5 text-[#B98768] shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {selectedType === "room" && (
               <div className="mb-6 rounded-xl border border-[#D8CCBC] bg-[#EFE7DA] p-6">
@@ -636,7 +762,9 @@ function BookingContent() {
                   <div>
                     <strong className="text-[#3B342F]">예약 확정</strong>
                     <p className="mt-1">
-                      포인트 결제 즉시 예약이 확정되며, 예약 확인 문자가 발송됩니다.
+                      {paymentMethod === "kakaopay"
+                        ? "카카오페이 결제가 완료되면 예약이 확정되며, 예약 확인 문자가 발송됩니다."
+                        : "포인트 결제 즉시 예약이 확정되며, 예약 확인 문자가 발송됩니다."}
                     </p>
                   </div>
                   <div>
@@ -666,23 +794,29 @@ function BookingContent() {
               </div>
             )}
 
-            {totalPoints > userPoints && (
-              <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-red-700 mb-1">
-                    포인트가 부족합니다
-                  </p>
-                  <p className="text-sm text-red-600">
-                    {(totalPoints - userPoints).toLocaleString("ko-KR")}P가 부족합니다
-                  </p>
+            {selectedType === "room" &&
+              paymentMethod === "points" &&
+              totalPoints > userPoints && (
+                <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-700 mb-1">
+                      포인트가 부족합니다
+                    </p>
+                    <p className="text-sm text-red-600">
+                      {(totalPoints - userPoints).toLocaleString("ko-KR")}P가
+                      부족합니다
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             <div className="space-y-3">
-              {totalPoints > userPoints ? (
+              {selectedType === "room" &&
+              paymentMethod === "points" &&
+              totalPoints > userPoints ? (
                 <button
+                  type="button"
                   onClick={() => router.push("/charge")}
                   className="w-full rounded-xl bg-[#B98768] px-6 py-4 text-base font-bold text-white transition-all hover:bg-[#a9785c] active:scale-95"
                 >
@@ -690,11 +824,21 @@ function BookingContent() {
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={handleSubmit}
-                  disabled={submitting || (selectedType === 'party-room' && !adultConfirmed)}
+                  disabled={
+                    submitting ||
+                    (selectedType === "party-room" && !adultConfirmed)
+                  }
                   className="w-full rounded-xl bg-[#B98768] px-6 py-4 text-base font-bold text-white transition-all hover:bg-[#a9785c] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? "예약 중..." : "예약 확정하기"}
+                  {submitting
+                    ? "처리 중..."
+                    : selectedType === "room" && paymentMethod === "kakaopay"
+                      ? `카카오페이로 결제하기 (${totalPoints.toLocaleString("ko-KR")}원)`
+                      : selectedType === "room"
+                        ? `포인트로 예약하기 (${totalPoints.toLocaleString("ko-KR")}P)`
+                        : "예약 확정하기"}
                 </button>
               )}
             </div>

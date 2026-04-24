@@ -176,6 +176,52 @@ export async function cancelPayment(params: CancelPaymentParams): Promise<Cancel
 }
 
 // =============================================
+// 연습실 직접 결제 (KAKAOPAY_CID — 포인트 충전과 동일 가맹점)
+// =============================================
+
+interface PracticeRoomPaymentReadyParams {
+  userId: string;
+  orderId: string;
+  itemName: string;
+  amount: number;
+}
+
+/**
+ * 카카오페이 결제 준비 (연습실 예약용)
+ */
+export async function readyPracticeRoomPayment(
+  params: PracticeRoomPaymentReadyParams
+): Promise<ReadyPaymentResponse> {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+  const body = {
+    cid: process.env.KAKAOPAY_CID,
+    partner_order_id: params.orderId,
+    partner_user_id: params.userId,
+    item_name: params.itemName,
+    quantity: 1,
+    total_amount: params.amount,
+    tax_free_amount: 0,
+    approval_url: `${baseUrl}/api/reservations/payments/kakao/approve`,
+    cancel_url: `${baseUrl}/api/reservations/payments/kakao/cancel`,
+    fail_url: `${baseUrl}/api/reservations/payments/kakao/fail`,
+  };
+
+  const response = await fetch(`${KAKAO_PAY_BASE_URL}/online/v1/payment/ready`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`카카오페이 결제 준비 실패: ${error.msg || response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// =============================================
 // 파티룸 직접 결제용 (포인트 충전과 별개)
 // =============================================
 

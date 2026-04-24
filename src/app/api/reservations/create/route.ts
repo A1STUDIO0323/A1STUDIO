@@ -15,6 +15,11 @@ import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
 import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
 import { prisma } from "@/lib/db";
 
+/**
+ * 연습실·파티룸 예약 — 포인트 결제
+ *
+ * 연습실 카카오페이 직접 결제는 `/api/reservations/payments/kakao/*` 를 사용합니다.
+ */
 export async function POST(request: NextRequest) {
   let lockKey: string | null = null;
   let userId: string | null = null;
@@ -187,6 +192,8 @@ export async function POST(request: NextRequest) {
       headcount: headcount || 1,
       status: "PAID",
       total_amount: pointsToUse,
+      points_used: pointsToUse,
+      payment_method: "points",
       reservation_type,
     };
 

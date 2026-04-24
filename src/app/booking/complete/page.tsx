@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle, Calendar, Clock } from "lucide-react";
+import { CheckCircle, Calendar, Clock, Coins, CreditCard } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -13,6 +13,7 @@ function BookingCompleteContent() {
   const searchParams = useSearchParams();
   const reservationId = searchParams.get("id");
   const pointsUsed = searchParams.get("points");
+  const paymentMethod = searchParams.get("method") || "points";
 
   const [reservation, setReservation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +55,18 @@ function BookingCompleteContent() {
   }
 
   const reservationDate = new Date(reservation.date);
+  const startDisp =
+    typeof reservation.start_time === "string"
+      ? reservation.start_time.slice(0, 5)
+      : String(reservation.start_time ?? "").slice(0, 5);
+  const endDisp =
+    typeof reservation.end_time === "string"
+      ? reservation.end_time.slice(0, 5)
+      : String(reservation.end_time ?? "").slice(0, 5);
+  const durationLabel =
+    reservation.duration_hours != null
+      ? `${reservation.duration_hours}시간`
+      : null;
 
   return (
     <div className="min-h-screen bg-[#F7F3EB] flex items-center justify-center py-20 px-4">
@@ -92,20 +105,39 @@ function BookingCompleteContent() {
                 <div>
                   <p className="text-sm text-[#9b9189] mb-1">이용 시간</p>
                   <p className="font-semibold text-[#3B342F]">
-                    {reservation.start_time} ~ {reservation.end_time}
-                    <span className="text-sm text-[#9b9189] ml-2">
-                      ({reservation.duration_hours}시간)
-                    </span>
+                    {startDisp} ~ {endDisp}
+                    {durationLabel && (
+                      <span className="text-sm text-[#9b9189] ml-2">
+                        ({durationLabel})
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
 
               <div className="pt-4 border-t border-[#D8CCBC]">
-                <p className="text-sm text-[#9b9189] mb-1">사용 포인트</p>
-                <p className="text-2xl font-bold text-[#B98768]">
-                  {parseInt(pointsUsed || "0").toLocaleString("ko-KR")}
-                  <span className="text-base ml-1">P</span>
-                </p>
+                <p className="text-sm text-[#9b9189] mb-1">결제 정보</p>
+                {paymentMethod === "kakaopay" ? (
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-[#B98768]" />
+                    <p className="text-2xl font-bold text-[#B98768]">
+                      카카오페이{" "}
+                      {(reservation.total_amount ?? 0).toLocaleString("ko-KR")}
+                      <span className="text-base ml-1">원</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-[#B98768]" />
+                    <p className="text-2xl font-bold text-[#B98768]">
+                      {(reservation.points_used != null
+                        ? reservation.points_used
+                        : parseInt(pointsUsed || "0", 10)
+                      ).toLocaleString("ko-KR")}
+                      <span className="text-base ml-1">P</span>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
