@@ -46,6 +46,13 @@ export async function deductPointsDB(params: {
   }
 
   try {
+    console.log("[Deduct Points] Calling use_points RPC:", {
+      userId: params.userId,
+      points: params.points,
+      reservationId: params.reservationId,
+      description: params.description,
+    });
+
     const { data, error } = await supabase.rpc("use_points", {
       p_user_id: params.userId,
       p_points: params.points,
@@ -53,8 +60,10 @@ export async function deductPointsDB(params: {
       p_reservation_id: params.reservationId ?? null,
     });
 
+    console.log("[Deduct Points] RPC raw response:", { data, error });
+
     if (error) {
-      console.error("[Use Points Error]", error);
+      console.error("[Deduct Points Error]", error);
       return {
         success: false,
         newBalance: 0,
@@ -62,8 +71,18 @@ export async function deductPointsDB(params: {
       };
     }
 
+    console.log("[Deduct Points] Parsing response...");
+    console.log("[Deduct Points] data type:", typeof data);
+    console.log("[Deduct Points] data is array:", Array.isArray(data));
+    if (Array.isArray(data)) {
+      console.log("[Deduct Points] data[0]:", data[0]);
+    }
+
     const row = parseRpcRow(data);
+    console.log("[Deduct Points] Parsed row:", row);
+
     if (!row?.o_success) {
+      console.error("[Deduct Points] RPC returned o_success=false or missing:", row);
       return {
         success: false,
         newBalance: 0,
@@ -71,13 +90,15 @@ export async function deductPointsDB(params: {
       };
     }
 
+    console.log("[Deduct Points] Success! New balance:", row.o_new_balance);
+
     return {
       success: true,
       newBalance: row.o_new_balance ?? 0,
       transactionId: row.o_transaction_id,
     };
   } catch (err) {
-    console.error("[Use Points Exception]", err);
+    console.error("[Deduct Points Exception]", err);
     return {
       success: false,
       newBalance: 0,
