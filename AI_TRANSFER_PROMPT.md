@@ -666,6 +666,7 @@ GET  /api/admin/dashboard                # 대시보드 통계
 GET  /api/admin/members                  # 회원 목록
 POST /api/admin/members/actions          # 회원 관리 액션
 GET  /api/admin/reservations/calendar    # 예약 캘린더 데이터
+POST /api/admin/reservations/cancel      # 관리자 예약 취소 (Prisma reservations, x-admin-password, 포인트 환불은 service role RPC)
 GET  /api/admin/reviews                  # 후기 목록 조회 (Supabase)
 PATCH /api/admin/reviews                 # 후기 공개/비공개 토글
 DELETE /api/admin/reviews                # 후기 삭제
@@ -888,6 +889,11 @@ export const REFUND_POLICY = { cancellationDeadlineHours: 48 }; // 레거시 힌
 **파티룸 취소 API** `POST src/app/api/party-room/reservations/cancel/route.ts`
 
 - `calculatePartyRoomRefund` / 포인트 결제 시 `refundPointsDB` 등 (카드·포인트 분기는 라우트 구현 따름)
+
+**포인트 환불 헬퍼** (`src/lib/supabase-points.ts`)
+
+- 일반: `refundPointsDB` — 요청 컨텍스트의 Supabase 세션(쿠키)으로 `refund_points` RPC  
+- 관리자 등 비세션: **`refundPointsDBServiceRole`** / 잔액 **`getPointBalanceServiceRole`** — **`SUPABASE_SERVICE_ROLE_KEY`**
 
 **UI**
 
@@ -2492,8 +2498,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 ---
 
-**작성일**: 2026-04-23  
-**버전**: 2.23 (최신)  
+**작성일**: 2026-04-26  
+**버전**: 2.24 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -2913,3 +2919,37 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 - **Step 6:** `approvePayment` (카카오).
 - **Step 7~8:** `chargePointsDB` 호출·결과 로그; 예외는 `logErrorDetails` 후 fail 리다이렉트.
 - **운영 참고:** 원인 파악 후 **프로브(Step 3~4) 제거** 여부를 검토할 수 있다(매 충전마다 `users` 읽기·실패 시 조기 종료).
+
+---
+
+## 📝 최근 수정 사항 (2026-04-26)
+
+### 1. 환불·취소 일수(서울) 및 마이페이지 동기화
+
+- **`src/lib/refund-policy.ts` — `getDaysDifference`**: `Intl.DateTimeFormat` + **`Asia/Seoul`** 연·월·일만 추출해 일수 차이 계산. 브라우저(KST)와 서버(UTC/Vercel) 간 **‘오늘’ 날짜 어긋남**으로 마이페이지 미리보기와 취소 API 결과가 달라지던 문제 방지.
+- **마이페이지** (`src/app/mypage/page.tsx`): 취소 확인 모달에서 `calculatePracticeRoomRefund` / `calculatePartyRoomRefund` 사용(회원 취소 API와 동일한 금액·사유). `canCancelReservation`으로 취소 버튼 비활성화·안내.
+
+### 2. 관리자 예약 취소 API·포인트 환불(service role)
+
+- **`POST /api/admin/reservations/cancel`** (`src/app/api/admin/reservations/cancel/route.ts`): 헤더 **`x-admin-password`** = `ADMIN_PASSWORD` (후기 관리 API와 동일 패턴; **Supabase 로그인 세션 불필요**).
+- Prisma **`Reservation`** 조회 → 상태 **`PAID` / `CONFIRMED`** 만 처리 → 회원 취소와 동일하게 `canCancelReservation` + `calculatePracticeRoomRefund` 또는 `calculatePartyRoomRefund` → **`refund_points` RPC**는 **`src/lib/supabase-points.ts`의 `refundPointsDBServiceRole`** 로 호출(**`SUPABASE_SERVICE_ROLE_KEY` 필수**).
+- 취소 후 `status: CANCELLED`. 파티룸 **낮 패키지**면 **`blocked_slots`**(17:00~19:00, `party-room`) `deleteMany`.
+- 환불액이 0보다 큰데 **`user_id`가 없으면 400**(수동 처리 유도).
+- **`getPointBalanceServiceRole`**: 응답용 잔액 조회.
+
+### 3. 관리자 UI (`src/app/admin/page.tsx`)
+
+- 예약 관리 탭 **⊗(취소)** 버튼 → 위 API 호출, `confirm` 후 목록 새로고침.
+- **`CONFIRMED`** 상태·필터 추가, `normalizeStatus`로 표시/필터 통일.
+
+### 4. 파티룸 환불 안내 문구(연습실 스타일)
+
+- **`/pricing`**, **`/party-room/booking`**, **`/party-room/booking/complete`**: 이용 **7일 전 이상** 전액, **3~6일 전** 50%, **전날·당일** 취소 불가. 완료 페이지는 **요약 목록 + 이 예약 기준 취소 마감 시각**(전액·50% 데드라인) 병기.
+- **`AI_TRANSFER_PROMPT.md` §6**: 동일 내용 반영, 실제 코드는 **달력 3일 미만** 취소 불가이므로 **이용 2일 전**도 구간에 포함됨을 명시.
+
+### 5. Git 커밋 참고(예)
+
+- `fix: 환불 계산 날짜 로직 수정 + 파티룸 취소 정책 명확화`
+- `fix: 마이페이지 환불 금액 미리보기 서버 로직과 동기화`
+- `fix: 관리자 예약 취소 기능 수정`
+- `docs: 파티룸 환불 정책 문구 명확화 (이용 전날/당일 추가)`
