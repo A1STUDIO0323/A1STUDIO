@@ -391,6 +391,7 @@ export default function PricingPage() {
           <div className="rounded-2xl border border-[#D8CCBC] bg-[#F7F3EB] p-6">
             <h3 className="text-lg font-bold text-[#3B342F] mb-3">연습실</h3>
             <ul className="space-y-2 text-sm text-[#6f655d] list-disc list-inside">
+              <li>이용 3일 전: 100% 환불</li>
               <li>이용 2일 전: 50% 환불</li>
               <li>이용 전날: 환불 불가</li>
               <li>이용 당일: 환불 불가</li>

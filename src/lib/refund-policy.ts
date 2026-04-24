@@ -4,6 +4,7 @@
 
 /** 연습실 환불 비율 (정책 문서·UI용) */
 export const PRACTICE_ROOM_REFUND_POLICY = {
+  threeDaysBefore: 1.0,
   twoDaysBefore: 0.5,
   oneDayBefore: 0,
   sameDay: 0,
@@ -25,9 +26,9 @@ export const REFUND_POLICY = {
 } as const;
 
 /**
- * 연습실 취소 환불율 계산
- * - 이용 시작 시각 기준 **2일(48시간) 이상** 남았으면 50% 환불
- * - 그 외(전날·당일 구간): 환불율 0% (취소 자체는 `canCancelReservation`에서 2일 미만이면 차단)
+ * 연습실 취소 환불율 계산 (예약 시작까지 남은 일수 = `floor(남은 ms / 24h)`)
+ * - 3일 이상: 100% · 정확히 2일: 50% · 전날·당일: 0%
+ * - 취소 가능 여부는 `canCancelReservation`을 따름
  */
 export function calculatePracticeRoomRefundRate(reservationDateTime: Date): {
   refundRate: number;
@@ -35,18 +36,32 @@ export function calculatePracticeRoomRefundRate(reservationDateTime: Date): {
 } {
   const now = new Date();
   const diffMs = reservationDateTime.getTime() - now.getTime();
-  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays >= 2) {
+  if (diffDays >= 3) {
+    return {
+      refundRate: PRACTICE_ROOM_REFUND_POLICY.threeDaysBefore,
+      description: "이용 3일 전 취소 (전액 환불)",
+    };
+  }
+
+  if (diffDays === 2) {
     return {
       refundRate: PRACTICE_ROOM_REFUND_POLICY.twoDaysBefore,
-      description: "이용 2일 전 취소: 50% 환불",
+      description: "이용 2일 전 취소 (50% 환불)",
+    };
+  }
+
+  if (diffDays === 1) {
+    return {
+      refundRate: PRACTICE_ROOM_REFUND_POLICY.oneDayBefore,
+      description: "이용 전날 취소 (환불 불가)",
     };
   }
 
   return {
-    refundRate: 0,
-    description: "이용 전날 및 당일: 환불 불가",
+    refundRate: PRACTICE_ROOM_REFUND_POLICY.sameDay,
+    description: "이용 당일 취소 (환불 불가)",
   };
 }
 
@@ -59,9 +74,13 @@ export function calculatePracticeRoomRefund(
 ): { refundRate: number; refundAmount: number; reason: string } {
   const { refundRate, description } =
     calculatePracticeRoomRefundRate(reservationDateTime);
+  const refundAmount =
+    refundRate === PRACTICE_ROOM_REFUND_POLICY.threeDaysBefore
+      ? totalAmount
+      : Math.floor(totalAmount * refundRate);
   return {
     refundRate,
-    refundAmount: Math.floor(totalAmount * refundRate),
+    refundAmount,
     reason: description,
   };
 }
