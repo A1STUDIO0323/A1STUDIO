@@ -8,8 +8,8 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { formatPhoneNumber } from "@/lib/phone-utils";
 import {
-  calculatePracticeRoomRefundRate,
-  calculatePartyRoomRefundRate,
+  calculatePracticeRoomRefund,
+  calculatePartyRoomRefund,
   canCancelReservation as getCancelPolicy,
 } from "@/lib/refund-policy";
 import { 
@@ -757,20 +757,18 @@ function MyPageContent() {
                 const startDateTime = new Date(`${selectedReservation.date}T${selectedReservation.start_time}`);
                 const isPartyRoom = selectedReservation.reservation_type === 'party-room';
                 const isKakaoPay = selectedReservation.payment_method === 'kakaopay';
-                
-                // 환불율 계산
-                const refundPolicy = isPartyRoom 
-                  ? calculatePartyRoomRefundRate(startDateTime)
-                  : calculatePracticeRoomRefundRate(startDateTime);
-                
+
                 const originalAmount =
                   selectedReservation.total_amount ||
                   selectedReservation.points_used ||
                   0;
-                const refundAmount =
-                  refundPolicy.refundRate === 1.0
-                    ? originalAmount
-                    : Math.floor(originalAmount * refundPolicy.refundRate);
+
+                // 취소 API와 동일: calculate*Refund (금액·전액 처리·서울 달력 일수)
+                const refundInfo = isPartyRoom
+                  ? calculatePartyRoomRefund(startDateTime, originalAmount)
+                  : calculatePracticeRoomRefund(startDateTime, originalAmount);
+
+                const { refundRate, refundAmount, reason: refundReason } = refundInfo;
 
                 // 결제 금액 표시
                 if (isPartyRoom && isKakaoPay) {
@@ -783,16 +781,16 @@ function MyPageContent() {
                       
                       {/* 환불 안내 */}
                       <div className={`mb-3 rounded-lg border p-3 text-sm ${
-                        refundPolicy.refundRate === 1.0 
+                        refundRate === 1.0 
                           ? 'bg-green-50 border-green-200 text-green-700'
-                          : refundPolicy.refundRate === 0.5
+                          : refundRate === 0.5
                           ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
                           : 'bg-red-50 border-red-200 text-red-700'
                       }`}>
-                        <p className="font-semibold mb-1">{refundPolicy.description}</p>
-                        {refundPolicy.refundRate === 1.0 ? (
+                        <p className="font-semibold mb-1">{refundReason}</p>
+                        {refundRate === 1.0 ? (
                           <p>카드로 {refundAmount.toLocaleString("ko-KR")}원 환불</p>
-                        ) : refundPolicy.refundRate === 0.5 ? (
+                        ) : refundRate === 0.5 ? (
                           <p className="text-xs">⚠️ 카드 전액 취소 후 {refundAmount.toLocaleString("ko-KR")}원이 포인트로 적립됩니다.</p>
                         ) : (
                           <p>취소 불가</p>
@@ -806,19 +804,19 @@ function MyPageContent() {
                     <>
                       <p className="text-sm text-[#9b9189] mb-1">환불 포인트</p>
                       <div className={`rounded-lg border p-3 ${
-                        refundPolicy.refundRate === 1.0 
+                        refundRate === 1.0 
                           ? 'bg-green-50 border-green-200'
-                          : refundPolicy.refundRate === 0.5
+                          : refundRate === 0.5
                           ? 'bg-yellow-50 border-yellow-200'
                           : 'bg-red-50 border-red-200'
                       }`}>
                         <p className="text-sm font-semibold text-[#3B342F] mb-1">
-                          {refundPolicy.description}
+                          {refundReason}
                         </p>
                         <p className="text-lg font-bold text-[#B98768]">
                           {refundAmount.toLocaleString("ko-KR")}P
                         </p>
-                        {refundPolicy.refundRate < 1.0 && (
+                        {refundRate < 1.0 && (
                           <p className="text-xs text-[#9b9189] mt-1">
                             원금: {originalAmount.toLocaleString("ko-KR")}P
                           </p>

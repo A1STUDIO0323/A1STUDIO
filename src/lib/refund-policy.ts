@@ -32,23 +32,37 @@ export type CancelRoomType =
   | "practice-room"
   | "party-room";
 
+const SEOUL_TZ = "Asia/Seoul";
+
+function getCalendarYmdInSeoul(d: Date): { y: number; m: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: SEOUL_TZ,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(d);
+  const map: Record<string, number> = {};
+  for (const p of parts) {
+    if (p.type === "year" || p.type === "month" || p.type === "day") {
+      map[p.type] = Number(p.value);
+    }
+  }
+  return { y: map.year, m: map.month, day: map.day };
+}
+
 /**
- * 두 시각이 가리키는 **달력 날짜** 사이의 일수 차이 (미래 − 현재)
- * @param futureDate 예약일(시) 등 — 날짜 부분만 사용
- * @param currentDate 기준일(기본: 지금)
+ * 두 시각이 가리키는 **서울 달력 날짜** 사이의 일수 차이 (미래 − 현재)
+ * 브라우저(KST)와 서버(UTC, 예: Vercel)에서 `setHours(0)`만 쓰면 ‘오늘’이 어긋날 수 있어 TZ 고정.
  */
 export function getDaysDifference(
   futureDate: Date,
   currentDate: Date = new Date()
 ): number {
-  const futureDateOnly = new Date(futureDate);
-  futureDateOnly.setHours(0, 0, 0, 0);
-
-  const currentDateOnly = new Date(currentDate);
-  currentDateOnly.setHours(0, 0, 0, 0);
-
-  const diffMs = futureDateOnly.getTime() - currentDateOnly.getTime();
-  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const f = getCalendarYmdInSeoul(futureDate);
+  const c = getCalendarYmdInSeoul(currentDate);
+  const tFuture = Date.UTC(f.y, f.m - 1, f.day);
+  const tCurrent = Date.UTC(c.y, c.m - 1, c.day);
+  return Math.floor((tFuture - tCurrent) / 86400000);
 }
 
 function normalizeRoomType(roomType: CancelRoomType): "practice" | "party" {

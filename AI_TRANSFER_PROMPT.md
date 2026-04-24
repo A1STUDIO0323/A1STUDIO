@@ -843,7 +843,7 @@ export async function approvePayment(params: {
 ```typescript
 // src/lib/refund-policy.ts (요약)
 
-// 예약일·오늘을 각각 00:00:00으로 맞춘 뒤 일수 차이 (시각 무시)
+// 예약일·기준일의 Asia/Seoul 달력 날짜 차이(일)
 export function getDaysDifference(futureDate: Date, currentDate?: Date): number
 
 // 연습실 환불 구간: getDaysDifference 기준 — 3일 이상 100%, 2일 50%, 전날·당일 0%
@@ -2261,7 +2261,7 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 
 ### 11. 환불·취소 일수 = 달력 기준 + 파티룸 문구 (`getDaysDifference`, 2026-04-23)
 
-- **`getDaysDifference`**: 예약 시각·현재 시각을 **로컬 날짜 00:00**으로 맞춘 뒤 일수 차이 계산 — 시·분 때문에 깨지던 구간(연습실 2일 전/3일 전, 파티룸 3·7일 경계) 정리.
+- **`getDaysDifference`**: 예약일·기준일을 **`Asia/Seoul` 달력 연·월·일**로만 비교해 일수 차이 계산 — 브라우저(KST)와 서버(UTC, Vercel 등)에서 `setHours(0)`만 쓸 때 **‘오늘’이 하루 어긋나** 마이페이지 미리보기와 취소 API 결과가 달라지던 문제 방지.
 - **`calculatePartyRoomRefund*`**: 파티룸도 **연속 시간(시간/24h)** 대신 **`getDaysDifference`와 동일한 달력 규칙**으로 7일/3일 구간 적용.
 - **`canCancelReservation`**: `practice` / `party` 외 **`practice-room` · `party-room` 별칭** 허용; 메시지는 「전날·당일 취소 불가」「3일 이내 취소 불가」 등으로 통일.
 - **UI**: 파티룸 `/pricing`, `/party-room/booking`, `/party-room/booking/complete` 등 **「3일 이내 환불 불가」→「취소 불가」**; 연습실 안내는 전날·당일 **취소 불가** 표기.
@@ -2484,7 +2484,7 @@ DISABLE TRIGGER validate_reservation_user;
 ---
 
 **작성일**: 2026-04-23  
-**버전**: 2.21 (최신)  
+**버전**: 2.22 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
