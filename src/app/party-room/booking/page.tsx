@@ -29,7 +29,7 @@ function PartyRoomBookingContent() {
   const [user, setUser] = useState<any>(null);
   const [userPoints, setUserPoints] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const isAdultUser = useIsAdult();
+  const { loading: adultCheckLoading, isAdult: isAdultUser } = useIsAdult();
 
   const [currentStep, setCurrentStep] = useState<Step>(1);
   
@@ -83,6 +83,19 @@ function PartyRoomBookingContent() {
             fetch("/api/members/profile")
               .then((res) => res.json())
               .then((profileData) => {
+                console.log("[Party Room Booking] Profile data:", profileData.profile);
+                console.log(
+                  "[Party Room Booking] birthYear (camelCase):",
+                  profileData.profile?.birthYear
+                );
+                console.log(
+                  "[Party Room Booking] birth_year (snake_case):",
+                  profileData.profile?.birth_year
+                );
+                const hasBirthYear = !!(
+                  profileData.profile?.birthYear ?? profileData.profile?.birth_year
+                );
+                console.log("[Party Room Booking] Has birth year:", hasBirthYear);
                 if (profileData.profile) {
                   if (profileData.profile.name) {
                     setGuestName(profileData.profile.name);
@@ -102,21 +115,27 @@ function PartyRoomBookingContent() {
     });
   }, [router]);
 
-  // 성인 체크 - 로딩 완료 후 최종 값으로 판단
+  // 성인 체크 — 페이지 데이터 로딩 + useIsAdult(세션·프로필) 준비 후에만 판단
   useEffect(() => {
-    // 로딩 중이거나 isAdultUser가 아직 확정되지 않았으면 대기
-    if (loading) return;
-    
-    // isAdultUser가 확정된 후 체크 (null 또는 false만 팝업)
+    if (loading || adultCheckLoading) return;
+
+    console.log("[Party Room Booking] Adult gate:", {
+      isAdultUser,
+      adultCheckLoading,
+      pageLoading: loading,
+    });
+
     if (isAdultUser === null) {
+      console.log(
+        "[Party Room Booking] Birth year missing after checks, redirecting to onboarding"
+      );
       alert("파티룸 예약을 위해 출생연도 정보가 필요합니다.\n출생연도를 입력해 주세요.");
       router.push("/onboarding/profile?returnTo=/party-room/booking");
     } else if (isAdultUser === false) {
       alert("파티룸은 만 19세 이상 성인 회원만 예약할 수 있습니다.");
       router.push("/party-room");
     }
-    // isAdultUser === true 인 경우 아무것도 안 함 (정상 진행)
-  }, [isAdultUser, loading, router]);
+  }, [isAdultUser, loading, adultCheckLoading, router]);
 
   // 패키지 선택 시 예약 가능 날짜 조회
   useEffect(() => {
@@ -240,7 +259,7 @@ function PartyRoomBookingContent() {
     }
   };
 
-  if (loading) {
+  if (loading || adultCheckLoading) {
     return (
       <div className="min-h-screen bg-[#F7F3EB] py-20 flex items-center justify-center">
         <p className="text-[#6f655d]">로딩 중...</p>

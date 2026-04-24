@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
+import { isAdult as birthYearIsAdult } from "@/lib/age-check";
 
 type AuthUser = {
   id: string;
@@ -197,68 +198,89 @@ export async function signOut(options?: { callbackUrl?: string }) {
 }
 
 /**
- * 현재 로그인 유저의 성인 여부 반환
- * @returns true: 만 19세 이상 / false: 미성년 / null: 생년월일 정보 없음
+ * 현재 로그인 유저의 성인 여부 (파티룸 등)
+ * - `loading`: Auth 세션 확정 전이거나 `/api/members/profile` 응답 대기 중
+ * - `isAdult`: `loading`이 false일 때 — true/false = 판단 완료, null = 출생연도 없음·프로필 없음
+ *
+ * 이메일 없이 로그인한 계정(카카오 이메일 미동의·휴대폰 등)도 `user.id`로 프로필을 조회한다.
  */
-export function useIsAdult(): boolean | null {
-  const { data: session } = useSession();
-  const [isAdult, setIsAdult] = useState<boolean | null>(null);
+export function useIsAdult(): { loading: boolean; isAdult: boolean | null } {
+  const { data: session, status } = useSession();
+  const [state, setState] = useState<{ loading: boolean; isAdult: boolean | null }>(
+    { loading: true, isAdult: null }
+  );
   const [refreshKey, setRefreshKey] = useState(0);
-  
-  // URL에서 refresh 파라미터 확인
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
-      const refresh = urlParams.get('refresh');
-      if (refresh) {
+      if (urlParams.get("refresh")) {
         setRefreshKey(Date.now());
       }
     }
   }, []);
-  
+
   useEffect(() => {
-    if (!session?.user?.email) {
-      console.log('[useIsAdult] 세션 이메일 없음 → isAdult: null');
-      setIsAdult(null);
+    if (status === "loading") {
+      setState({ loading: true, isAdult: null });
       return;
     }
 
-    // 프로필에서 생년월일 가져오기
-    fetch("/api/members/profile", {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-      },
+    if (status !== "authenticated" || !session?.user?.id) {
+      console.log("[useIsAdult] 비로그인 또는 세션 없음 → 판단 종료");
+      setState({ loading: false, isAdult: null });
+      return;
+    }
+
+    let cancelled = false;
+    setState({ loading: true, isAdult: null });
+
+    void fetch("/api/members/profile", {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
     })
       .then((res) => {
-        console.log('[useIsAdult] HTTP:', res.status, res.ok);
+        console.log("[useIsAdult] HTTP:", res.status, res.ok);
         return res.json();
       })
-      .then((data) => {
-        console.log('[useIsAdult] API 응답:', data);
-        console.log('[useIsAdult] birthYear:', data.profile?.birthYear);
+      .then((data: {
+        success?: boolean;
+        profile?: { birthYear?: number | null; birth_year?: number | null };
+      }) => {
+        if (cancelled) return;
+        console.log("[useIsAdult] API 응답:", data);
+        const profile = data.profile;
+        const birthYear =
+          profile?.birthYear ?? profile?.birth_year ?? null;
+        console.log("[useIsAdult] birthYear (camelCase):", profile?.birthYear);
+        console.log("[useIsAdult] birth_year (snake_case):", profile?.birth_year);
+        console.log("[useIsAdult] resolved birthYear:", birthYear);
 
-        if (!data.success || !data.profile?.birthYear) {
-          console.log('[useIsAdult] 성인 판단 불가:', {
+        if (!data.success || birthYear == null) {
+          console.log("[useIsAdult] 성인 판단 불가:", {
             success: data.success,
-            hasProfile: !!data.profile,
-            birthYear: data.profile?.birthYear,
+            hasProfile: !!profile,
+            birthYear,
           });
-          setIsAdult(null);
+          setState({ loading: false, isAdult: null });
           return;
         }
 
-        const birthYear = data.profile.birthYear;
-        const currentYear = new Date().getFullYear();
-        const age = currentYear - birthYear;
-        console.log('[useIsAdult] age:', age, '→ isAdult:', age >= 19);
-        setIsAdult(age >= 19);
+        const adult = birthYearIsAdult(new Date(birthYear, 11, 31));
+        console.log("[useIsAdult] isAdult (서버와 동일 기준, 연말 기준일):", adult);
+        setState({ loading: false, isAdult: adult });
       })
       .catch((err) => {
-        console.error('[useIsAdult] fetch 에러:', err);
-        setIsAdult(null);
+        console.error("[useIsAdult] fetch 에러:", err);
+        if (!cancelled) {
+          setState({ loading: false, isAdult: null });
+        }
       });
-  }, [session?.user?.email, refreshKey]);
-  
-  return isAdult;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, session?.user?.id, refreshKey]);
+
+  return state;
 }
