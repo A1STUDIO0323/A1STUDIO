@@ -103,37 +103,44 @@ export async function GET(request: NextRequest) {
 
     if (transactionError) throw new Error("충전 내역 생성 실패");
 
-    // 4. 보너스 포인트가 있으면 추가 거래 내역 생성
+    // 4. 보너스 포인트가 있으면 추가 거래 내역 생성 (실패해도 포인트는 이미 반영됨 → 전체 실패 처리 안 함)
     const bonusPoints = Math.round(Number(chargePackage.bonus_points ?? 0));
     if (bonusPoints > 0) {
       const bonusRateRaw = chargePackage.bonus_rate ?? chargePackage.bonusRate;
       const bonusRateLabel =
         bonusRateRaw != null && bonusRateRaw !== "" ? String(bonusRateRaw) : "";
 
+      const packageName = String(chargePackage.name ?? "");
+      const bonusDescription = bonusRateLabel
+        ? `${packageName} 보너스 ${bonusRateLabel}%`
+        : `${packageName} 보너스`;
+
+      // user_points.balance는 이미 total_points(유료+보너스) 반영 → 거래 후 잔액 = newBalance
+      const finalBalance = newBalance;
+
+      console.log("[보너스 거래] 데이터:", {
+        user_id: user.id,
+        type: "bonus",
+        amount: bonusPoints,
+        balance_after: finalBalance,
+        description: bonusDescription,
+      });
+
       const bonusTransactionData = {
         user_id: user.id,
         type: "bonus" as const,
         amount: bonusPoints,
-        balance_after: newBalance,
-        description: bonusRateLabel
-          ? `${chargePackage.name} 보너스 ${bonusRateLabel}%`
-          : `${chargePackage.name} 보너스`,
+        balance_after: finalBalance,
+        description: bonusDescription,
         reservation_id: null as string | null,
-        // 충전 행과 동일한 payment_id면 DB UNIQUE 위반(400) 가능 → 보너스 전용 키
-        payment_id: `${approval.aid}:bonus`,
       };
-
-      console.log("[충전 승인] 보너스 거래 데이터:", bonusTransactionData);
 
       const { error: bonusError } = await supabase
         .from("point_transactions")
         .insert(bonusTransactionData);
 
       if (bonusError) {
-        console.error("[충전 승인] 보너스 insert 오류:", bonusError);
-        throw new Error(
-          bonusError.message || "보너스 내역 생성 실패"
-        );
+        console.error("[보너스 거래 실패]", bonusError);
       }
     }
 
