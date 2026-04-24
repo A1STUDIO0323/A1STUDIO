@@ -628,8 +628,8 @@ GET  /api/reservations/available         # 사용 가능한 시간대 조회
 POST /api/reservations/create            # 예약 생성 (포인트 결제)
 POST /api/reservations/payments/kakao/ready   # 연습실 카카오페이 결제 준비
 GET  /api/reservations/payments/kakao/approve # 연습실 카카오페이 결제 승인 (콜백)
-GET  /api/reservations/payments/kakao/fail    # 연습실 결제 실패 → /booking?failed=true
-GET  /api/reservations/payments/kakao/cancel  # 연습실 결제 취소 → /booking?cancelled=true
+GET  /api/reservations/payments/kakao/fail    # 연습실 결제 실패 → 락 해제·쿠키 삭제 → /booking?failed=true
+GET  /api/reservations/payments/kakao/cancel  # 연습실 결제 취소 → 락 해제·쿠키 삭제 → /booking?cancelled=true
 POST /api/reservations/cancel            # 예약 취소
 POST /api/reservations/holds/expire      # 만료된 HOLD 정리
 
@@ -639,8 +639,8 @@ POST /api/party-room/reservations/create    # 파티룸 예약 생성
 POST /api/party-room/reservations/cancel    # 파티룸 예약 취소
 POST /api/party-room/payments/kakao/ready   # 카카오페이 결제 준비
 GET  /api/party-room/payments/kakao/approve # 카카오페이 결제 승인
-GET  /api/party-room/payments/kakao/fail    # 결제 실패
-GET  /api/party-room/payments/kakao/cancel  # 결제 취소
+GET  /api/party-room/payments/kakao/fail    # 결제 실패 → party-room 락 해제·쿠키 삭제 → /party-room/booking?failed=true
+GET  /api/party-room/payments/kakao/cancel  # 결제 취소 → party-room 락 해제·쿠키 삭제 → /party-room/booking?cancelled=true
 
 결제 API (Toss - 준비중)
 POST /api/payments/toss/confirm          # Toss 결제 승인
@@ -779,14 +779,17 @@ NEXT_PUBLIC_PARTY_ROOM_EVENT_ACTIVE="true"
 1. /booking 에서 결제 수단 «카카오페이» 선택 후 결제하기
 2. POST /api/reservations/payments/kakao/ready
    - 서버에서 금액 재계산(getPriceType + calcPoints), 중복 시간대 검사
-   - acquirePaymentLock("practice-room", partner_order_id)
-   - readyPracticeRoomPayment() → 쿠키: practice_kakao_tid, practice_kakao_order_id, practice_reservation_data
+   - `deleteExpiredPaymentLocksForUser` + 활성 `practice-room` 락 있으면 **409 + `retryAfter`(초)** (`/booking`에서 분 단위 안내)
+   - `acquirePaymentLock("practice-room", partner_order_id, 600)` — 실패 시 409/500
+   - `readyPracticeRoomPayment()` → 쿠키: practice_kakao_tid, practice_kakao_order_id, practice_reservation_data
+   - 준비 단계 예외 시 `releasePaymentLock`로 정리
 3. 카카오 결제 페이지로 이동 (모바일은 next_redirect_mobile_url 우선)
-4. GET /api/reservations/payments/kakao/approve?pg_token=...
+4. 실패/취소 시 카카오가 호출: **GET .../fail**, **GET .../cancel** → 쿠키의 `practice_kakao_order_id`로 **`releasePaymentLock(..., "practice-room")`** 후 쿠키 삭제 → `/booking?failed|cancelled=true`
+5. GET /api/reservations/payments/kakao/approve?pg_token=...
    - approvePayment → reservations INSERT (payment_method: kakaopay, kakaopay_*, duration_hours, points_used: 0)
    - SMS (연습실 템플릿) — 실패해도 예약은 유지
    - releasePaymentLock, 쿠키 삭제
-5. /booking/complete?id=...&method=kakaopay
+6. /booking/complete?id=...&method=kakaopay
 ```
 
 ### 4. 예약 프로세스 (파티룸)
@@ -799,14 +802,14 @@ NEXT_PUBLIC_PARTY_ROOM_EVENT_ACTIVE="true"
    → 예약된 시간대 조회
 3. "결제하기" 클릭
 4. POST /api/party-room/payments/kakao/ready
-   - PaymentLock 생성 (중복 방지)
-   - 카카오페이 결제 준비
-   - next_redirect_pc_url로 리다이렉트
-5. 카카오페이 결제 승인
+   - 만료 `party-room` 락 정리 후 활성 락 있으면 **409 + `retryAfter`** (연습실과 동일 UX)
+   - `acquirePaymentLock("party-room", orderId, 600)` 후 `readyPartyRoomPayment`
+   - 예외 시 `releasePaymentLock`; 쿠키에 `party_order_id` 등 저장
+5. 카카오페이 결제 페이지 (실패/취소 시 **GET .../fail**, **GET .../cancel** → `releasePaymentLock` + 쿠키 삭제)
 6. GET /api/party-room/payments/kakao/approve?pg_token=...
    - party_reservations INSERT (status: confirmed, payment_method: kakaopay, kakaopay_*)
    - SMS: sendMessage + getPartyRoomConfirmMessage + message_logs (실패해도 예약 유지)
-   - (파티 준비 플로우는 PaymentLock 미사용; 연습실 카카오는 practice-room 락 사용)
+   - **`releasePaymentLock(..., "party-room", orderId)`** 후 쿠키 삭제; 승인 예외 시에도 쿠키 기준 락 해제 시도
 7. 리다이렉트 → /party-room/booking/complete?id={reservationId}
 ```
 
@@ -1120,23 +1123,34 @@ type MemberRole = "NONE" | "CM"; // CM = Class Master (클래스마스터)
 ### 10. 결제 락 시스템
 
 ```typescript
-// src/lib/payment-lock.ts
+// src/lib/payment-lock.ts — 실제 함수명
 
-// 동시 결제 방지 (중복 결제 차단)
-export async function createPaymentLock(
+// 획득: 전역 만료 행 삭제 후 (user_id, lock_type, lock_key) 중복만 차단
+export async function acquirePaymentLock(
   userId: string,
-  lockType: 'charge' | 'reservation' | 'party-room',
+  lockType: string,       // 예: "reservation", "practice-room", "party-room"
   lockKey: string,
-  expiresInMinutes: number = 10
+  durationSeconds?: number
 ): Promise<boolean>
 
-export async function deletePaymentLock(
+// 해제: 동일 (user_id, lock_type, lock_key) 행 삭제 — 카카오 fail/cancel/approve 성공 후 호출
+export async function releasePaymentLock(
   userId: string,
   lockType: string,
   lockKey: string
 ): Promise<void>
 
-export async function cleanupExpiredLocks(): Promise<void>
+// 해당 사용자·타입의 만료된 락만 삭제 (ready 직전 재시도 정리)
+export async function deleteExpiredPaymentLocksForUser(
+  userId: string,
+  lockType: string
+): Promise<void>
+
+// 아직 만료되지 않은 락 목록 — 활성 락 있으면 ready에서 409 + retryAfter(초) 반환
+export async function getActivePaymentLocksForUser(
+  userId: string,
+  lockType: string
+): Promise<{ lock_key: string; expires_at: string }[]>
 ```
 
 ---
@@ -2612,8 +2626,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 ---
 
-**작성일**: 2026-04-27  
-**버전**: 2.27 (최신)  
+**작성일**: 2026-04-28  
+**버전**: 2.28 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3081,9 +3095,9 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 ### 1. 연습실 카카오페이 직접 결제
 
 - **`src/lib/kakaopay.ts`**: `readyPracticeRoomPayment` — `KAKAOPAY_CID`, 승인/취소/실패 URL을 `/api/reservations/payments/kakao/*` 로 고정.
-- **`POST /api/reservations/payments/kakao/ready`**: 금액 **서버 재계산**(`getPriceType`, `calcPoints`), 시간대 중복 검사, `acquirePaymentLock(userId, "practice-room", partner_order_id, 600)`, 실패 시 `releasePaymentLock`. 쿠키 `practice_*` (httpOnly·production 시 secure).
+- **`POST /api/reservations/payments/kakao/ready`**: 금액 **서버 재계산**(`getPriceType`, `calcPoints`), 시간대 중복 검사, **만료 락 정리·활성 락 409 + `retryAfter`**, `acquirePaymentLock(userId, "practice-room", partner_order_id, 600)`, 예외 시 `releasePaymentLock`. 쿠키 `practice_*` (httpOnly·production 시 secure). *(세부는 **「최근 수정 사항 (2026-04-28)」**.)*
 - **`GET .../approve`**: `approvePayment` → `reservations` INSERT (`payment_method: kakaopay`, `kakaopay_*`, `duration_hours`, `points_used: 0`, `reservation_type: room`, `room_id: a1-room`) → **`sendMessage` + `getPracticeRoomConfirmMessage` + `logMessage`** → 락 해제·쿠키 삭제 → **`/booking/complete?method=kakaopay`**.
-- **`GET .../fail`**, **`GET .../cancel`**: 각각 `/booking?failed=true`, `/booking?cancelled=true`.
+- **`GET .../fail`**, **`GET .../cancel`**: **`releasePaymentLock` + 쿠키 삭제** 후 각각 `/booking?failed=true`, `/booking?cancelled=true`.
 - **`src/app/booking/page.tsx`**: 연습실만 **포인트 / 카카오페이** 선택 UI, 모바일은 `next_redirect_mobile_url` 우선.
 - **`src/app/booking/complete/page.tsx`**: `method=kakaopay` 시 카카오페이·원 표시.
 - **`POST /api/reservations/create`**: 주석 명시(포인트 전용), INSERT에 **`payment_method: "points"`**, **`points_used`**.
@@ -3101,3 +3115,21 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 
 - `fix: 파티룸 카카오페이 결제 후 SMS 발송 추가`
 - `feat: 연습실 예약에 카카오페이 결제 추가`
+
+---
+
+## 📝 최근 수정 사항 (2026-04-28)
+
+### 1. PaymentLock — 카카오 실패/취소 시 즉시 해제·재시도 UX
+
+- **`src/lib/payment-lock.ts`**: `deleteExpiredPaymentLocksForUser`, `getActivePaymentLocksForUser` 추가.
+- **연습실** `GET /api/reservations/payments/kakao/fail`, **`.../cancel`**: 로그인 사용자 + `practice_kakao_order_id` 쿠키로 **`releasePaymentLock(userId, "practice-room", partner_order_id)`**, 관련 쿠키 삭제 후 리다이렉트.
+- **연습실** `POST .../kakao/ready`: ready 직전 **만료 락 정리**; **활성 `practice-room` 락**이 있으면 **409** + **`retryAfter`(초)**; `acquirePaymentLock` 실패 시에도 가능하면 동일 409 또는 **500**.
+- **파티룸** `POST .../kakao/ready`: **`acquirePaymentLock(..., "party-room", orderId, 600)`** 도입(기존에는 락 없음). 만료 정리·활성 락 409·예외 시 `releasePaymentLock` 동일 패턴.
+- **파티룸** `GET .../approve`: 성공 후 **`releasePaymentLock`**; **catch**에서 쿠키 `party_order_id`로 락 해제 시도.
+- **파티룸** `GET .../fail`, **`.../cancel`**: `party_order_id`로 **`releasePaymentLock`** 후 기존 파티 쿠키 전부 삭제.
+- **클라이언트** `src/app/booking/page.tsx`, `src/app/party-room/booking/page.tsx`: **409** 이고 **`retryAfter`** 가 있으면 분 단위 안내(진행 중 결제).
+
+### 2. Git 커밋 참고
+
+- `fix: PaymentLock 자동 삭제 및 만료 락 정리 구현`
