@@ -2064,7 +2064,7 @@ A1STUDIO/
 - **연습실 예약 생성** (`src/app/api/reservations/create/route.ts`): `deductPointsDB`, 응답에 `pointBalance` 등
 - **파티룸 예약 생성** (`src/app/api/party-room/reservations/create/route.ts`): 동일하게 `deductPointsDB` (카카오 결제 준비 `fetch` 없음 — 포인트 차감 플로우)
 - **예약 취소** (`src/app/api/reservations/cancel/route.ts`): `refundPointsDB` + 필요 시 `getPointBalance`
-- **포인트 충전 승인** (`src/app/api/charge/approve/route.ts`): `chargePointsDB`; 성공 리다이렉트 쿼리에 `newBalance` 등
+- **포인트 충전 승인** (`src/app/api/charge/approve/route.ts`): 세션·진단용 `public.users` 프로브·`[Charge Approve] Step` 로그 후 `chargePointsDB` (`charge_points` RPC); 성공 리다이렉트에 `newBalance` 등 (상세는 본 문서 **「9. 카카오페이 충전 승인」** 및 **「최근 수정 사항 (2026-04-25) → 6. 충전 승인 라우트」**)
 - **관리자 후기** (`src/app/api/admin/reviews/route.ts`): `getAllReviews` / `toggleReviewVisibility` / `deleteReview`; **Supabase 로그인 + 헤더 `x-admin-password`** (`ADMIN_PASSWORD`)
 - **관리자 후기 UI**: `src/lib/admin-context.tsx` — 로그인 성공 시 `ADMIN_PASSWORD_SESSION_KEY`로 비밀번호 보관(세션), `src/app/admin/reviews/page.tsx`에서 API 호출 시 헤더 전달·응답 `{ reviews }`·필드 `authorName`
 - **공개 후기 페이지** (`src/app/reviews/page.tsx`): `getPublicReviews()`, camelCase 표시 필드
@@ -2211,24 +2211,20 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
   7) **`auth.admin.deleteUser`**  
 - **`party_reservations`**: 스키마에 따라 `user_id`가 `auth.users`에 **ON DELETE CASCADE**이면 Auth 삭제 시 연쇄 삭제될 수 있음(운영 스키마 확인).
 
-### 9. 카카오페이 충전 승인 — `point_transactions` (`GET` `src/app/api/charge/approve/route.ts`)
+### 9. 카카오페이 충전 승인 (`GET` `src/app/api/charge/approve/route.ts`)
 
-- **흐름**: `approvePayment` 성공 → **`user_points`** `balance`를 **`currentBalance + chargePackage.total_points`** 로 반영 → **`point_transactions`** 기록 → (보너스 있으면) 보너스 행 추가 → `/charge/success` 리다이렉트.
-- **충전(`type: "charge"`) 행**:
-  - **`amount`**: 결제 **원화(`chargePackage.amount`)가 아니라 포인트 `total_points`** (`Math.round(Number(total_points))`) — 거래 테이블은 포인트 단위.
-  - **`balance_after`**: `currentBalance +` 위 포인트(= `user_points` 갱신 후 잔액과 일치).
-  - **`payment_id`**: 카카오 승인 `approval.aid`, **`reservation_id: null`** 명시.
-  - **디버그**: `[충전 거래] INSERT 직전 데이터`, 성공 시 `[충전 거래] INSERT 성공`, 실패 시 **`[충전 거래 내역 실패]`** + `message` / `code` / `details` / `hint` 후 **`throw`** → `/charge/fail`.
-- **보너스(`type: "bonus"`) 행** (`bonus_points > 0`):
-  - **`balance_after`**: `newBalance`(이미 `total_points` 반영된 최종 잔액).
-  - **`payment_id` 미전송**(스키마·UNIQUE·UUID 이슈 완화).
-  - **실패 시**: **`console.error("[보너스 거래 실패]", …)` 만** — 포인트는 이미 반영되었으므로 **전체 플로우는 성공 리다이렉트 유지**.
-- *장부 해석*: 한 결제에 **충전 행이 `total_points` 전체를 담고, 보너스 행이 또 있으면** 라인 합계와 잔액 변화를 **이중으로 읽지 않도록** UI/리포트에서 정책 정리 권장.
+- **흐름 (현행)**: Supabase 세션(`getUser`) → **진단용** `public.users` 단건 조회 → 쿼리 `pg_token` + 쿠키(`kakao_pay_tid`, `kakao_pay_order_id`, `kakao_pay_package_id`) → **`charge_packages`** → 카카오 **`approvePayment`** → **`chargePointsDB()`** (`supabase.rpc('charge_points', …)`, 정의는 `src/lib/supabase-points.ts`) → 성공 시 **`/charge/success?points=…&bonus=…&newBalance=…`** 및 결제 쿠키 삭제.
+- **`user_points` / `point_transactions`**: 라우트에서 직접 `INSERT` 하지 않고 **RPC `charge_points` 내부**에서 갱신·적재한다. (장부 규칙·`amount`/`balance_after`는 DB 함수 정의와 `AI_TRANSFER_PROMPT.md`의 `charge_points` SQL 절 참고.)
+- **포인트·보너스 계산**: `chargePackage.total_points`·`bonus_points`를 반올림한 뒤, 기본 충전분과 보너스분을 분리해 RPC에 `p_points` / `p_bonus_points`로 넘긴다. `description`은 패키지명 기반 문자열.
+- **진단용 `users` 프로브**: 카카오 승인·RPC 이전에 `from('users').select('*').eq('id', user.id).single()` 실행. **PostgREST로 `public.users`를 읽을 때** 나는 `permission denied` 등과 **RPC 내부** 오류를 로그 단계로 구분하기 위함. 실패 시 **`/charge/fail?error=users_probe:…`** (메시지 URL 인코딩).
+- **서버 로그**: `[Charge Approve] Step 1~8` — 세션, users 프로브, 패키지, 카카오 승인, `chargePointsDB` 호출 전·응답 후.
+- **`logErrorDetails`**: `chargePointsDB` **try/catch** 예외와 **바깥 catch**에서 `message` / `code` / `details` / `hint` / `stack` 출력.
+- **실패 시**: RPC 실패·예외는 `/charge/fail?error=…` 로 리다이렉트; 일부 실패 경로에서는 결제 관련 쿠키를 삭제한다.
 
 ---
 
 **작성일**: 2026-04-25  
-**버전**: 2.16 (최신)  
+**버전**: 2.18 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -2255,3 +2251,396 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 **문의**: shinji9112@gmail.com  
 **GitHub**: (프로젝트 저장소 URL)  
 **배포 URL**: https://a1-studio.vercel.app (예시)
+
+---
+
+## 📝 최근 수정 사항 (2026-04-25)
+
+### 1. Prisma/Supabase 시스템 최적화 완료
+
+#### 목표
+- Prisma Migrate 사용을 위한 FK 제거
+- 데이터 무결성은 3중 안전망으로 보장
+- Supabase와 Prisma 역할 명확히 분리
+
+---
+
+#### Phase 1: 데이터베이스 트리거 생성 (1층 안전망)
+
+**Supabase SQL Editor 실행:**
+
+```sql
+-- 사용자 검증 트리거 함수
+CREATE OR REPLACE FUNCTION public.validate_user_exists()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.user_id IS NOT NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = NEW.user_id) THEN
+      RAISE EXCEPTION 'Invalid user_id: User % does not exist in auth.users', NEW.user_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 4개 테이블에 트리거 적용
+CREATE TRIGGER validate_reservation_user
+  BEFORE INSERT OR UPDATE ON reservations
+  FOR EACH ROW EXECUTE FUNCTION validate_user_exists();
+
+CREATE TRIGGER validate_party_reservation_user
+  BEFORE INSERT OR UPDATE ON party_reservations
+  FOR EACH ROW EXECUTE FUNCTION validate_user_exists();
+
+CREATE TRIGGER validate_class_application_user
+  BEFORE INSERT OR UPDATE ON one_day_class_applications
+  FOR EACH ROW EXECUTE FUNCTION validate_user_exists();
+
+CREATE TRIGGER validate_user_points_user
+  BEFORE INSERT OR UPDATE ON user_points
+  FOR EACH ROW EXECUTE FUNCTION validate_user_exists();
+```
+
+---
+
+#### Phase 2: 애플리케이션 검증 헬퍼 (2층 안전망)
+
+**파일 생성:** `src/lib/user-validation.ts`
+
+```typescript
+import { prisma } from './db';
+
+/**
+ * 사용자 존재 여부 검증 (2층 안전망)
+ */
+export async function validateUserExists(
+  userId: string | null | undefined
+): Promise<boolean> {
+  if (!userId) return true; // null/undefined 허용 (비회원)
+  
+  try {
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    return !!user;
+  } catch (error) {
+    console.error('[validateUserExists] Error:', error);
+    return false;
+  }
+}
+
+export const USER_NOT_FOUND_ERROR = {
+  error: '존재하지 않는 사용자입니다',
+  code: 'USER_NOT_FOUND',
+} as const;
+```
+
+**적용된 API:**
+- `src/app/api/reservations/create/route.ts`
+- `src/app/api/party-room/reservations/create/route.ts`
+- `src/app/api/one-day-class/route.ts`
+
+각 API에서 핵심 로직(포인트 차감, 결제, DB 저장) 직전에 `validateUserExists()` 호출.
+
+---
+
+#### Phase 3: FK 제거 (3층 안전망)
+
+**Supabase SQL Editor 실행:**
+
+```sql
+-- auth.users FK 제거 (4개)
+ALTER TABLE party_reservations DROP CONSTRAINT IF EXISTS party_reservations_user_id_fkey;
+ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_user_id_fkey;
+ALTER TABLE one_day_class_applications DROP CONSTRAINT IF EXISTS one_day_class_applications_user_id_fkey;
+ALTER TABLE user_points DROP CONSTRAINT IF EXISTS user_points_user_id_fkey;
+```
+
+---
+
+#### Phase 4: Prisma DB Pull & 모델명 변경
+
+**로컬 터미널:**
+
+```bash
+npx prisma db pull
+npx prisma generate
+```
+
+**변경 사항:**
+- 모델명: `User` → `users` (소문자)
+- 필드명: camelCase → snake_case
+  - `updatedAt` → `updated_at`
+  - `birthYear` → `birth_year`
+  - `phoneVerified` → `phone_verified`
+  - `avatarUrl` → `avatar_url`
+
+**수정된 파일 (8개):**
+- `src/app/api/account/delete/route.ts`
+- `src/app/api/find-account/route.ts`
+- `src/app/auth/callback/route.ts`
+- `src/app/api/members/profile/route.ts`
+- `src/app/api/members/sync/route.ts`
+- `src/app/api/admin/members/route.ts`
+- `src/lib/member-role-db.ts`
+- 모든 `prisma.user` → `prisma.users` 일괄 변경
+
+---
+
+#### Phase 5: Prisma Migrate 베이스라인
+
+**로컬 터미널:**
+
+```bash
+# 베이스라인 마이그레이션 폴더 생성
+mkdir -p prisma/migrations/20260425000000_init
+
+# 빈 migration.sql 파일 생성 (Windows CMD)
+echo -- Baseline migration > prisma/migrations/20260425000000_init/migration.sql
+echo -- Database already contains all tables >> prisma/migrations/20260425000000_init/migration.sql
+echo -- This migration marks the current state as the starting point >> prisma/migrations/20260425000000_init/migration.sql
+
+# 마이그레이션을 "적용됨"으로 표시
+npx prisma migrate resolve --applied 20260425000000_init
+
+# 상태 확인
+npx prisma migrate status
+# 결과: Database schema is up to date!
+```
+
+---
+
+### 2. Supabase Auth 사용자 삭제 자동화
+
+#### 목표
+Supabase Authentication에서 사용자를 삭제하면 관련된 모든 데이터를 자동으로 삭제
+
+**Supabase SQL Editor 실행:**
+
+```sql
+-- ================================================================
+-- auth.users 삭제 시 관련 데이터 자동 삭제
+-- ================================================================
+
+-- 1. 삭제 로그 테이블 생성
+CREATE TABLE IF NOT EXISTS public.auth_deletion_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  deleted_user_id uuid NOT NULL,
+  deleted_email text,
+  deleted_at timestamptz DEFAULT NOW(),
+  related_data_count jsonb
+);
+
+-- 2. 트리거 함수 생성
+CREATE OR REPLACE FUNCTION public.handle_user_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+BEGIN
+  -- 삭제 전 로그 기록
+  INSERT INTO public.auth_deletion_logs (
+    deleted_user_id,
+    deleted_email,
+    related_data_count
+  ) VALUES (
+    OLD.id,
+    OLD.email,
+    jsonb_build_object(
+      'users', (SELECT COUNT(*) FROM public.users WHERE id = OLD.id),
+      'user_points', (SELECT COUNT(*) FROM public.user_points WHERE user_id = OLD.id),
+      'reservations', (SELECT COUNT(*) FROM public.reservations WHERE user_id = OLD.id),
+      'party_reservations', (SELECT COUNT(*) FROM public.party_reservations WHERE user_id = OLD.id),
+      'one_day_class_applications', (SELECT COUNT(*) FROM public.one_day_class_applications WHERE user_id = OLD.id),
+      'message_logs', (SELECT COUNT(*) FROM public.message_logs WHERE user_id = OLD.id),
+      'payment_locks', (SELECT COUNT(*) FROM public.payment_locks WHERE user_id = OLD.id),
+      'accounts', (SELECT COUNT(*) FROM public.accounts WHERE user_id = OLD.id),
+      'sessions', (SELECT COUNT(*) FROM public.sessions WHERE user_id = OLD.id)
+    )
+  );
+  
+  -- 후기 익명화 (삭제 전에 먼저 처리)
+  UPDATE public.reviews 
+  SET nickname = '탈퇴한 사용자'
+  WHERE reservation_id IN (
+    SELECT id FROM public.reservations WHERE user_id = OLD.id
+  );
+  
+  -- 실제 데이터 삭제
+  DELETE FROM public.users WHERE id = OLD.id;
+  DELETE FROM public.user_points WHERE user_id = OLD.id;
+  DELETE FROM public.point_transactions WHERE user_id = OLD.id;
+  DELETE FROM public.reservations WHERE user_id = OLD.id;
+  DELETE FROM public.party_reservations WHERE user_id = OLD.id;
+  DELETE FROM public.one_day_class_applications WHERE user_id = OLD.id;
+  DELETE FROM public.message_logs WHERE user_id = OLD.id;
+  DELETE FROM public.payment_locks WHERE user_id = OLD.id;
+  DELETE FROM public.accounts WHERE user_id = OLD.id;
+  DELETE FROM public.sessions WHERE user_id = OLD.id;
+  
+  RAISE NOTICE 'Deleted all data for user % (email: %)', OLD.id, OLD.email;
+  
+  RETURN OLD;
+END;
+$function$;
+
+-- 함수 소유자를 postgres로 변경
+ALTER FUNCTION public.handle_user_delete() OWNER TO postgres;
+
+-- 3. 트리거 생성 (기존 on_auth_user_deleted 트리거가 있으면 재활용)
+DROP TRIGGER IF EXISTS on_auth_user_deleted ON auth.users;
+
+CREATE TRIGGER on_auth_user_deleted
+  AFTER DELETE ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_user_delete();
+```
+
+**삭제 범위:**
+- ✅ users, user_points, point_transactions
+- ✅ reservations, party_reservations (user_id 있는 것만)
+- ✅ one_day_class_applications, message_logs
+- ✅ payment_locks, accounts, sessions
+- ❌ payments, refunds (결제 이력 보존)
+- 🔄 reviews (익명화: `nickname = '탈퇴한 사용자'`)
+
+**사용 방법:**
+1. Supabase Dashboard → Authentication → Users
+2. 삭제할 사용자 선택 → Delete
+3. 확인 → 모든 관련 데이터 자동 삭제됨
+
+**로그 확인:**
+```sql
+SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
+```
+
+---
+
+### 3. RLS (Row Level Security) 비활성화
+
+#### 배경
+포인트 충전 시 "permission denied for table users" 에러 발생.
+RPC 함수 내부에서 테이블 접근 시 RLS 정책이 막음.
+
+**Supabase SQL Editor 실행:**
+
+```sql
+-- 주요 테이블 RLS 비활성화 (임시)
+ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_points DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.point_transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reservations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.party_reservations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.one_day_class_applications DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payment_locks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.accounts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sessions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reviews DISABLE ROW LEVEL SECURITY;
+```
+
+**참고:** 향후 프로덕션 배포 전에 적절한 RLS 정책을 다시 설정해야 함.
+
+**앱 측 진단 (중복 아님):** `src/app/api/charge/approve/route.ts`에서 위 RLS/권한 이슈를 추적하기 위해 **`public.users` 단건 조회(프로브)** 와 **`[Charge Approve] Step 1~8`**, **`logErrorDetails`** 를 두었다. 터미널에서 Step 3에서 막히면 PostgREST·테이블 권한·테이블명 불일치 쪽, Step 7~8에서 막히면 **`charge_points` RPC·DB** 쪽을 우선 본다.
+
+---
+
+### 4. Supabase RPC 함수 권한 설정
+
+#### charge_points() 함수
+
+**Supabase SQL Editor 실행:**
+
+```sql
+CREATE OR REPLACE FUNCTION public.charge_points(
+  p_user_id uuid,
+  p_points integer,
+  p_bonus_points integer DEFAULT 0,
+  p_description text DEFAULT '포인트 충전',
+  OUT o_success boolean,
+  OUT o_new_balance integer
+)
+LANGUAGE plpgsql
+SECURITY DEFINER  -- ✅ 핵심: postgres 권한으로 실행
+SET search_path = public
+AS $$
+DECLARE
+  v_total_points integer;
+BEGIN
+  v_total_points := p_points + p_bonus_points;
+  
+  INSERT INTO public.user_points (user_id, balance, total_charged, total_used)
+  VALUES (p_user_id, v_total_points, p_points, 0)
+  ON CONFLICT (user_id) DO UPDATE
+  SET 
+    balance = user_points.balance + v_total_points,
+    total_charged = user_points.total_charged + p_points,
+    updated_at = NOW()
+  RETURNING balance INTO o_new_balance;
+  
+  INSERT INTO public.point_transactions (user_id, type, amount, balance_after, description)
+  VALUES (p_user_id, 'charge', p_points, o_new_balance, p_description);
+  
+  IF p_bonus_points > 0 THEN
+    INSERT INTO public.point_transactions (user_id, type, amount, balance_after, description)
+    VALUES (p_user_id, 'bonus', p_bonus_points, o_new_balance, 'Bonus: ' || p_bonus_points || 'P');
+  END IF;
+  
+  o_success := TRUE;
+  
+EXCEPTION WHEN OTHERS THEN
+  o_success := FALSE;
+  o_new_balance := 0;
+  RAISE NOTICE 'charge_points error: %', SQLERRM;
+END;
+$$;
+
+ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postgres;
+```
+
+**사용처:** `src/lib/supabase-points.ts` → `chargePointsDB()`
+
+**앱 호출 파라미터 (코드 기준):** `p_user_id`, `p_points`, `p_bonus_points`, `p_description` — 그 외 RPC 인자 없음.
+
+---
+
+### 5. 최종 시스템 아키텍처
+
+#### Supabase 전담
+- **인증:** auth.users (Supabase Auth)
+- **포인트:** user_points, point_transactions (RPC 함수)
+- **후기:** reviews (Storage 연동)
+- **홀드:** reservation_holds (TTL)
+- **로그:** message_logs, auth_deletion_logs
+
+#### Prisma 전담
+- **예약:** reservations, party_reservations
+- **결제:** payments, refunds
+- **원데이클래스:** one_day_classes, one_day_class_applications
+- **공지:** notices, events
+- **사용자 프로필:** users (auth.users 확장)
+
+#### 3중 안전망
+
+```
+예약 플로우:
+1. validateUserExists() - 애플리케이션 검증 (2층)
+2. validate_user_exists() - DB 트리거 (1층)
+3. deductPointsDB() - Supabase RPC (Atomic)
+4. prisma.reservations.create() - Prisma (타입 안전)
+```
+
+---
+
+### 6. 충전 승인 라우트 — 진단 로그 요약 (코드 변경)
+
+- **파일:** `src/app/api/charge/approve/route.ts`
+- **`logErrorDetails(prefix, error)`**: Supabase/일반 객체형 에러의 `message`·`code`·`details`·`hint`·`stack` 통합 로깅.
+- **Step 1~2:** `supabase.auth.getUser()` — 실패·무사용자 시 `/login?error=unauthorized`.
+- **Step 3~4:** `public.users` 프로브 — 실패 시 `users_probe:` 포함 fail URL.
+- **Step 5:** `charge_packages` 조회.
+- **Step 6:** `approvePayment` (카카오).
+- **Step 7~8:** `chargePointsDB` 호출·결과 로그; 예외는 `logErrorDetails` 후 fail 리다이렉트.
+- **운영 참고:** 원인 파악 후 **프로브(Step 3~4) 제거** 여부를 검토할 수 있다(매 충전마다 `users` 읽기·실패 시 조기 종료).

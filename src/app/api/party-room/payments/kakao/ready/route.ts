@@ -36,17 +36,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. 성인 여부 서버사이드 재검증
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('birthdate')
-      .eq('id', user.id)
-      .single();
+    // 1. 성인 여부 서버사이드 재검증 (public.users.birth_year)
+    const { data: profile } = await supabase
+      .from("users")
+      .select("birth_year")
+      .eq("id", user.id)
+      .maybeSingle();
 
-    const birthdate = userProfile?.birthdate || user.user_metadata?.birthdate;
-    
-    if (!birthdate || !isAdult(birthdate)) {
-      return NextResponse.json({ error: '성인 인증 필요' }, { status: 403 });
+    const birthYear = profile?.birth_year ?? null;
+    if (birthYear == null) {
+      return NextResponse.json(
+        {
+          error:
+            "파티룸 예약을 위해서는 출생연도 정보가 필요합니다. 마이페이지에서 프로필을 완성해주세요.",
+        },
+        { status: 403 }
+      );
+    }
+    if (!isAdult(new Date(birthYear, 11, 31))) {
+      return NextResponse.json(
+        { error: "파티룸은 만 19세 이상 성인만 예약 가능합니다." },
+        { status: 403 }
+      );
     }
 
     // 2. 최대 인원 검증

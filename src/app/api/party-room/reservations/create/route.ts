@@ -66,17 +66,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. 성인 여부 서버사이드 재검증
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('birthdate')
-      .eq('id', user.id)
-      .single();
+    // 1. 성인 여부 서버사이드 재검증 (public.users.birth_year — Prisma/마이페이지와 동일)
+    console.log("[Party Room Create] Step age: Checking age verification");
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("birth_year")
+      .eq("id", user.id)
+      .maybeSingle();
 
-    const birthdate = userProfile?.birthdate || user.user_metadata?.birthdate;
-    
-    if (!birthdate || !isAdult(birthdate)) {
-      return NextResponse.json({ error: '성인 인증 필요' }, { status: 403 });
+    console.log("[Party Room Create] Profile row:", profile);
+    console.log("[Party Room Create] profileError:", profileError);
+    const birthYear = profile?.birth_year ?? null;
+    console.log("[Party Room Create] birth_year:", birthYear);
+
+    if (birthYear == null) {
+      console.log("[Party Room Create] No birth_year on users row");
+      return NextResponse.json(
+        {
+          error:
+            "파티룸 예약을 위해서는 출생연도 정보가 필요합니다. 마이페이지에서 프로필을 완성해주세요.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const birthDateForAge = new Date(birthYear, 11, 31);
+    const isAdultUser = isAdult(birthDateForAge);
+    console.log("[Party Room Create] isAdult (end-of-birth-year):", isAdultUser);
+
+    if (!isAdultUser) {
+      console.log("[Party Room Create] Age verification failed");
+      return NextResponse.json(
+        { error: "파티룸은 만 19세 이상 성인만 예약 가능합니다." },
+        { status: 403 }
+      );
     }
 
     // 2. 최대 인원 검증

@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
     if (reservation_type === 'party-room') {
       // 1. 성인 여부 서버사이드 재검증
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('birth_year')
-        .eq('id', user.id)
-        .single();
+        .from("users")
+        .select("birth_year")
+        .eq("id", user.id)
+        .maybeSingle();
 
       const birthYear = profile?.birth_year;
       
