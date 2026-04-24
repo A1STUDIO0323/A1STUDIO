@@ -4,6 +4,7 @@ import { approvePartyRoomPayment } from "@/lib/kakaopay";
 import { PARTY_ROOM_PACKAGES, PartyRoomPackage } from "@/lib/pricing";
 import { cookies } from "next/headers";
 import { formatPhoneNumber, isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone-utils";
+import { releasePaymentLock } from "@/lib/payment-lock";
 
 function timeToHHMM(value: unknown): string {
   if (value == null) return "";
@@ -166,6 +167,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    await releasePaymentLock(user.id, "party-room", orderId);
+
     // 쿠키 정리
     cookieStore.delete("party_kakao_tid");
     cookieStore.delete("party_order_id");
@@ -185,6 +188,19 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("카카오페이 결제 승인 오류:", error);
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const cookieStore = await cookies();
+      const oid = cookieStore.get("party_order_id")?.value ?? null;
+      if (user && oid) {
+        await releasePaymentLock(user.id, "party-room", oid);
+      }
+    } catch (e) {
+      console.error("[파티룸 승인] 락 해제 실패:", e);
+    }
     return NextResponse.redirect(new URL("/party-room/booking?failed=true", request.url));
   }
 }

@@ -82,6 +82,57 @@ export async function releasePaymentLock(
 }
 
 /**
+ * 특정 사용자·lock_type 에 대해 만료된 락만 삭제 (재시도 시 정리)
+ */
+export async function deleteExpiredPaymentLocksForUser(
+  userId: string,
+  lockType: string
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("payment_locks")
+      .delete()
+      .eq("user_id", userId)
+      .eq("lock_type", lockType)
+      .lt("expires_at", new Date().toISOString());
+
+    if (error) {
+      console.error("[PaymentLock] 만료 락 삭제 오류:", error);
+    }
+  } catch (error) {
+    console.error("[PaymentLock] 만료 락 삭제 예외:", error);
+  }
+}
+
+/**
+ * 특정 사용자·lock_type 의 아직 만료되지 않은 락 목록
+ */
+export async function getActivePaymentLocksForUser(
+  userId: string,
+  lockType: string
+): Promise<{ lock_key: string; expires_at: string }[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("payment_locks")
+      .select("lock_key, expires_at")
+      .eq("user_id", userId)
+      .eq("lock_type", lockType)
+      .gt("expires_at", new Date().toISOString());
+
+    if (error) {
+      console.error("[PaymentLock] 활성 락 조회 오류:", error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error("[PaymentLock] 활성 락 조회 예외:", error);
+    return [];
+  }
+}
+
+/**
  * 사용자의 모든 만료되지 않은 락 조회
  */
 export async function getUserActiveLocks(userId: string): Promise<any[]> {

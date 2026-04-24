@@ -247,7 +247,18 @@ function PartyRoomBookingContent() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "결제 준비에 실패했습니다");
+        if (response.status === 409 && typeof data.retryAfter === "number") {
+          const retryMinutes = Math.max(1, Math.ceil(data.retryAfter / 60));
+          alert(
+            `이미 진행 중인 결제가 있습니다.\n\n` +
+              `약 ${retryMinutes}분 후 다시 시도해 주세요.\n` +
+              `(또는 페이지를 새로고침한 뒤 다시 시도해 주세요)`
+          );
+        } else {
+          alert(data.error || "결제 준비에 실패했습니다");
+        }
+        setSubmitting(false);
+        return;
       }
 
       // 카카오페이 결제창으로 리디렉트

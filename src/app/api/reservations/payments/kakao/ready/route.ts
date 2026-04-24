@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { readyPracticeRoomPayment } from "@/lib/kakaopay";
-import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
+import {
+  acquirePaymentLock,
+  deleteExpiredPaymentLocksForUser,
+  getActivePaymentLocksForUser,
+  releasePaymentLock,
+} from "@/lib/payment-lock";
 import { calcDuration, calcPoints, getPriceType } from "@/lib/pricing";
 import { cookies } from "next/headers";
 import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
@@ -66,6 +71,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await deleteExpiredPaymentLocksForUser(user.id, "practice-room");
+    const activePracticeLocks = await getActivePaymentLocksForUser(
+      user.id,
+      "practice-room"
+    );
+    if (activePracticeLocks.length > 0) {
+      const nowMs = Date.now();
+      let minExpires = Infinity;
+      for (const row of activePracticeLocks) {
+        const t = new Date(row.expires_at).getTime();
+        if (t < minExpires) minExpires = t;
+      }
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((minExpires - nowMs) / 1000)
+      );
+      console.log(
+        "[PaymentLock] 연습실 활성 락 존재, retryAfter:",
+        retryAfter,
+        "초"
+      );
+      return NextResponse.json(
+        {
+          error: "이미 진행 중인 결제가 있습니다",
+          retryAfter,
+        },
+        { status: 409 }
+      );
+    }
+
     const reservationDate = new Date(date);
     const startHour = parseInt(startTime.split(":")[0], 10);
     const priceType = getPriceType(reservationDate, startHour);
@@ -82,9 +117,29 @@ export async function POST(request: NextRequest) {
     );
 
     if (!lockOk) {
+      const again = await getActivePaymentLocksForUser(
+        user.id,
+        "practice-room"
+      );
+      if (again.length > 0) {
+        const nowMs = Date.now();
+        let minExpires = Infinity;
+        for (const row of again) {
+          const t = new Date(row.expires_at).getTime();
+          if (t < minExpires) minExpires = t;
+        }
+        const retryAfter = Math.max(
+          1,
+          Math.ceil((minExpires - nowMs) / 1000)
+        );
+        return NextResponse.json(
+          { error: "이미 진행 중인 결제가 있습니다", retryAfter },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
-        { error: "이미 진행 중인 결제가 있습니다" },
-        { status: 409 }
+        { error: "결제 락 생성에 실패했습니다" },
+        { status: 500 }
       );
     }
 

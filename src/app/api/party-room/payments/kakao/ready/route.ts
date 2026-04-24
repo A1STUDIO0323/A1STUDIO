@@ -4,12 +4,21 @@ import { readyPartyRoomPayment } from "@/lib/kakaopay";
 import { calcPartyRoomPoints, PartyRoomPackage, PARTY_ROOM_MAX_HEADCOUNT } from "@/lib/pricing";
 import { isAdult } from "@/lib/age-check";
 import { cookies } from "next/headers";
+import {
+  acquirePaymentLock,
+  deleteExpiredPaymentLocksForUser,
+  getActivePaymentLocksForUser,
+  releasePaymentLock,
+} from "@/lib/payment-lock";
 
 /**
  * 카카오페이 결제 준비 (파티룸용)
  * POST /api/party-room/payments/kakao/ready
  */
 export async function POST(request: NextRequest) {
+  let orderId: string | null = null;
+  let userId: string | null = null;
+
   try {
     const supabase = await createClient();
 
@@ -18,6 +27,7 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
     }
+    userId = user.id;
 
     const body = await request.json();
     const {
@@ -79,13 +89,73 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await deleteExpiredPaymentLocksForUser(user.id, "party-room");
+    const activePartyLocks = await getActivePaymentLocksForUser(
+      user.id,
+      "party-room"
+    );
+    if (activePartyLocks.length > 0) {
+      const nowMs = Date.now();
+      let minExpires = Infinity;
+      for (const row of activePartyLocks) {
+        const t = new Date(row.expires_at).getTime();
+        if (t < minExpires) minExpires = t;
+      }
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((minExpires - nowMs) / 1000)
+      );
+      console.log(
+        "[PaymentLock] 파티룸 활성 락 존재, retryAfter:",
+        retryAfter,
+        "초"
+      );
+      return NextResponse.json(
+        {
+          error: "이미 진행 중인 결제가 있습니다",
+          retryAfter,
+        },
+        { status: 409 }
+      );
+    }
+
     // 4. 포인트 계산
     const reservationDate = new Date(date);
     const pricing = calcPartyRoomPoints(reservationDate, package_type as PartyRoomPackage);
     const amount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
 
     // 5. 주문 ID 생성
-    const orderId = `PR-${Date.now()}-${user.id.substring(0, 8)}`;
+    orderId = `PR-${Date.now()}-${user.id.substring(0, 8)}`;
+
+    const lockOk = await acquirePaymentLock(
+      user.id,
+      "party-room",
+      orderId,
+      600
+    );
+    if (!lockOk) {
+      const again = await getActivePaymentLocksForUser(user.id, "party-room");
+      if (again.length > 0) {
+        const nowMs = Date.now();
+        let minExpires = Infinity;
+        for (const row of again) {
+          const t = new Date(row.expires_at).getTime();
+          if (t < minExpires) minExpires = t;
+        }
+        const retryAfter = Math.max(
+          1,
+          Math.ceil((minExpires - nowMs) / 1000)
+        );
+        return NextResponse.json(
+          { error: "이미 진행 중인 결제가 있습니다", retryAfter },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json(
+        { error: "결제 락 생성에 실패했습니다" },
+        { status: 500 }
+      );
+    }
 
     // 6. 카카오페이 결제 준비
     const kakaoResult = await readyPartyRoomPayment({
@@ -116,6 +186,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("카카오페이 결제 준비 오류:", error);
+    if (userId && orderId) {
+      await releasePaymentLock(userId, "party-room", orderId);
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "결제 준비에 실패했습니다" },
       { status: 500 }
