@@ -7,6 +7,7 @@ import { format, addDays } from "date-fns";
 import { ko } from "date-fns/locale";
 import { CheckCircle, MapPin, Phone, Calendar, Clock, CreditCard, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { STUDIO_PHONE } from "@/lib/constants";
 
 const PACKAGE_INFO = {
   day: { name: '낮 패키지', time: '10:00 ~ 17:00' },
@@ -130,7 +131,7 @@ function PartyRoomCompleteContent() {
             <p>· 주소: 서울시 송파구 문정동 70-13 B1</p>
             <p className="flex items-center gap-2">
               <Phone className="w-4 h-4" />
-              문의: 010-5401-0732 (24시간)
+              문의: {STUDIO_PHONE} (24시간)
             </p>
           </div>
         </div>

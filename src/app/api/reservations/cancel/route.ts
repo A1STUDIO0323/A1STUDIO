@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getPointBalance, refundPointsDB } from "@/lib/supabase-points";
-import { calculatePracticeRoomRefundRate, canCancelReservation } from "@/lib/refund-policy";
+import {
+  calculatePracticeRoomRefund,
+  canCancelReservation,
+} from "@/lib/refund-policy";
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,10 +42,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "취소할 수 없는 예약입니다" }, { status: 400 });
     }
 
-    // 취소 가능 시간 확인 (연습실: 2시간 전까지)
     const reservationDateTime = new Date(`${reservation.date}T${reservation.start_time}`);
-    const cancelCheck = canCancelReservation(reservationDateTime, 'practice');
-    
+    const cancelCheck = canCancelReservation(reservationDateTime, "practice");
+
     if (!cancelCheck.canCancel) {
       return NextResponse.json(
         { error: cancelCheck.message },
@@ -50,18 +52,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 환불율 계산
-    const { refundRate, description } = calculatePracticeRoomRefundRate(reservationDateTime);
     const originalAmount = reservation.total_amount || 0;
-    const refundAmount = Math.floor(originalAmount * refundRate);
-    
-    console.log('[예약취소] 예약 정보:', { 
-      id: reservation.id, 
+    const refundInfo = calculatePracticeRoomRefund(
+      reservationDateTime,
+      originalAmount
+    );
+    const { refundRate, refundAmount, reason: refundReason } = refundInfo;
+
+    console.log("[예약취소] 예약 정보:", {
+      id: reservation.id,
       status: reservation.status,
       originalAmount,
       refundRate,
       refundAmount,
-      description
+      refundReason,
     });
     
     const { error: updateError } = await supabase
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest) {
       const refundResult = await refundPointsDB({
         userId: user.id,
         points: refundAmount,
-        description: "예약 취소 환불",
+        description: `연습실 예약 취소 환불 (${refundReason})`,
         reservationId: reservation_id,
       });
 
@@ -97,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       message: "예약이 취소되었습니다",
-      refund_policy: description,
+      refund_policy: refundReason,
       original_amount: originalAmount,
       refund_rate: refundRate,
       refund_points: refundAmount,

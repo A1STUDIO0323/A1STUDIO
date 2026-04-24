@@ -618,6 +618,36 @@ function BookingContent() {
               </div>
             </div>
 
+            {selectedType === "room" && (
+              <div className="mb-6 rounded-xl border border-[#D8CCBC] bg-[#EFE7DA] p-6">
+                <h3 className="text-lg font-semibold text-[#3B342F] mb-4">
+                  예약 전 안내
+                </h3>
+                <div className="space-y-3 text-sm text-[#6f655d]">
+                  <div>
+                    <strong className="text-[#3B342F]">환불 규정</strong>
+                    <ul className="mt-2 space-y-1 ml-4 list-disc">
+                      <li>이용 2일 전: 50% 환불</li>
+                      <li>이용 전날: 환불 불가</li>
+                      <li>이용 당일: 환불 불가</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-[#3B342F]">예약 확정</strong>
+                    <p className="mt-1">
+                      포인트 결제 즉시 예약이 확정되며, 예약 확인 문자가 발송됩니다.
+                    </p>
+                  </div>
+                  <div>
+                    <strong className="text-[#3B342F]">예약 변경</strong>
+                    <p className="mt-1">
+                      예약 변경은 취소 후 재예약으로 진행됩니다. (환불 규정 적용)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 파티룸 성인 확인 체크박스 */}
             {selectedType === 'party-room' && (
               <div className="mb-6 rounded-lg bg-[#f5ede6] p-4">

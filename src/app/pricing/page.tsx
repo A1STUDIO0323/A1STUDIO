@@ -2,8 +2,6 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { Info, Sparkles } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
-import { REFUND_POLICY } from "@/lib/constants";
-
 export const metadata: Metadata = { title: "요금안내" };
 
 // 연습실 시간당 요금
@@ -387,27 +385,25 @@ export default function PricingPage() {
           </table>
         </div>
 
-        {/* 환불규정 요약 */}
+        {/* 환불 규정 */}
         <h2 className="mt-14 text-2xl font-bold text-[#3B342F]">환불 규정</h2>
-        <div className="mt-4 overflow-hidden rounded-2xl border border-[#D8CCBC]">
-          <table className="w-full text-sm">
-            <thead className="border-b border-[#D8CCBC] bg-[#EFE7DA]">
-              <tr>
-                <th className="px-6 py-4 text-left font-semibold text-[#3B342F]">취소 시점</th>
-                <th className="px-6 py-4 text-right font-semibold text-[#3B342F]">환불율</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 bg-[#F7F3EB]">
-              {REFUND_POLICY.map((row) => (
-                <tr key={row.condition}>
-                  <td className="px-6 py-4 text-[#3B342F]">{row.condition}</td>
-                  <td className="px-6 py-4 text-right font-bold text-[#3B342F]">
-                    {row.refundRate}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-4 grid gap-6 sm:grid-cols-2">
+          <div className="rounded-2xl border border-[#D8CCBC] bg-[#F7F3EB] p-6">
+            <h3 className="text-lg font-bold text-[#3B342F] mb-3">연습실</h3>
+            <ul className="space-y-2 text-sm text-[#6f655d] list-disc list-inside">
+              <li>이용 2일 전: 50% 환불</li>
+              <li>이용 전날: 환불 불가</li>
+              <li>이용 당일: 환불 불가</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-[#D8CCBC] bg-[#F7F3EB] p-6">
+            <h3 className="text-lg font-bold text-[#3B342F] mb-3">파티룸</h3>
+            <ul className="space-y-2 text-sm text-[#6f655d] list-disc list-inside">
+              <li>7일 전까지: 전액 환불</li>
+              <li>3일 전까지: 50% 환불</li>
+              <li>3일 이내: 환불 불가</li>
+            </ul>
+          </div>
         </div>
 
         <div className="mt-4 flex items-start gap-2 text-xs text-[#b0a89e]">

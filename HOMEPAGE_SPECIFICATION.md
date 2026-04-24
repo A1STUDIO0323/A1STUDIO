@@ -211,7 +211,7 @@ useReducedMotion() // 접근성 고려
   1. **주소**: 서울시 송파구 문정동 70-13 B1
   2. **대중교통**: 8호선 문정역(도보 8분), 장지역(도보 10분)
   3. **주차**: 건물 주차 가능, 인근 공영주차장
-  4. **전화**: 010-5401-0732, 운영시간 00:00–24:00
+  4. **전화**: 010-2994-0323, 운영시간 00:00–24:00
 
 ---
 
@@ -403,7 +403,7 @@ A1STUDIO/
 export const STUDIO_NAME = "A1 STUDIO";
 export const STUDIO_TAGLINE = "보컬·댄스·연기·뮤지컬 연습실";
 export const STUDIO_ADDRESS = "서울시 송파구 문정동 70-13 B1";
-export const STUDIO_PHONE = "010-5401-0732";
+export const STUDIO_PHONE = "010-2994-0323";
 
 export const STUDIO_AMENITIES = [
   "전신거울", "삼각대", "촬영용 조명",

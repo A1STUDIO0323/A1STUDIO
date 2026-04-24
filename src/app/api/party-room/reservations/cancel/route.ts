@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cancelPartyRoomPayment } from "@/lib/kakaopay";
-import { calculatePartyRoomRefundRate, canCancelReservation } from "@/lib/refund-policy";
+import {
+  calculatePartyRoomRefund,
+  canCancelReservation,
+} from "@/lib/refund-policy";
 import { getPointBalance, refundPointsDB } from "@/lib/supabase-points";
 
 /**
@@ -63,8 +66,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { refundRate, description } = calculatePartyRoomRefundRate(startDateTime);
-    const refundAmount = Math.floor(reservation.total_amount * refundRate);
+    const refundInfo = calculatePartyRoomRefund(
+      startDateTime,
+      reservation.total_amount || 0
+    );
+    const { refundRate, refundAmount, reason: refundReason } = refundInfo;
     let refundMethod = '';
     let refundPoints = 0;
 
@@ -79,7 +85,7 @@ export async function POST(request: NextRequest) {
         const refundResult = await refundPointsDB({
           userId: user.id,
           points: refundAmount,
-          description: `파티룸 예약 취소 환불 (${reservation.package_type}, ${reservation.date})`,
+          description: `파티룸 예약 취소 환불 (${refundReason}; ${reservation.package_type}, ${reservation.date})`,
           reservationId: reservation.id,
         });
 
@@ -122,7 +128,7 @@ export async function POST(request: NextRequest) {
           const refundResult = await refundPointsDB({
             userId: user.id,
             points: refundAmount,
-            description: `파티룸 예약 취소 환불 포인트 (${reservation.package_type}, ${reservation.date})`,
+            description: `파티룸 예약 취소 환불 포인트 (${refundReason}; ${reservation.package_type}, ${reservation.date})`,
             reservationId: reservation.id,
           });
 
@@ -166,7 +172,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      refund_policy: description,
+      refund_policy: refundReason,
       refund_rate: refundRate,
       refund_amount: refundAmount,
       refund_method: refundMethod,

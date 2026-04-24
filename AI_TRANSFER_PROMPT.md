@@ -66,7 +66,7 @@
 **프로젝트명**: A1 STUDIO 웹사이트  
 **목적**: 보컬·댄스·연기·뮤지컬 연습실 예약 및 관리 플랫폼  
 **주소**: 서울시 송파구 문정동 70-13 B1  
-**연락처**: 010-5401-0732 (24시간 운영)  
+**연락처**: 010-2994-0323 (24시간 운영)  
 **특징**: 
 - 15평 단독 연습실 공간
 - 4가지 용도로 활용 가능 (보컬, 댄스, 연기, 뮤지컬)
@@ -1212,7 +1212,7 @@ const cardsY = useTransform(scrollYProgress, [0.24, 0.48], [120, 0]);
 1. 주소: 서울시 송파구 문정동 70-13 B1
 2. 대중교통: 8호선 문정역(도보 8분), 장지역(도보 10분)
 3. 주차: 건물 주차 가능, 인근 공영주차장
-4. 전화: 010-5401-0732, 운영시간 00:00–24:00
+4. 전화: 010-2994-0323, 운영시간 00:00–24:00
 
 ### 10. 하단 CTA 배너
 
@@ -1446,7 +1446,7 @@ git push origin main  # 자동 배포
 export const STUDIO_NAME = "A1 STUDIO";
 export const STUDIO_TAGLINE = "보컬·댄스·연기·뮤지컬 연습실";
 export const STUDIO_ADDRESS = "서울시 송파구 문정동 70-13 B1";
-export const STUDIO_PHONE = "010-5401-0732";
+export const STUDIO_PHONE = "010-2994-0323";
 export const STUDIO_KAKAO_CHANNEL = "https://pf.kakao.com/...";
 
 export const STUDIO_AMENITIES = [
@@ -2223,8 +2223,222 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 
 ---
 
-**작성일**: 2026-04-25  
-**버전**: 2.18 (최신)  
+## 📝 최근 수정 사항 (2026-04-24)
+
+### 1. party_reservations 테이블 스키마 확장
+
+**추가된 컬럼:**
+
+```sql
+ALTER TABLE public.party_reservations
+ADD COLUMN IF NOT EXISTS package_type TEXT,
+ADD COLUMN IF NOT EXISTS end_date DATE,
+ADD COLUMN IF NOT EXISTS is_event_price BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS memo TEXT,
+ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'points',
+ADD COLUMN IF NOT EXISTS points_used INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS refund_points INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS refund_amount INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS refund_method TEXT,
+ADD COLUMN IF NOT EXISTS auth_code TEXT,
+ADD COLUMN IF NOT EXISTS room_options JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS special_requests TEXT,
+ADD COLUMN IF NOT EXISTS price_type TEXT;
+```
+
+**컬럼 구조 (참고):** 위 ALTER에 나열한 신규 필드 + 기존 컬럼(`id`, `user_id`, `date`, `start_time`, `end_time`, `duration_hours`, `total_amount`, `guest_*`, `headcount`, `status`, 결제·메타, `created_at`, `cancelled_at` 등). **실제 개수·이름은 Supabase / `prisma db pull` 기준으로 확인**할 것.
+
+---
+
+### 2. reservations 테이블 스키마 수정
+
+**updated_at 기본값 추가:**
+
+```sql
+ALTER TABLE public.reservations
+ALTER COLUMN updated_at SET DEFAULT NOW();
+```
+
+---
+
+### 3. use_points RPC 함수 정리
+
+**문제:** 3개의 `use_points` 함수 시그니처가 충돌
+
+**해결:**
+
+```sql
+-- 기존 함수 모두 삭제
+DROP FUNCTION IF EXISTS public.use_points(uuid, integer, text) CASCADE;
+DROP FUNCTION IF EXISTS public.use_points(uuid, integer, text, text) CASCADE;
+DROP FUNCTION IF EXISTS public.use_points(uuid, integer, text, uuid) CASCADE;
+
+-- RETURNS TABLE 형식으로 단일 함수 생성
+CREATE OR REPLACE FUNCTION public.use_points(
+  p_user_id uuid,
+  p_points integer,
+  p_description text DEFAULT '포인트 사용',
+  p_reservation_id text DEFAULT NULL
+)
+RETURNS TABLE(
+  success BOOLEAN,
+  new_balance INTEGER,
+  error TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_current_balance INTEGER;
+  v_new_balance INTEGER;
+BEGIN
+  -- 현재 잔액 조회
+  SELECT balance INTO v_current_balance
+  FROM public.user_points
+  WHERE user_id = p_user_id;
+  
+  IF v_current_balance IS NULL THEN
+    RETURN QUERY SELECT FALSE, 0, 'User points record not found'::TEXT;
+    RETURN;
+  END IF;
+  
+  IF v_current_balance < p_points THEN
+    RETURN QUERY SELECT FALSE, v_current_balance, 'Insufficient points'::TEXT;
+    RETURN;
+  END IF;
+  
+  -- 포인트 차감
+  UPDATE public.user_points
+  SET balance = balance - p_points,
+      total_used = total_used + p_points,
+      updated_at = NOW()
+  WHERE user_id = p_user_id
+  RETURNING balance INTO v_new_balance;
+  
+  -- point_transactions 기록
+  INSERT INTO public.point_transactions (
+    user_id, type, amount, balance_after, description, reservation_id
+  ) VALUES (
+    p_user_id, 'use', p_points, v_new_balance, p_description, p_reservation_id
+  );
+  
+  RETURN QUERY SELECT TRUE, v_new_balance, NULL::TEXT;
+  
+EXCEPTION WHEN OTHERS THEN
+  RETURN QUERY SELECT FALSE, 0, SQLERRM;
+END;
+$$;
+```
+
+**반환 형식 변경:**
+
+- **이전:** OUT 파라미터 (`o_success`, `o_new_balance`)
+- **이후:** RETURNS TABLE (`success`, `new_balance`, `error`)
+
+**앱 코드 (`src/lib/supabase-points.ts`):** `deductPointsDB`는 PostgREST 응답이 **객체 또는 단일 행 배열**일 수 있어 `unwrapRpcFirstRow`로 언랩 후, **`success` / `new_balance` / `error` 우선**, 구형 OUT 필드(`o_success`, `o_new_balance`)는 호환용 폴백. `charge_points` / `refund_points`는 계속 **`o_*`** 파싱(`parseRpcRow`).
+
+---
+
+### 4. 트리거 비활성화 (RLS·중복 검증)
+
+**문제:** `validate_user_exists()` 트리거가 `users` 등 접근 시 RLS와 맞물려 실패하는 사례
+
+**해결 (운영에서 선택 적용):**
+
+```sql
+ALTER TABLE public.party_reservations 
+DISABLE TRIGGER validate_party_reservation_user;
+
+ALTER TABLE public.reservations 
+DISABLE TRIGGER validate_reservation_user;
+```
+
+**참고:** 앱에서 Prisma·API로 사용자·출생연도 검증을 하는 경우 트리거와 **역할이 겹칠 수 있음**. 비활성화는 **운영 정책·감사 요구**에 맞게 결정.
+
+---
+
+### 5. users 테이블 RLS 정책 (확인 메모)
+
+**기존 정책 예시 (대시보드에서 확인):**
+
+- `service_role` 포함 여부에 따라 서버·PostgREST 동작이 달라짐
+- 정책 추가 전 **이미 `authenticated` / `service_role`에 읽기·쓰기가 열려 있는지** 확인
+
+---
+
+### 6. API 코드 수정 (요약)
+
+#### 6.1. deductPointsDB (`src/lib/supabase-points.ts`)
+
+- `use_points` 응답: **`success` / `new_balance` / `error`** 처리, 실패 시 RPC `error` 문자열 우선 반환
+- 디버깅: `[Deduct Points]` RPC 전후·파싱 로그
+
+#### 6.2. 파티룸 예약 생성 (`src/app/api/party-room/reservations/create/route.ts`)
+
+- 성인 검증: **`prisma.users`의 `birth_year`** (Supabase `users` 직접 조회 RLS 회피)
+- INSERT: **`duration_hours`** = `PARTY_ROOM_PACKAGES[package_type].hours` (day 7 / night 12 / allday 21)
+- INSERT 직전 `[Party Room Create]` 로그
+
+#### 6.3. 파티룸 카카오 승인 (`src/app/api/party-room/payments/kakao/approve/route.ts`)
+
+- `party_reservations` INSERT 시 **`duration_hours`** 동일 규칙 적용
+
+#### 6.4. 파티룸 예약 취소 (`src/app/api/party-room/reservations/cancel/route.ts`)
+
+- **`refund_party_room_points` 제거** → **`refundPointsDB`** (`refund_points` RPC, `balance_after` 포함)
+- `[Party Room Cancel]` 잔액·환불액 로그
+
+#### 6.5. 연습실 예약 생성 (`src/app/api/reservations/create/route.ts`)
+
+- 전화·이름: **`prisma.users`** (`phone`, `name`). ~~`profiles`~~ / RLS 이슈 회피
+- `guest_name`: DB `name` 우선
+
+#### 6.6. 파티룸 예약 — 클라이언트 성인 게이트 (`src/lib/auth-client.tsx`, `src/app/party-room/booking/page.tsx`)
+
+- **`useIsAdult()`** 반환: **`{ loading, isAdult }`** — 이메일 없는 계정도 **`session.user.id`** 로 `/api/members/profile` 조회
+- 만 나이: `isAdult(new Date(birthYear, 11, 31))` (서버와 동일 취지)
+- `[Party Room Booking]` 프로필·게이트 로그
+
+---
+
+### 7. 주요 수정 요약
+
+**스키마 변경:**
+
+- party_reservations: 위 ALTER 컬럼들 + **`duration_hours` NOT NULL** 대응(앱에서 반드시 설정)
+- reservations: `updated_at` 기본값
+
+**RPC 함수:**
+
+- use_points: OUT → **RETURNS TABLE** (`success`, `new_balance`, `error`)
+- `refund_points`: 환불 시 **`balance_after`** 포함 여부 운영 DB에서 유지
+
+**트리거:**
+
+- (선택) `validate_party_reservation_user`, `validate_reservation_user` 비활성화
+
+**API 코드:**
+
+- 파티룸/연습실: 민감 조회 **Prisma `users`**
+- `deductPointsDB`: RETURNS TABLE + 언랩 + 로깅
+- 파티룸 취소: `refundPointsDB`
+
+**결과 (목표):**
+
+- 파티룸 예약 생성/취소, 연습실 예약 생성, SMS 발송 플로우 안정화
+
+---
+
+### 8. 기타 (문서·상수, 2026-04-24 전후 반영)
+
+- **대표 문의 전화:** `STUDIO_PHONE` = **`010-2994-0323`** (`src/lib/constants.ts`, 푸터·문의·`party-room/booking/complete` 입실 안내 등)
+- **충전 승인:** `src/app/api/charge/approve/route.ts` — `[Charge Approve] Step`·`users` 프로브·`logErrorDetails` (진단용, 원인 확인 후 제거 검토)
+
+---
+
+**작성일**: 2026-04-24  
+**버전**: 2.19 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---

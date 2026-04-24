@@ -4,9 +4,9 @@
 
 /**
  * 전화번호를 한국 형식으로 정규화
- * @example "821054010732" -> "01054010732"
- * @example "010-5401-0732" -> "01054010732"
- * @example "+82 10-5401-0732" -> "01054010732"
+ * @example "821029940323" -> "01029940323"
+ * @example "010-2994-0323" -> "01029940323"
+ * @example "+82 10-2994-0323" -> "01029940323"
  */
 export function normalizePhoneNumber(phone: string | null | undefined): string | null {
   if (!phone) return null;
@@ -47,8 +47,8 @@ export function isValidPhoneNumber(phone: string | null | undefined): boolean {
 
 /**
  * 전화번호를 표시 형식으로 포맷팅
- * @example "01054010732" -> "010-5401-0732"
- * @example "821054010732" -> "010-5401-0732"
+ * @example "01029940323" -> "010-2994-0323"
+ * @example "821029940323" -> "010-2994-0323"
  */
 export function formatPhoneNumber(phone: string | null | undefined): string | null {
   if (!phone) return null;

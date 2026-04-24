@@ -4,7 +4,7 @@ export const STUDIO_DESCRIPTION =
   "서울시 송파구 문정동 70-13 B1. 문정역 도보 8분, 장지역 도보 10분.";
 export const STUDIO_ADDRESS = "서울시 송파구 문정동 70-13 B1";
 export const STUDIO_ADDRESS_DETAIL = "문정역 도보 8분 · 장지역 도보 10분";
-export const STUDIO_PHONE = "010-5401-0732";
+export const STUDIO_PHONE = "010-2994-0323";
 export const STUDIO_KAKAO_CHANNEL = "https://pf.kakao.com/_example";
 export const STUDIO_INSTAGRAM = "https://instagram.com/a1studio";
 
@@ -80,13 +80,6 @@ export const NAV_LINKS = [
   },
   { label: "오시는길", href: "/location" },
   { label: "문의", href: "/contact" },
-];
-
-export const REFUND_POLICY = [
-  { condition: "예약일 7일 전 이상", refundRate: 100 },
-  { condition: "예약일 3~6일 전", refundRate: 80 },
-  { condition: "예약일 1~2일 전", refundRate: 50 },
-  { condition: "예약 당일", refundRate: 0 },
 ];
 
 export const BOOKING_STEPS = [

@@ -1,5 +1,4 @@
 import { Metadata } from "next";
-import { REFUND_POLICY } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "이용안내" };
