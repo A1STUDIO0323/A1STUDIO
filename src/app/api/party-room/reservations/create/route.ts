@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
 import { deductPointsDB } from "@/lib/supabase-points";
 import { calcPartyRoomPoints, PartyRoomPackage, PARTY_ROOM_MAX_HEADCOUNT, PARTY_ROOM_PACKAGES } from "@/lib/pricing";
 import { isAdult } from "@/lib/age-check";
 import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
 import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
-import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
 
 /**
  * 파티룸 예약 생성 (포인트 결제)
@@ -66,21 +66,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. 성인 여부 서버사이드 재검증 (public.users.birth_year — Prisma/마이페이지와 동일)
-    console.log("[Party Room Create] Step age: Checking age verification");
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("birth_year")
-      .eq("id", user.id)
-      .maybeSingle();
+    // 1. 성인 여부 — public.users 는 PostgREST(RLS)로 읽으면 permission denied 될 수 있어 Prisma(DB 직결) 사용
+    console.log("[Party Room Create] Step age: Checking age verification (Prisma users.birth_year)");
+    let profileRow: { birth_year: number | null } | null = null;
+    try {
+      profileRow = await prisma.users.findUnique({
+        where: { id: user.id },
+        select: { birth_year: true },
+      });
+    } catch (prismaErr) {
+      console.error("[Party Room Create] Prisma users lookup failed:", prismaErr);
+      return NextResponse.json(
+        { error: "프로필 확인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." },
+        { status: 500 }
+      );
+    }
 
-    console.log("[Party Room Create] Profile row:", profile);
-    console.log("[Party Room Create] profileError:", profileError);
-    const birthYear = profile?.birth_year ?? null;
+    console.log("[Party Room Create] Profile row (Prisma):", profileRow);
+    const birthYear = profileRow?.birth_year ?? null;
     console.log("[Party Room Create] birth_year:", birthYear);
 
     if (birthYear == null) {
-      console.log("[Party Room Create] No birth_year on users row");
+      console.log("[Party Room Create] No birth_year on users row (Prisma)");
       return NextResponse.json(
         {
           error:
@@ -138,11 +145,6 @@ export async function POST(request: NextRequest) {
 
     const pointDescription = `파티룸 ${package_type} 예약 (${date})`;
 
-    // ✅ 사용자 검증 (2층 안전망)
-    if (!(await validateUserExists(userId))) {
-      return NextResponse.json(USER_NOT_FOUND_ERROR, { status: 400 });
-    }
-
     const pointResult = await deductPointsDB({
       userId: user.id,
       points: pointsToUse,
@@ -156,7 +158,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. party_reservations INSERT
+    // 6. party_reservations INSERT (실패 시 메시지에 users 권한이 보이면 DB 트리거·RLS를 점검)
+    console.log("[Party Room Create] About to insert party_reservations", {
+      userId: user.id,
+      date,
+      package_type,
+    });
     const { data: reservation, error: insertError } = await supabase
       .from("party_reservations")
       .insert({
