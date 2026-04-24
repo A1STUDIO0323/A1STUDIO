@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cancelPartyRoomPayment } from "@/lib/kakaopay";
 import { calculatePartyRoomRefundRate, canCancelReservation } from "@/lib/refund-policy";
+import { getPointBalance, refundPointsDB } from "@/lib/supabase-points";
 
 /**
  * 파티룸 예약 취소 + 환불 처리
@@ -68,23 +69,30 @@ export async function POST(request: NextRequest) {
     let refundPoints = 0;
 
     // 4. 결제 수단별 환불 처리
-    if (reservation.payment_method === 'points') {
-      // 포인트 환불
-      const { error: refundError } = await supabase.rpc("refund_party_room_points", {
-        p_user_id: user.id,
-        p_amount: refundAmount,
-        p_description: `파티룸 예약 취소 환불 (${reservation.package_type}, ${reservation.date})`,
-        p_reservation_id: reservation.id,
-      });
+    // 포인트 적립/환불은 refund_points RPC (refundPointsDB) — balance_after 포함. refund_party_room_points 는 balance_after 미기입으로 NOT NULL 위반 가능.
+    if (reservation.payment_method === "points") {
+      if (refundAmount > 0) {
+        const currentBalance = await getPointBalance(user.id);
+        console.log("[Party Room Cancel] Current balance:", currentBalance);
+        console.log("[Party Room Cancel] Refund amount:", refundAmount);
 
-      if (refundError) {
-        throw new Error(`포인트 환불 실패: ${refundError.message}`);
+        const refundResult = await refundPointsDB({
+          userId: user.id,
+          points: refundAmount,
+          description: `파티룸 예약 취소 환불 (${reservation.package_type}, ${reservation.date})`,
+          reservationId: reservation.id,
+        });
+
+        if (!refundResult.success) {
+          throw new Error(refundResult.error || "포인트 환불 실패");
+        }
+        console.log("[Party Room Cancel] New balance:", refundResult.newBalance);
       }
 
-      refundMethod = 'points';
+      refundMethod = "points";
       refundPoints = 0;
 
-    } else if (reservation.payment_method === 'kakaopay') {
+    } else if (reservation.payment_method === "kakaopay") {
       if (refundRate === 1.0) {
         // 전액: 카드 취소
         await cancelPartyRoomPayment({
@@ -106,18 +114,25 @@ export async function POST(request: NextRequest) {
         });
 
         // 50% 포인트 적립
-        const { error: pointError } = await supabase.rpc("refund_party_room_points", {
-          p_user_id: user.id,
-          p_amount: refundAmount,
-          p_description: `파티룸 예약 취소 환불 포인트 (${reservation.package_type}, ${reservation.date})`,
-          p_reservation_id: reservation.id,
-        });
+        if (refundAmount > 0) {
+          const currentBalance = await getPointBalance(user.id);
+          console.log("[Party Room Cancel] Current balance (after card cancel):", currentBalance);
+          console.log("[Party Room Cancel] Refund points to credit:", refundAmount);
 
-        if (pointError) {
-          throw new Error(`포인트 적립 실패: ${pointError.message}`);
+          const refundResult = await refundPointsDB({
+            userId: user.id,
+            points: refundAmount,
+            description: `파티룸 예약 취소 환불 포인트 (${reservation.package_type}, ${reservation.date})`,
+            reservationId: reservation.id,
+          });
+
+          if (!refundResult.success) {
+            throw new Error(refundResult.error || "포인트 적립 실패");
+          }
+          console.log("[Party Room Cancel] New balance:", refundResult.newBalance);
         }
 
-        refundMethod = 'points'; // 카드 취소 후 포인트 적립
+        refundMethod = "points";
         refundPoints = refundAmount;
       }
     }
