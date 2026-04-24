@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { deductPointsDB } from "@/lib/supabase-points";
 import { calcPartyRoomPoints, PartyRoomPackage, PARTY_ROOM_MAX_HEADCOUNT, PARTY_ROOM_PACKAGES } from "@/lib/pricing";
 import { isAdult } from "@/lib/age-check";
 import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
 import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
+import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
 
 /**
  * 파티룸 예약 생성 (포인트 결제)
@@ -111,18 +113,23 @@ export async function POST(request: NextRequest) {
     const pricing = calcPartyRoomPoints(reservationDate, package_type as PartyRoomPackage);
     const pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
 
-    // 5. 포인트 잔액 확인 및 차감
-    const { data: usePointsResult, error: usePointsError } = await supabase.rpc("use_points", {
-      p_user_id: user.id,
-      p_amount: pointsToUse,
-      p_description: `파티룸 ${package_type} 예약 (${date})`,
-      p_reservation_id: null,
+    const pointDescription = `파티룸 ${package_type} 예약 (${date})`;
+
+    // ✅ 사용자 검증 (2층 안전망)
+    if (!(await validateUserExists(userId))) {
+      return NextResponse.json(USER_NOT_FOUND_ERROR, { status: 400 });
+    }
+
+    const pointResult = await deductPointsDB({
+      userId: user.id,
+      points: pointsToUse,
+      description: pointDescription,
     });
 
-    if (usePointsError || !usePointsResult) {
+    if (!pointResult.success) {
       return NextResponse.json(
-        { error: "포인트가 부족합니다" },
-        { status: 402 }
+        { error: pointResult.error || "포인트 차감 실패" },
+        { status: 400 }
       );
     }
 
@@ -211,7 +218,7 @@ export async function POST(request: NextRequest) {
       .from("point_transactions")
       .update({ reservation_id: reservation.id })
       .eq("user_id", user.id)
-      .eq("description", `파티룸 ${package_type} 예약 (${date})`)
+      .eq("description", pointDescription)
       .is("reservation_id", null)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -270,8 +277,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
+      success: true,
       reservation_id: reservation.id,
       points_used: pointsToUse,
+      pointBalance: pointResult.newBalance,
       reservation,
     });
   } catch (error) {

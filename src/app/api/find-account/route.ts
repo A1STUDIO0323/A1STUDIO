@@ -28,14 +28,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const users = await prisma.user.findMany({
+    const users = await prisma.users.findMany({
       where: { phone: normalizedPhone },
       select: {
         email: true,
         provider: true,
-        createdAt: true,
+        created_at: true,
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: { created_at: "asc" },
     });
 
     if (users.length === 0) {
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const accounts = users.map((user) => ({
       email: maskEmail(user.email || ""),
       provider: user.provider || "email",
-      createdAt: user.createdAt.toISOString(),
+      createdAt: user.created_at.toISOString(),
     }));
 
     return NextResponse.json({

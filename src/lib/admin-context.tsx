@@ -4,6 +4,9 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 
 const SESSION_KEY = "a1studio_admin";
 
+/** 관리자 API(`x-admin-password`)용 — 로그인 시 세션에만 보관 */
+export const ADMIN_PASSWORD_SESSION_KEY = "a1studio_admin_password";
+
 type AdminContextType = {
   isAdmin: boolean;
   adminLogin: (password: string) => Promise<boolean>;
@@ -35,6 +38,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         setIsAdmin(true);
         sessionStorage.setItem(SESSION_KEY, "true");
+        sessionStorage.setItem(ADMIN_PASSWORD_SESSION_KEY, password);
         return true;
       }
     } catch {
@@ -46,6 +50,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const adminLogout = () => {
     setIsAdmin(false);
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(ADMIN_PASSWORD_SESSION_KEY);
   };
 
   return (

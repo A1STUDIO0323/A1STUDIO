@@ -1,6 +1,8 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { prisma as db } from "@/lib/db";
+import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
 import { z } from "zod";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin1234";
@@ -141,6 +143,17 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       return NextResponse.json({ error: "이미 신청하셨습니다." }, { status: 400 });
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const userId = user?.id ?? null;
+
+    // ✅ 사용자 검증 (2층 안전망)
+    if (!(await validateUserExists(userId))) {
+      return NextResponse.json(USER_NOT_FOUND_ERROR, { status: 400 });
     }
 
     const application = await db.oneDayClassApplication.create({

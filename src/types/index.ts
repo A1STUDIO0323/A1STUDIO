@@ -78,12 +78,6 @@ export interface PaymentRequest {
   failUrl: string;
 }
 
-export interface TossPaymentConfirmRequest {
-  paymentKey: string;
-  orderId: string;
-  amount: number;
-}
-
 export interface ReviewData {
   id: string;
   rating: number;

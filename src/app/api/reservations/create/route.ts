@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { deductPointsDB } from "@/lib/supabase-points";
 import { 
   getPriceType, 
   calcPoints, 
@@ -11,6 +12,7 @@ import {
 import { isAdult } from "@/lib/age-check";
 import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
 import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
+import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
 
 export async function POST(request: NextRequest) {
   let lockKey: string | null = null;
@@ -150,18 +152,21 @@ export async function POST(request: NextRequest) {
     // 우선순위: 1) profiles 테이블, 2) Supabase Auth
     const normalizedPhone = normalizePhoneNumber(profile?.phone || user.phone);
 
-    // 포인트 잔액 확인 및 차감 (use_points 함수 호출)
-    const { data: usePointsResult, error: usePointsError } = await supabase.rpc("use_points", {
-      p_user_id: user.id,
-      p_amount: pointsToUse,
-      p_description: `${date} ${start_time}~${end_time} 예약`,
-      p_reservation_id: null, // 예약 ID는 나중에 업데이트
+    // ✅ 사용자 검증 (2층 안전망)
+    if (!(await validateUserExists(userId))) {
+      return NextResponse.json(USER_NOT_FOUND_ERROR, { status: 400 });
+    }
+
+    const pointResult = await deductPointsDB({
+      userId: user.id,
+      points: pointsToUse,
+      description: `${date} ${start_time}~${end_time} 예약`,
     });
 
-    if (usePointsError || !usePointsResult) {
+    if (!pointResult.success) {
       return NextResponse.json(
-        { error: "포인트가 부족합니다" },
-        { status: 402 }
+        { error: pointResult.error || "포인트 차감 실패" },
+        { status: 400 }
       );
     }
 
@@ -258,17 +263,6 @@ export async function POST(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(1);
 
-    // 현재 잔액 조회
-    const { data: userPoints, error: pointsQueryError } = await supabase
-      .from("user_points")
-      .select("balance")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (pointsQueryError) {
-      console.warn('[ReservationCreate] 현재 잔액 조회 실패:', pointsQueryError);
-    }
-
     // 예약 확정 메시지 발송 (전화번호가 유효한 경우만)
     const hasValidPhone = normalizedPhone && isValidPhoneNumber(normalizedPhone);
     
@@ -332,9 +326,11 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
+      success: true,
       reservation_id: reservation.id,
       points_used: pointsToUse,
-      balance_after: userPoints?.balance || 0,
+      balance_after: pointResult.newBalance,
+      pointBalance: pointResult.newBalance,
       reservation,
     });
   } catch (error) {

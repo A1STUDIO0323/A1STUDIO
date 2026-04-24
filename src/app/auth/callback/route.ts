@@ -140,7 +140,7 @@ export async function GET(request: Request) {
 
       // 전화번호 중복 체크 (다른 사용자가 이미 사용 중인지)
       if (kakaoPhone) {
-        const existingByPhone = await prisma.user.findUnique({
+        const existingByPhone = await prisma.users.findUnique({
           where: { phone: kakaoPhone },
           select: { id: true, email: true },
         });
@@ -163,46 +163,48 @@ export async function GET(request: Request) {
       if (kakaoRealName || kakaoNickname || kakaoBirthyear || kakaoPhone) {
         try {
           // update 데이터 동적 생성
-          const updateData: any = {};
+          const updateData: Record<string, unknown> = {};
 
           if (kakaoRealName) updateData.name = kakaoRealName;
           if (kakaoNickname) updateData.nickname = kakaoNickname;
-          if (kakaoBirthyear) updateData.birthYear = kakaoBirthyear;
+          if (kakaoBirthyear) updateData.birth_year = kakaoBirthyear;
           if (kakaoPhone) {
             updateData.phone = kakaoPhone;
-            updateData.phoneVerified = true;
+            updateData.phone_verified = true;
           }
-          if (avatarUrl) updateData.avatarUrl = avatarUrl;
+          if (avatarUrl) updateData.avatar_url = avatarUrl;
+          updateData.updated_at = new Date();
 
           // 트리거 실행 여부와 무관하게 안전하게 처리
-          const existing = await prisma.user.findUnique({
+          const existing = await prisma.users.findUnique({
             where: { id: user.id },
           });
 
           if (existing) {
-            await prisma.user.update({
+            await prisma.users.update({
               where: { id: user.id },
               data: updateData,
             });
           } else {
-            await prisma.user.create({
+            await prisma.users.create({
               data: {
                 id: user.id,
                 email: user.email ?? null,
                 name: kakaoRealName ?? null,
                 nickname: kakaoNickname ?? null,
-                avatarUrl: avatarUrl ?? null,
+                avatar_url: avatarUrl ?? null,
                 provider,
-                birthYear: kakaoBirthyear,
+                birth_year: kakaoBirthyear,
                 phone: kakaoPhone,
-                phoneVerified: kakaoPhone ? true : false,
+                phone_verified: kakaoPhone ? true : false,
+                updated_at: new Date(),
               },
             });
           }
           console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', {
             name: kakaoRealName,
             nickname: kakaoNickname,
-            birthYear: kakaoBirthyear,
+            birth_year: kakaoBirthyear,
             phone: kakaoPhone,
             updateData,
           });
@@ -212,21 +214,21 @@ export async function GET(request: Request) {
       }
 
       // 카카오: 저장 직후 프로필 다시 조회
-      const profile = await prisma.user.findUnique({
+      const profile = await prisma.users.findUnique({
         where: { id: user.id },
-        select: { name: true, birthYear: true, phone: true, phoneVerified: true },
+        select: { name: true, birth_year: true, phone: true, phone_verified: true },
       });
 
       let redirectPath = next || '/';
 
       console.log('[auth/callback] === 온보딩 체크 시작 ===');
       console.log('[auth/callback] profile:', JSON.stringify(profile));
-      console.log('[auth/callback] !name:', !profile?.name, '!birthYear:', !profile?.birthYear, '!phoneVerified:', !profile?.phoneVerified);
+      console.log('[auth/callback] !name:', !profile?.name, '!birth_year:', !profile?.birth_year, '!phone_verified:', !profile?.phone_verified);
 
-      if (!profile?.name || !profile?.birthYear) {
+      if (!profile?.name || !profile?.birth_year) {
         redirectPath = '/onboarding/profile';
         console.log('[auth/callback] → /onboarding/profile (이름 또는 출생연도 없음)');
-      } else if (!profile?.phoneVerified) {
+      } else if (!profile?.phone_verified) {
         redirectPath = '/onboarding/phone';
         console.log('[auth/callback] → /onboarding/phone (전화번호 미인증)');
       } else {
@@ -252,19 +254,19 @@ export async function GET(request: Request) {
   // 온보딩 플로우: 프로필 완성도에 따라 리다이렉트
   if (user?.id) {
     try {
-      const profile = await prisma.user.findUnique({
+      const profile = await prisma.users.findUnique({
         where: { id: user.id },
-        select: { name: true, birthYear: true, phone: true, phoneVerified: true },
+        select: { name: true, birth_year: true, phone: true, phone_verified: true },
       });
 
       let redirectPath = next || '/';
 
       // 1. 이름 또는 출생연도가 없으면 → 프로필 입력
-      if (!profile?.name || !profile?.birthYear) {
+      if (!profile?.name || !profile?.birth_year) {
         redirectPath = '/onboarding/profile';
       }
       // 2. 이름과 출생연도는 있지만 전화번호 미인증 → 전화번호 인증
-      else if (!profile?.phoneVerified) {
+      else if (!profile?.phone_verified) {
         redirectPath = '/onboarding/phone';
       }
       // 3. 모두 완료 → 원래 목적지 또는 홈

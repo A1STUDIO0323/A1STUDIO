@@ -17,31 +17,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // DB ?? ? ?? ?? ???
-    // const { prisma } = await import("@/lib/db");
-    // const now = new Date();
-    //
-    // ??? ?? ??
-    // const expiredHolds = await prisma.reservationHold.findMany({
-    //   where: { expiresAt: { lt: now } },
-    //   include: { reservation: true },
-    // });
-    //
-    // ?????? ?? ??
-    // const result = await prisma.$transaction(
-    //   expiredHolds.map((hold) =>
-    //     prisma.reservation.update({
-    //       where: { id: hold.reservationId },
-    //       data: { status: "EXPIRED" },
-    //     })
-    //   )
-    // );
-    //
-    // ?? ??? ?? (?? CASCADE)
-    // await prisma.reservationHold.deleteMany({
-    //   where: { expiresAt: { lt: now } },
-    // });
-
     return NextResponse.json({
       processed: 0, // result.length
       message: "?? ??",

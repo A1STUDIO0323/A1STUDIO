@@ -77,20 +77,22 @@ export async function POST(req: NextRequest) {
 
     let prismaUserSynced = true;
     try {
-      await prisma.user.upsert({
+      await prisma.users.upsert({
         where: { id },
         update: {
           email,
           ...(isKakao ? {} : { name: userName }),
-          avatarUrl,
+          avatar_url: avatarUrl,
           provider,
+          updated_at: new Date(),
         },
         create: {
           id,
           email,
           name: userName,
-          avatarUrl,
+          avatar_url: avatarUrl,
           provider,
+          updated_at: new Date(),
         },
       });
     } catch (error) {

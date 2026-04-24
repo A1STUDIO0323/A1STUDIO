@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { approvePayment } from "@/lib/kakaopay";
+import { chargePointsDB } from "@/lib/supabase-points";
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,129 +42,46 @@ export async function GET(request: NextRequest) {
     }
 
     // 카카오페이 결제 승인
-    const approval = await approvePayment({
+    await approvePayment({
       tid,
       partner_order_id,
       partner_user_id: user.id,
       pg_token,
     });
 
-    // Supabase 트랜잭션으로 포인트 충전 처리
-    // 1. user_points에서 현재 잔액 조회 (없으면 생성)
-    let { data: userPoints, error: pointsError } = await supabase
-      .from("user_points")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const totalPointsRounded = Math.round(Number(chargePackage.total_points ?? 0));
+    const declaredBonus = Math.round(Number(chargePackage.bonus_points ?? 0));
+    const basePoints = Math.max(0, totalPointsRounded - declaredBonus);
+    const points = basePoints > 0 ? basePoints : totalPointsRounded;
+    const bonusPoints = basePoints > 0 ? declaredBonus : 0;
 
-    if (pointsError) {
-      console.error('[Charge] 포인트 조회 실패:', pointsError);
-      throw new Error("포인트 조회 실패");
-    }
+    const chargeResult = await chargePointsDB({
+      userId: user.id,
+      points,
+      bonusPoints,
+      description: `${String(chargePackage.name ?? "패키지")} 충전`,
+    });
 
-    const currentBalance = userPoints?.balance || 0;
-    const newBalance = currentBalance + chargePackage.total_points;
-
-    // 2. user_points 업데이트 또는 생성
-    if (userPoints) {
-      const { error: updateError } = await supabase
-        .from("user_points")
-        .update({
-          balance: newBalance,
-          total_charged: (userPoints.total_charged || 0) + chargePackage.amount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-
-      if (updateError) throw new Error("포인트 업데이트 실패");
-    } else {
-      const { error: insertError } = await supabase
-        .from("user_points")
-        .insert({
-          user_id: user.id,
-          balance: newBalance,
-          total_charged: chargePackage.amount,
-          total_used: 0,
-        });
-
-      if (insertError) throw new Error("포인트 생성 실패");
-    }
-
-    // 3. point_transactions에 충전 내역 추가
-    const chargePoints = Math.round(Number(chargePackage.total_points ?? 0));
-    const chargeBalanceAfter = Math.round(currentBalance + chargePoints);
-    const chargeTransactionPayload = {
-      user_id: user.id,
-      type: "charge" as const,
-      amount: chargePoints,
-      balance_after: chargeBalanceAfter,
-      description: `${chargePackage.name} 충전`,
-      payment_id: approval.aid,
-      reservation_id: null as string | null,
-    };
-
-    console.log("[충전 거래] INSERT 직전 데이터:", chargeTransactionPayload);
-
-    const { error: transactionError } = await supabase
-      .from("point_transactions")
-      .insert(chargeTransactionPayload);
-
-    if (transactionError) {
-      console.error("[충전 거래 내역 실패]", {
-        message: transactionError.message,
-        code: transactionError.code,
-        details: transactionError.details,
-        hint: transactionError.hint,
-      });
-      throw new Error("충전 내역 생성 실패");
-    }
-
-    console.log("[충전 거래] INSERT 성공");
-
-    // 4. 보너스 포인트가 있으면 추가 거래 내역 생성 (실패해도 포인트는 이미 반영됨 → 전체 실패 처리 안 함)
-    const bonusPoints = Math.round(Number(chargePackage.bonus_points ?? 0));
-    if (bonusPoints > 0) {
-      const bonusRateRaw = chargePackage.bonus_rate ?? chargePackage.bonusRate;
-      const bonusRateLabel =
-        bonusRateRaw != null && bonusRateRaw !== "" ? String(bonusRateRaw) : "";
-
-      const packageName = String(chargePackage.name ?? "");
-      const bonusDescription = bonusRateLabel
-        ? `${packageName} 보너스 ${bonusRateLabel}%`
-        : `${packageName} 보너스`;
-
-      // user_points.balance는 이미 total_points(유료+보너스) 반영 → 거래 후 잔액 = newBalance
-      const finalBalance = newBalance;
-
-      console.log("[보너스 거래] 데이터:", {
-        user_id: user.id,
-        type: "bonus",
-        amount: bonusPoints,
-        balance_after: finalBalance,
-        description: bonusDescription,
-      });
-
-      const bonusTransactionData = {
-        user_id: user.id,
-        type: "bonus" as const,
-        amount: bonusPoints,
-        balance_after: finalBalance,
-        description: bonusDescription,
-        reservation_id: null as string | null,
-      };
-
-      const { error: bonusError } = await supabase
-        .from("point_transactions")
-        .insert(bonusTransactionData);
-
-      if (bonusError) {
-        console.error("[보너스 거래 실패]", bonusError);
-      }
+    if (!chargeResult.success) {
+      console.error("[Charge Points Error]", chargeResult.error);
+      const fail = NextResponse.redirect(
+        new URL(
+          `/charge/fail?error=${encodeURIComponent(chargeResult.error || "포인트 충전 실패")}`,
+          request.url
+        )
+      );
+      fail.cookies.delete("kakao_pay_tid");
+      fail.cookies.delete("kakao_pay_order_id");
+      fail.cookies.delete("kakao_pay_package_id");
+      return fail;
     }
 
     // 쿠키 삭제
     const response = NextResponse.redirect(
-      new URL(`/charge/success?points=${chargePackage.total_points}`, request.url)
+      new URL(
+        `/charge/success?points=${totalPointsRounded}&bonus=${bonusPoints}&newBalance=${chargeResult.newBalance}`,
+        request.url
+      )
     );
 
     response.cookies.delete("kakao_pay_tid");

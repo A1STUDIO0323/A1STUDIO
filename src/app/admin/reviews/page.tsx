@@ -4,17 +4,28 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Lock, Star, Eye, EyeOff, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAdmin } from "@/lib/admin-context";
+import { ADMIN_PASSWORD_SESSION_KEY, useAdmin } from "@/lib/admin-context";
 
 type Review = {
   id: string;
   rating: number;
   content: string;
-  nickname: string | null;
+  authorName: string;
   isVisible: boolean;
   createdAt: string;
-  reservationId: string;
+  reservationId: string | null;
 };
+
+function adminFetchHeaders(): HeadersInit {
+  const pw =
+    typeof window !== "undefined"
+      ? sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY) ?? ""
+      : "";
+  return {
+    "Content-Type": "application/json",
+    "x-admin-password": pw,
+  };
+}
 
 export default function AdminReviewsPage() {
   const { isAdmin, adminLogin, adminLogout } = useAdmin();
@@ -27,9 +38,12 @@ export default function AdminReviewsPage() {
   const loadReviews = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/reviews", { cache: "no-store" });
+      const res = await fetch("/api/admin/reviews", {
+        cache: "no-store",
+        headers: adminFetchHeaders(),
+      });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && Array.isArray(data.reviews)) {
         setReviews(data.reviews);
       }
     } catch (error) {
@@ -43,7 +57,7 @@ export default function AdminReviewsPage() {
     try {
       const res = await fetch("/api/admin/reviews", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: adminFetchHeaders(),
         body: JSON.stringify({ id, isVisible: !currentVisibility }),
       });
       const data = await res.json();
@@ -62,6 +76,7 @@ export default function AdminReviewsPage() {
     try {
       const res = await fetch(`/api/admin/reviews?id=${id}`, {
         method: "DELETE",
+        headers: adminFetchHeaders(),
       });
       const data = await res.json();
       if (data.success) {
@@ -194,7 +209,7 @@ export default function AdminReviewsPage() {
                   <tr key={review.id} className="hover:bg-[#EFE7DA]/20 transition-colors">
                     <td className="px-4 py-3 text-xs text-[#9b9189]">{reviews.length - index}</td>
                     <td className="px-4 py-3 font-medium text-[#3B342F]">
-                      {review.nickname || "익명"}
+                      {review.authorName || "익명"}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-0.5">

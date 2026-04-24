@@ -7,10 +7,10 @@ export async function GET(req: NextRequest) {
   try {
     const keyword = (req.nextUrl.searchParams.get("search") ?? "").trim().toLowerCase();
 
-    const users = await prisma.user.findMany({
+    const users = await prisma.users.findMany({
       where: { email: { not: null } },
-      select: { email: true, name: true, updatedAt: true },
-      orderBy: { updatedAt: "desc" },
+      select: { email: true, name: true, updated_at: true },
+      orderBy: { updated_at: "desc" },
       take: 500,
     });
 
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
           role: roleMap.get(email) ?? "MEMBER",
           isBanned: bannedMap.has(email),
           banReason: bannedMap.get(email) ?? null,
-          lastSeenAt: user.updatedAt.toISOString(),
+          lastSeenAt: user.updated_at.toISOString(),
         };
       });
 

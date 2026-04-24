@@ -17,46 +17,9 @@ const CreateReservationSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const data = CreateReservationSchema.parse(body);
+    CreateReservationSchema.parse(body);
 
-    // DB ?? ? ?? ?? ???
-    // const { prisma } = await import("@/lib/db");
-    //
-    // 1. ?? ?? ??
-    // const conflict = await prisma.reservationHold.findFirst({
-    //   where: {
-    //     roomId: data.roomId,
-    //     date: data.date,
-    //     OR: [
-    //       { startTime: { lte: data.startTime }, endTime: { gt: data.startTime } },
-    //       { startTime: { lt: data.endTime }, endTime: { gte: data.endTime } },
-    //     ],
-    //     expiresAt: { gt: new Date() },
-    //   },
-    // });
-    // if (conflict) {
-    //   return NextResponse.json({ error: "?? ??? ?????." }, { status: 409 });
-    // }
-    //
-    // 2. ?????? ?? + ?? ??
-    // const reservation = await prisma.$transaction(async (tx) => {
-    //   const res = await tx.reservation.create({
-    //     data: { ...data, status: "HOLD", totalAmount: calculateAmount(data), authCode: generateAuthCode() },
-    //   });
-    //   await tx.reservationHold.create({
-    //     data: {
-    //       roomId: data.roomId,
-    //       reservationId: res.id,
-    //       date: data.date,
-    //       startTime: data.startTime,
-    //       endTime: data.endTime,
-    //       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-    //     },
-    //   });
-    //   return res;
-    // });
-
-    // ?? ??
+    // 데모 응답 (실제 예약은 `/api/reservations/create` 등 사용)
     const demoReservationId = `RES-${Date.now()}`;
     return NextResponse.json({
       reservationId: demoReservationId,
@@ -82,13 +45,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "date, roomId ????? ?????." }, { status: 400 });
   }
 
-  // DB ?? ? ?? ?? ???
-  // const { prisma } = await import("@/lib/db");
-  // const reservations = await prisma.reservation.findMany({
-  //   where: { roomId, date, status: { in: ["HOLD", "PAID"] } },
-  //   select: { startTime: true, endTime: true, status: true },
-  // });
-
-  // ?? ??
   return NextResponse.json({ reservedSlots: [] });
 }

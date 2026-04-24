@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const deletedProfiles = await prisma.user.deleteMany({
+      const deletedProfiles = await prisma.users.deleteMany({
         where: { id: user.id },
       });
       console.log("[계정탈퇴] Prisma User(profiles) 삭제:", deletedProfiles.count);

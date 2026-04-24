@@ -1992,6 +1992,112 @@ A1STUDIO/
 
 ---
 
+## 📝 최근 수정 사항 (2026-04-25)
+
+### Prisma/Supabase 시스템 최적화
+
+**1. 시스템 역할 재분배**
+- Supabase 전담: 인증, 포인트 시스템, 후기, 예약 홀드, 메시지 로그
+- Prisma 전담: 예약, 결제, 원데이클래스, 공지/이벤트
+
+**2. Prisma 스키마 정리**
+- Review, ReservationHold, MessageLog 모델 제거
+- Supabase에서 직접 관리하는 테이블로 이관
+
+**3. Supabase 헬퍼 함수 생성**
+- `src/lib/supabase-points.ts`: 포인트 시스템 타입 안전 헬퍼
+  - `deductPointsDB` (`use_points` RPC; 예전 이름 `usePointsDB`는 React hooks 규칙 오탐 방지로 변경), `chargePointsDB`, `refundPointsDB`, `getPointBalance`, `getPointTransactions`
+- `src/lib/supabase-reviews.ts`: 후기 시스템 타입 안전 헬퍼
+  - `getPublicReviews`, `getAllReviews`, `toggleReviewVisibility`, `deleteReview`, `createReview`
+
+**4. API·페이지 통합**
+- **연습실 예약 생성** (`src/app/api/reservations/create/route.ts`): `deductPointsDB`, 응답에 `pointBalance` 등
+- **파티룸 예약 생성** (`src/app/api/party-room/reservations/create/route.ts`): 동일하게 `deductPointsDB` (카카오 결제 준비 `fetch` 없음 — 포인트 차감 플로우)
+- **예약 취소** (`src/app/api/reservations/cancel/route.ts`): `refundPointsDB` + 필요 시 `getPointBalance`
+- **포인트 충전 승인** (`src/app/api/charge/approve/route.ts`): `chargePointsDB`; 성공 리다이렉트 쿼리에 `newBalance` 등
+- **관리자 후기** (`src/app/api/admin/reviews/route.ts`): `getAllReviews` / `toggleReviewVisibility` / `deleteReview`; **Supabase 로그인 + 헤더 `x-admin-password`** (`ADMIN_PASSWORD`)
+- **관리자 후기 UI**: `src/lib/admin-context.tsx` — 로그인 성공 시 `ADMIN_PASSWORD_SESSION_KEY`로 비밀번호 보관(세션), `src/app/admin/reviews/page.tsx`에서 API 호출 시 헤더 전달·응답 `{ reviews }`·필드 `authorName`
+- **공개 후기 페이지** (`src/app/reviews/page.tsx`): `getPublicReviews()`, camelCase 표시 필드
+
+**5. Toss Payments 제거**
+- 삭제: `src/lib/payment/toss.ts`, `src/app/api/payments/toss/**`, `src/app/booking/payment/toss/**`
+- `.env.example`에서 Toss 키 제거; `src/types/index.ts`의 Toss 전용 타입 제거
+- 빌드 캐시: 라우트 삭제 후 TypeScript 오류 시 `.next` 삭제 후 재빌드
+
+**6. 데이터 흐름 (보정)**
+- 포인트: Supabase RPC (헬퍼 경유)
+- **연습실/파티룸 예약 레코드**: Supabase `reservations` / `party_reservations` 등(앱 기준); Prisma `Reservation` 모델과 병행 여부는 스키마 기준으로 구분
+- 문서 상 “협업: Prisma 예약 생성”은 일부 플로우와 다를 수 있음 → 실제 API 구현 기준 우선
+
+### Prisma `users` 모델·클라이언트 (`db pull` 이후)
+
+- Prisma 모델명 **`users`** → 클라이언트 **`prisma.users`**
+- 스키마 필드가 **snake_case**로 인트로스펙션된 경우(`birth_year`, `phone_verified`, `avatar_url`, `created_at`, `updated_at` 등): API에서 Prisma 쓰는 구간은 DB 필드명에 맞춤
+- 영향 파일 예: `src/app/auth/callback/route.ts`, `src/app/api/members/profile/route.ts`, `src/app/api/members/sync/route.ts`, `src/app/api/find-account/route.ts`, `src/app/api/admin/members/route.ts`, `src/app/api/account/delete/route.ts`, `src/lib/member-role-db.ts`
+- 공개 API 응답은 기존처럼 **camelCase**(`serializeProfile` 등) 유지 가능
+
+### 사용자 검증 헬퍼 (2층 안전망)
+
+- **`src/lib/user-validation.ts`**: `validateUserExists(userId)`, `USER_NOT_FOUND_ERROR`
+- **호출 위치**: `deductPointsDB` 또는 신청 저장 직전
+  - `src/app/api/reservations/create/route.ts`
+  - `src/app/api/party-room/reservations/create/route.ts`
+  - `src/app/api/one-day-class/route.ts` (신청 분기: `getUser()`로 `userId` 확보, 비로그인이면 `validateUserExists(null)` → 통과)
+
+### Prisma Migrate / Supabase FK (참고)
+
+- `public.party_reservations` → `auth.users` FK가 있으면 `schemas = ["public"]`만 쓸 때 **`migrate dev` P4002** 가능
+- 완화용 SQL 예시: `prisma/scripts/drop-party-reservations-auth-fkey.sql` (Supabase SQL Editor에서 실행 검토)
+- `auth` 스키마를 Prisma datasource에 넣는 방식은 Supabase 관리 `auth` 전체 drift 이슈로 **운영 DB에 부적합**할 수 있음
+
+### Supabase Auth 사용자 삭제 자동화 (DB)
+
+**파일:** Supabase SQL (Database Functions)
+
+**목적:** Supabase Authentication에서 사용자를 삭제하면 관련 데이터를 자동 정리
+
+**1. Cascade Trigger (개요)**
+
+```sql
+-- Supabase SQL Editor에서 실행됨
+
+-- 트리거 함수: handle_user_delete()
+CREATE OR REPLACE FUNCTION public.handle_user_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+```
+
+**동작 요약:**
+- `auth.users` 삭제 시 실행
+- 삭제 전 `auth_deletion_logs` 기록
+- 관련 `public` 데이터 순차 삭제
+- 후기는 삭제 대신 익명화
+
+**2. 삭제·보존 범위**
+
+- **자동 삭제(예시):** `users`, `user_points`, `point_transactions`, `reservations`/`party_reservations`(해당 `user_id`), `one_day_class_applications`, `message_logs`, `payment_locks`, `accounts`, `sessions`
+- **보존:** `payments`, `refunds`; `reviews`는 익명화(`nickname = '탈퇴한 사용자'` 등 정책에 따름); 비회원 예약(`user_id` NULL)
+
+**3. 대시보드 사용:** Authentication → Users → Delete
+
+**로그 확인:**
+
+```sql
+SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
+```
+
+**4. 트리거 구조(예시)**
+
+```sql
+-- auth.users:
+-- 1. on_auth_user_created → handle_new_user() (기존)
+-- 2. on_auth_user_deleted → handle_user_delete() (신규)
+```
+
+---
+
 ## 📝 최근 수정 사항 (2026-04-23)
 
 ### 1. OAuth 콜백 — 카카오 (`src/app/auth/callback/route.ts`)
@@ -1999,7 +2105,7 @@ A1STUDIO/
 - **catch에 `return`**: 카카오 처리 예외 시에도 `NextResponse.redirect`로 종료. 반환 누락 시 하단 **구글 등 공통 OAuth** 블록이 이어져 **온보딩 체크가 두 번** 도는 문제 방지.
 - **온보딩 로그**: 프로필 `findUnique` 후 리다이렉트 분기마다 콘솔 로그(프로필 부재·전화 미인증·완료).
 - **온보딩 완료 + `next`**: 이미 온보딩이 끝난 경우 `next`가 `/onboarding/...`이면 **홈 `/`로** 보냄 — 예약/콜백 루프 완화.
-- **전화번호 중복**: 카카오에서 `kakaoPhone`을 받은 뒤, 저장·`findUnique` 전에 `prisma.user.findUnique({ where: { phone: kakaoPhone } })`로 **다른 `user.id`가 쓰는 번호면** `GET /signup/error?reason=phone_duplicate`로 리다이렉트(동일 `user.id`면 업데이트 허용).
+- **전화번호 중복**: 카카오에서 `kakaoPhone`을 받은 뒤, 저장·`findUnique` 전에 `prisma.users.findUnique({ where: { phone: kakaoPhone } })`로 **다른 `user.id`가 쓰는 번호면** `GET /signup/error?reason=phone_duplicate`로 리다이렉트(동일 `user.id`면 업데이트 허용).
 
 ### 2. 파티룸 예약 — 성인/출생연도 (`src/app/party-room/booking/page.tsx`)
 
@@ -2012,7 +2118,7 @@ A1STUDIO/
 
 ### 4. 아이디 찾기 (SMS 인증 재사용)
 
-- **`GET /api/find-account`** (`src/app/api/find-account/route.ts`): 쿼리 `phone`, `code` — **`@/lib/sms-otp`** 의 `normalizePhone`·`verifyOtp`로 검증 후 `prisma.user.findMany({ where: { phone } })`, 응답에 **마스킹 이메일·`provider`·`createdAt`**. `export const dynamic = "force-dynamic"`, `runtime = "nodejs"`.
+- **`GET /api/find-account`** (`src/app/api/find-account/route.ts`): 쿼리 `phone`, `code` — **`@/lib/sms-otp`** 의 `normalizePhone`·`verifyOtp`로 검증 후 `prisma.users.findMany({ where: { phone } })`, 응답에 **마스킹 이메일·`provider`·`createdAt`**(DB는 `created_at`, 응답 조합 시 ISO). `export const dynamic = "force-dynamic"`, `runtime = "nodejs"`.
 - **페이지** `src/app/find-account/page.tsx`: `/api/auth/sms/send-code` → 인증번호 입력 → `/api/find-account`, 3분 타이머·재발송·provider 한글 라벨.
 
 ### 5. 가입/로그인 UI
@@ -2035,7 +2141,7 @@ A1STUDIO/
 ### 7. 회원 프로필 API — 경로·응답 정리 (`src/app/api/members/profile/route.ts`)
 
 - **경로**: App Router **`src/app/api/members/profile/route.ts`** → **`GET` / `POST` `/api/members/profile`** (존재 확인·단일 소스).
-- **GET**: Supabase 서버 클라이언트로 세션 확인 후 `prisma.user.findUnique({ where: { id: user.id } })`.
+- **GET**: Supabase 서버 클라이언트로 세션 확인 후 `prisma.users.findUnique({ where: { id: user.id } })`.
   - **성공·행 있음**: `{ success: true, profile }` — `serializeProfile`로 **`birthYear`·`phone`·`provider` 등 camelCase**, 날짜는 ISO 문자열.
   - **행 없음**: `{ success: true, profile: null }` (200).
   - **미인증**: `{ error: "인증이 필요합니다." }` (**401**, `success` 없음) — 브라우저에서 호출 시 **쿠키**가 넘어가야 함.
@@ -2055,10 +2161,24 @@ A1STUDIO/
   7) **`auth.admin.deleteUser`**  
 - **`party_reservations`**: 스키마에 따라 `user_id`가 `auth.users`에 **ON DELETE CASCADE**이면 Auth 삭제 시 연쇄 삭제될 수 있음(운영 스키마 확인).
 
+### 9. 카카오페이 충전 승인 — `point_transactions` (`GET` `src/app/api/charge/approve/route.ts`)
+
+- **흐름**: `approvePayment` 성공 → **`user_points`** `balance`를 **`currentBalance + chargePackage.total_points`** 로 반영 → **`point_transactions`** 기록 → (보너스 있으면) 보너스 행 추가 → `/charge/success` 리다이렉트.
+- **충전(`type: "charge"`) 행**:
+  - **`amount`**: 결제 **원화(`chargePackage.amount`)가 아니라 포인트 `total_points`** (`Math.round(Number(total_points))`) — 거래 테이블은 포인트 단위.
+  - **`balance_after`**: `currentBalance +` 위 포인트(= `user_points` 갱신 후 잔액과 일치).
+  - **`payment_id`**: 카카오 승인 `approval.aid`, **`reservation_id: null`** 명시.
+  - **디버그**: `[충전 거래] INSERT 직전 데이터`, 성공 시 `[충전 거래] INSERT 성공`, 실패 시 **`[충전 거래 내역 실패]`** + `message` / `code` / `details` / `hint` 후 **`throw`** → `/charge/fail`.
+- **보너스(`type: "bonus"`) 행** (`bonus_points > 0`):
+  - **`balance_after`**: `newBalance`(이미 `total_points` 반영된 최종 잔액).
+  - **`payment_id` 미전송**(스키마·UNIQUE·UUID 이슈 완화).
+  - **실패 시**: **`console.error("[보너스 거래 실패]", …)` 만** — 포인트는 이미 반영되었으므로 **전체 플로우는 성공 리다이렉트 유지**.
+- *장부 해석*: 한 결제에 **충전 행이 `total_points` 전체를 담고, 보너스 행이 또 있으면** 라인 합계와 잔액 변화를 **이중으로 읽지 않도록** UI/리포트에서 정책 정리 권장.
+
 ---
 
-**작성일**: 2026-04-23  
-**버전**: 2.13 (최신)  
+**작성일**: 2026-04-24  
+**버전**: 2.14 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---

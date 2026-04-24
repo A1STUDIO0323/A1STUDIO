@@ -1,30 +1,10 @@
 import { Metadata } from "next";
 import Image from "next/image";
 import { Star } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getPublicReviews } from "@/lib/supabase-reviews";
 import ReviewForm from "./_components/ReviewForm";
 
 export const metadata: Metadata = { title: "후기 | A1 STUDIO" };
-
-type Review = {
-  id: string;
-  author_name: string;
-  rating: number;
-  content: string;
-  created_at: string;
-  image_url: string | null;
-  video_url: string | null;
-};
-
-async function getReviews(): Promise<Review[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("reviews")
-    .select("id, author_name, rating, content, created_at, image_url, video_url")
-    .eq("is_visible", true)
-    .order("created_at", { ascending: false });
-  return data ?? [];
-}
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -50,7 +30,7 @@ function formatDate(iso: string) {
 }
 
 export default async function ReviewsPage() {
-  const reviews = await getReviews();
+  const reviews = await getPublicReviews();
 
   const avgRating =
     reviews.length > 0
@@ -113,9 +93,9 @@ export default async function ReviewsPage() {
               >
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
-                    <p className="font-semibold text-[#3B342F]">{review.author_name}</p>
+                    <p className="font-semibold text-[#3B342F]">{review.authorName}</p>
                     <p className="text-xs text-[#9b9189] mt-0.5">
-                      {formatDate(review.created_at)}
+                      {formatDate(review.createdAt)}
                     </p>
                   </div>
                   <StarRating rating={review.rating} />
@@ -123,10 +103,10 @@ export default async function ReviewsPage() {
                 <p className="text-sm leading-relaxed text-[#6f655d] whitespace-pre-wrap">
                   {review.content}
                 </p>
-                {review.image_url && (
+                {review.imageUrl && (
                   <div className="mt-4">
                     <Image
-                      src={review.image_url}
+                      src={review.imageUrl}
                       alt="후기 사진"
                       width={480}
                       height={320}
@@ -135,10 +115,10 @@ export default async function ReviewsPage() {
                     />
                   </div>
                 )}
-                {review.video_url && (
+                {review.videoUrl && (
                   <div className="mt-4">
                     <video
-                      src={review.video_url}
+                      src={review.videoUrl}
                       controls
                       preload="metadata"
                       className="w-full rounded-xl max-h-72 bg-black"

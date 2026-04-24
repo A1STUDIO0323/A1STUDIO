@@ -179,7 +179,7 @@ export async function withdrawMemberByUserId(userId: string, email?: string | nu
   }
 
   try {
-    await prisma.user.delete({ where: { id: normalizedUserId } });
+    await prisma.users.delete({ where: { id: normalizedUserId } });
   } catch (error) {
     if (!isPrismaTableMissingError(error)) {
       // profile FK cascade 누락 환경에서는 이 정리가 실패할 수 있으므로 무시
@@ -205,7 +205,7 @@ export async function withdrawMemberByEmail(email: string) {
 
   let userId: string | null = null;
   try {
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: normalizedEmail },
       select: { id: true },
     });

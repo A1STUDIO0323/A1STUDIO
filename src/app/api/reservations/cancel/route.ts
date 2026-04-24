@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getPointBalance, refundPointsDB } from "@/lib/supabase-points";
 import { calculatePracticeRoomRefundRate, canCancelReservation } from "@/lib/refund-policy";
 
 export async function POST(request: NextRequest) {
@@ -75,54 +76,23 @@ export async function POST(request: NextRequest) {
       throw new Error(`예약 취소 처리 실패: ${updateError.message}`);
     }
 
-    // 포인트 환불 처리
-    // 1. user_points 조회
-    const { data: userPoints, error: pointsError } = await supabase
-      .from("user_points")
-      .select("balance, total_used")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (pointsError) {
-      console.error('[CancelReservation] 포인트 조회 실패:', pointsError);
-      throw new Error("포인트 조회 실패");
-    }
-
-    if (!userPoints) {
-      throw new Error("포인트 정보를 찾을 수 없습니다");
-    }
-
-    const newBalance = (userPoints?.balance || 0) + refundAmount;
-    const newTotalUsed = Math.max(0, (userPoints?.total_used || 0) - refundAmount);
-
-    // 2. user_points 업데이트
-    const { error: balanceUpdateError } = await supabase
-      .from("user_points")
-      .update({
-        balance: newBalance,
-        total_used: newTotalUsed,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", user.id);
-
-    if (balanceUpdateError) {
-      throw new Error("포인트 환불 실패");
-    }
-
-    // 3. point_transactions 추가
-    const { error: transactionError } = await supabase
-      .from("point_transactions")
-      .insert({
-        user_id: user.id,
-        type: "refund",
-        amount: refundAmount,
-        balance_after: newBalance,
-        description: `${reservation.date} ${reservation.start_time}~${reservation.end_time} 예약 취소 환불`,
-        reservation_id: reservation_id,
+    let balanceAfter: number;
+    if (refundAmount > 0) {
+      const refundResult = await refundPointsDB({
+        userId: user.id,
+        points: refundAmount,
+        description: "예약 취소 환불",
+        reservationId: reservation_id,
       });
 
-    if (transactionError) {
-      throw new Error("환불 내역 생성 실패");
+      if (!refundResult.success) {
+        console.error("[Refund Error]", refundResult.error);
+        balanceAfter = await getPointBalance(user.id);
+      } else {
+        balanceAfter = refundResult.newBalance;
+      }
+    } else {
+      balanceAfter = await getPointBalance(user.id);
     }
 
     return NextResponse.json({
@@ -131,7 +101,7 @@ export async function POST(request: NextRequest) {
       original_amount: originalAmount,
       refund_rate: refundRate,
       refund_points: refundAmount,
-      balance_after: newBalance,
+      balance_after: balanceAfter,
     });
   } catch (error) {
     console.error("예약 취소 오류:", error);

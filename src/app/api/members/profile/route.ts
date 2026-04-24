@@ -2,24 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import type { User } from "@prisma/client";
+import type { users } from "@prisma/client";
 
-/** JSON 응답용 — DB @map(snake)과 무관하게 항상 camelCase */
-function serializeProfile(row: User) {
-  const r = row as User & { nickname?: string | null };
+/** JSON 응답용 — API는 항상 camelCase */
+function serializeProfile(row: users) {
+  const r = row as users & { nickname?: string | null };
   return {
     id: r.id,
     email: r.email,
     name: r.name,
     nickname: r.nickname ?? null,
-    avatarUrl: r.avatarUrl,
+    avatarUrl: r.avatar_url,
     provider: r.provider,
-    birthYear: r.birthYear,
+    birthYear: r.birth_year,
     phone: r.phone,
-    phoneVerified: r.phoneVerified,
-    marketingAgreed: r.marketingAgreed,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
+    phoneVerified: r.phone_verified,
+    marketingAgreed: r.marketing_agreed,
+    createdAt: r.created_at.toISOString(),
+    updatedAt: r.updated_at.toISOString(),
   };
 }
 
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
     }
 
-    const profile = await prisma.user.findUnique({
+    const profile = await prisma.users.findUnique({
       where: { id: user.id },
     });
 
@@ -98,25 +98,24 @@ export async function POST(request: NextRequest) {
     const { name, birthYear, phone, phoneVerified } = parsed.data;
 
     // Prisma upsert — auth user id 기준
-    const updatedProfile = await prisma.user.upsert({
+    const updatedProfile = await prisma.users.upsert({
       where: { id: user.id },
       create: {
         id: user.id,
         email: user.email ?? null,
         name: name ?? null,
-        // @ts-ignore — 스키마 확장 필드 (마이그레이션 후 타입 자동 생성됨)
-        birthYear: birthYear ?? null,
+        birth_year: birthYear ?? null,
         phone: phone ?? null,
-        phoneVerified: phoneVerified ?? false,
+        phone_verified: phoneVerified ?? false,
         provider: user.app_metadata?.provider ?? "email",
+        updated_at: new Date(),
       },
       update: {
         ...(name !== undefined && { name }),
-        // @ts-ignore
-        ...(birthYear !== undefined && { birthYear }),
+        ...(birthYear !== undefined && { birth_year: birthYear }),
         ...(phone !== undefined && { phone }),
-        ...(phoneVerified !== undefined && { phoneVerified }),
-        updatedAt: new Date(),
+        ...(phoneVerified !== undefined && { phone_verified: phoneVerified }),
+        updated_at: new Date(),
       },
     });
 

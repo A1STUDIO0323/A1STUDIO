@@ -7,42 +7,20 @@ datasource db {
   schemas  = ["public"]
 }
 
-model User {
-  id        String   @id @db.Uuid
-  email     String?  @unique
-  name      String?
-  nickname  String?  @map("nickname")
-  avatarUrl String?  @map("avatar_url")
-  provider  String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  birthYear       Int?     @map("birth_year") @db.SmallInt
-  phone           String?  @unique
-  phoneVerified   Boolean  @default(false) @map("phone_verified")
-  marketingAgreed Boolean  @default(false) @map("marketing_agreed")
-
-  accounts        Account[]
-  sessions        Session[]
-  oneDayClassApps OneDayClassApplication[]
-
-  @@map("profiles")
-  @@schema("public")
-}
-
 model Account {
   id                String  @id @default(cuid())
   userId            String  @map("user_id") @db.Uuid
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
+  user              users   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
@@ -53,8 +31,8 @@ model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique @map("session_token")
   userId       String   @map("user_id") @db.Uuid
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expires      DateTime
+  user         users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
   @@schema("public")
@@ -70,60 +48,25 @@ model VerificationToken {
   @@schema("public")
 }
 
-model EmailAuthUser {
-  email        String   @id
-  passwordHash String   @map("password_hash")
-  name         String?
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  @@map("email_auth_users")
-  @@schema("public")
-}
-
-model PasswordResetToken {
-  token     String    @id
-  email     String
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@index([email])
-  @@index([expiresAt])
-  @@map("password_reset_tokens")
-  @@schema("public")
-}
-
-// ─── 원데이클래스 모델 ─────────────────────────────────────────
-enum OneDayClassStatus {
-  OPEN // 신청 모집 중
-  CONFIRMED // 인원 충족, 확정
-  CANCELLED // 취소됨
-  COMPLETED // 진행 완료
-
-  @@schema("public")
-}
-
 model OneDayClass {
-  id              String            @id @default(cuid())
+  id              String                   @id @default(cuid())
   title           String
-  teacherName     String            @map("teacher_name")
-  teacherProfile  String            @map("teacher_profile") @db.Text
-  teacherImage    String?           @map("teacher_image")
-  classType       String            @map("class_type") // VOCAL / DANCE / ACT / MUSICAL
-  description     String            @db.Text
-  desiredDate     DateTime          @map("desired_date")
-  durationMinutes Int               @default(120) @map("duration_minutes")
-  minHeadcount    Int               @default(8) @map("min_headcount")
-  maxHeadcount    Int               @default(15) @map("max_headcount")
-  pricePerPerson  Int               @map("price_per_person")
-  status          OneDayClassStatus @default(OPEN)
-  confirmedDate   DateTime?         @map("confirmed_date")
-  isPublished     Boolean           @default(true) @map("is_published")
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
-
-  applications OneDayClassApplication[]
+  teacherName     String                   @map("teacher_name")
+  teacherProfile  String                   @map("teacher_profile")
+  teacherImage    String?                  @map("teacher_image")
+  classType       String                   @map("class_type")
+  description     String
+  desiredDate     DateTime                 @map("desired_date")
+  durationMinutes Int                      @default(120) @map("duration_minutes")
+  minHeadcount    Int                      @default(8) @map("min_headcount")
+  maxHeadcount    Int                      @default(15) @map("max_headcount")
+  pricePerPerson  Int                      @map("price_per_person")
+  status          OneDayClassStatus        @default(OPEN)
+  confirmedDate   DateTime?                @map("confirmed_date")
+  isPublished     Boolean                  @default(true) @map("is_published")
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+  applications    OneDayClassApplication[]
 
   @@map("one_day_classes")
   @@schema("public")
@@ -132,9 +75,7 @@ model OneDayClass {
 model OneDayClassApplication {
   id          String      @id @default(cuid())
   classId     String      @map("class_id")
-  class       OneDayClass @relation(fields: [classId], references: [id], onDelete: Cascade)
   userId      String?     @map("user_id") @db.Uuid
-  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   guestName   String      @map("guest_name")
   guestPhone  String      @map("guest_phone")
   guestEmail  String?     @map("guest_email")
@@ -142,27 +83,27 @@ model OneDayClassApplication {
   message     String?
   isCancelled Boolean     @default(false) @map("is_cancelled")
   createdAt   DateTime    @default(now()) @map("created_at")
+  class       OneDayClass @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@map("one_day_class_applications")
   @@schema("public")
 }
 
 model Room {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  capacity    Int
-  sizeM2      Float    @map("size_m2")
-  amenities   Json     @default("[]") @map("amenities_json")
-  images      Json     @default("[]")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  pricingRules PricingRule[]
-  reservations Reservation[]
-  holds        ReservationHold[]
+  id                String              @id @default(cuid())
+  name              String
+  slug              String              @unique
+  description       String?
+  capacity          Int
+  sizeM2            Float               @map("size_m2")
+  amenities         Json                @default("[]") @map("amenities_json")
+  images            Json                @default("[]")
+  isActive          Boolean             @default(true) @map("is_active")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  pricingRules      PricingRule[]
+  reservation_holds reservation_holds[]
+  reservations      Reservation[]
 
   @@map("rooms")
   @@schema("public")
@@ -171,11 +112,10 @@ model Room {
 model PricingRule {
   id            String   @id @default(cuid())
   roomId        String   @map("room_id")
-  room          Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   label         String
-  dayOfWeekMask Int      @map("day_of_week_mask") // bitmask: Sun=1,Mon=2,Tue=4,Wed=8,Thu=16,Fri=32,Sat=64
-  timeStart     String   @map("time_start") // "HH:MM"
-  timeEnd       String   @map("time_end") // "HH:MM"
+  dayOfWeekMask Int      @map("day_of_week_mask")
+  timeStart     String   @map("time_start")
+  timeEnd       String   @map("time_end")
   pricePerHour  Int      @map("price_per_hour")
   minHours      Int      @default(1) @map("min_hours")
   isPackage     Boolean  @default(false) @map("is_package")
@@ -184,46 +124,35 @@ model PricingRule {
   packagePrice  Int?     @map("package_price")
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
+  room          Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@map("pricing_rules")
   @@schema("public")
 }
 
-enum ReservationStatus {
-  HOLD
-  PAID
-  CONFIRMED
-  CANCELLED
-  EXPIRED
-  REFUNDED
-
-  @@schema("public")
-}
-
 model Reservation {
-  id          String            @id @default(cuid())
-  roomId      String            @map("room_id")
-  room        Room              @relation(fields: [roomId], references: [id])
-  userId      String?           @map("user_id") @db.Uuid
-  guestName   String            @map("guest_name")
-  guestPhone  String            @map("guest_phone")
-  guestEmail  String?           @map("guest_email")
-  date        String // "YYYY-MM-DD"
-  startTime   String            @map("start_time") // "HH:MM"
-  endTime     String            @map("end_time") // "HH:MM"
-  headcount   Int               @default(1)
-  packageType     String?           @map("package_type")
-  reservationType String?           @map("reservation_type")
-  status      ReservationStatus @default(HOLD)
-  totalAmount Int               @map("total_amount")
-  memo        String?
-  authCode    String?           @map("auth_code") // 비회원 조회용 인증코드
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
-
-  hold    ReservationHold?
-  payment Payment?
-  review  Review?
+  id                String             @id @default(cuid())
+  roomId            String             @map("room_id")
+  userId            String?            @map("user_id") @db.Uuid
+  guestName         String             @map("guest_name")
+  guestPhone        String             @map("guest_phone")
+  guestEmail        String?            @map("guest_email")
+  date              String
+  startTime         String             @map("start_time")
+  endTime           String             @map("end_time")
+  headcount         Int                @default(1)
+  status            ReservationStatus  @default(HOLD)
+  totalAmount       Int                @map("total_amount")
+  memo              String?
+  authCode          String?            @map("auth_code")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  reservationType   String?            @map("reservation_type")
+  packageType       String?            @map("package_type")
+  payment           Payment?
+  reservation_holds reservation_holds?
+  room              Room               @relation(fields: [roomId], references: [id])
+  reviews           reviews?
 
   @@index([roomId, date])
   @@index([guestPhone])
@@ -239,46 +168,17 @@ model ChargePackage {
   bonusPoints Int?     @map("bonus_points")
   totalPoints Int      @map("total_points")
   isPopular   Boolean  @default(false) @map("is_popular")
-  sortOrder   Int      @default(0) @map("sort_order")
   isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("charge_packages")
   @@schema("public")
 }
 
-model ReservationHold {
-  id            String      @id @default(cuid())
-  roomId        String      @map("room_id")
-  room          Room        @relation(fields: [roomId], references: [id])
-  reservationId String      @unique @map("reservation_id")
-  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  date          String
-  startTime     String      @map("start_time")
-  endTime       String      @map("end_time")
-  expiresAt     DateTime    @map("expires_at")
-  createdAt     DateTime    @default(now()) @map("created_at")
-
-  @@unique([roomId, date, startTime, endTime], name: "unique_slot")
-  @@map("reservation_holds")
-  @@schema("public")
-}
-
-enum PaymentStatus {
-  PENDING
-  APPROVED
-  FAILED
-  CANCELLED
-  PARTIAL_REFUNDED
-  REFUNDED
-
-  @@schema("public")
-}
-
 model Payment {
   id                 String        @id @default(cuid())
   reservationId      String        @unique @map("reservation_id")
-  reservation        Reservation   @relation(fields: [reservationId], references: [id])
   provider           String        @default("toss")
   providerPaymentKey String?       @map("provider_payment_key")
   orderId            String        @unique @map("order_id")
@@ -287,46 +187,24 @@ model Payment {
   requestedAt        DateTime      @default(now()) @map("requested_at")
   approvedAt         DateTime?     @map("approved_at")
   rawResponse        Json?         @map("raw_response")
-
-  refunds Refund[]
+  reservation        Reservation   @relation(fields: [reservationId], references: [id])
+  refunds            Refund[]
 
   @@map("payments")
-  @@schema("public")
-}
-
-enum RefundStatus {
-  REQUESTED
-  APPROVED
-  REJECTED
-
   @@schema("public")
 }
 
 model Refund {
   id          String       @id @default(cuid())
   paymentId   String       @map("payment_id")
-  payment     Payment      @relation(fields: [paymentId], references: [id])
   amount      Int
   reason      String
   status      RefundStatus @default(REQUESTED)
   processedAt DateTime?    @map("processed_at")
   createdAt   DateTime     @default(now()) @map("created_at")
+  payment     Payment      @relation(fields: [paymentId], references: [id])
 
   @@map("refunds")
-  @@schema("public")
-}
-
-model Review {
-  id            String      @id @default(cuid())
-  reservationId String      @unique @map("reservation_id")
-  reservation   Reservation @relation(fields: [reservationId], references: [id])
-  rating        Int
-  content       String
-  nickname      String?
-  isVisible     Boolean     @default(false) @map("is_visible")
-  createdAt     DateTime    @default(now()) @map("created_at")
-
-  @@map("reviews")
   @@schema("public")
 }
 
@@ -372,15 +250,14 @@ model BlockedSlot {
   @@schema("public")
 }
 
-// 외부 플랫폼 예약 (스페이스클라우드, 네이버 플레이스 등)
 model ExternalReservation {
   id         String   @id @default(cuid())
-  platform   String   // 'spacecloud', 'naver', etc.
-  externalId String?  @map("external_id") // 외부 플랫폼의 예약 ID
-  roomType   String   @map("room_type") // 'practice-room' or 'party-room'
-  date       String   // "YYYY-MM-DD"
-  startTime  String   @map("start_time") // "HH:MM"
-  endTime    String   @map("end_time") // "HH:MM"
+  platform   String
+  externalId String?  @map("external_id")
+  roomType   String   @map("room_type")
+  date       String
+  startTime  String   @map("start_time")
+  endTime    String   @map("end_time")
   guestName  String   @map("guest_name")
   guestPhone String   @map("guest_phone")
   amount     Int      @default(0)
@@ -396,48 +273,234 @@ model ExternalReservation {
   @@schema("public")
 }
 
-// 결제 중복 방지를 위한 락 테이블
 model PaymentLock {
-  id        String   @id @default(cuid())
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
   userId    String   @map("user_id") @db.Uuid
-  lockType  String   @map("lock_type") // 'charge', 'reservation', 'party-room'
-  lockKey   String   @map("lock_key") // 주문 ID 또는 예약 날짜+시간
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  lockType  String   @map("lock_type")
+  lockKey   String   @map("lock_key")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@unique([userId, lockType, lockKey])
-  @@index([userId, lockType])
-  @@index([expiresAt])
+  @@index([expiresAt], map: "idx_payment_locks_expires")
+  @@index([userId], map: "idx_payment_locks_user")
   @@map("payment_locks")
-  @@schema("public")
-}
-
-// 메시지 발송 로그
-model MessageLog {
-  id            String   @id @default(cuid())
-  userId        String?  @map("user_id") @db.Uuid
-  reservationId String?  @map("reservation_id")
-  phoneNumber   String   @map("phone_number")
-  messageType   String   @map("message_type") // 'reservation_confirm', 'reservation_cancel', 'reminder'
-  content       String   @db.Text
-  status        String   // 'success', 'failed'
-  errorMessage  String?  @map("error_message") @db.Text
-  messageId     String?  @map("message_id")
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  @@index([userId])
-  @@index([reservationId])
-  @@index([createdAt(sort: Desc)])
-  @@map("message_logs")
   @@schema("public")
 }
 
 model MemberRole {
   email     String   @id
-  role      String // "CM" 등
-  createdAt DateTime @default(now()) @map("created_at")
+  role      String
   updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@map("member_roles")
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model public_PaymentLock {
+  id        String   @id
+  userId    String   @db.Uuid
+  lockType  String
+  lockKey   String
+  expiresAt DateTime @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([userId, lockType, lockKey])
+  @@index([expiresAt], map: "idx_payment_lock_expires")
+  @@index([userId], map: "idx_payment_lock_user")
+  @@map("PaymentLock")
+  @@schema("public")
+}
+
+model banned_members {
+  email      String   @id
+  reason     String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@schema("public")
+}
+
+model email_auth_users {
+  email         String   @id
+  password_hash String
+  name          String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model message_logs {
+  id             String   @id
+  user_id        String?  @db.Uuid
+  reservation_id String?
+  phone_number   String
+  message_type   String
+  content        String
+  status         String
+  error_message  String?
+  message_id     String?
+  created_at     DateTime @default(now())
+
+  @@index([created_at(sort: Desc)])
+  @@index([reservation_id])
+  @@index([user_id])
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model party_reservations {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String?   @db.Uuid
+  date             DateTime  @db.Date
+  start_time       DateTime  @db.Time(6)
+  end_time         DateTime  @db.Time(6)
+  duration_hours   Decimal   @db.Decimal(4, 2)
+  total_amount     Int
+  guest_name       String
+  guest_phone      String
+  guest_email      String?
+  headcount        Int?      @default(1)
+  status           String?   @default("PAID")
+  payment_provider String?
+  payment_key      String?
+  order_id         String?
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  cancelled_at     DateTime? @db.Timestamptz(6)
+
+  @@schema("public")
+}
+
+model password_reset_tokens {
+  token      String    @id
+  email      String
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  @@index([email])
+  @@index([expires_at])
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model point_transactions {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String   @db.Uuid
+  type           String
+  amount         Int
+  balance_after  Int
+  description    String?
+  reservation_id String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([user_id], map: "idx_point_transactions_user")
+  @@schema("public")
+}
+
+model reservation_holds {
+  id             String      @id
+  room_id        String
+  reservation_id String      @unique
+  date           String
+  start_time     String
+  end_time       String
+  expires_at     DateTime
+  created_at     DateTime    @default(now())
+  reservations   Reservation @relation(fields: [reservation_id], references: [id], onDelete: Cascade)
+  rooms          Room        @relation(fields: [room_id], references: [id])
+
+  @@unique([room_id, date, start_time, end_time])
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model reviews {
+  id             String      @id
+  rating         Int
+  content        String
+  created_at     DateTime    @default(now())
+  is_visible     Boolean     @default(false)
+  nickname       String?
+  reservation_id String      @unique
+  reservations   Reservation @relation(fields: [reservation_id], references: [id])
+
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model user_points {
+  user_id       String    @id @db.Uuid
+  balance       Int?      @default(0)
+  total_charged Int?      @default(0)
+  total_used    Int?      @default(0)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id               String    @id(map: "profiles_pkey") @db.Uuid
+  email            String?   @unique(map: "profiles_email_key")
+  name             String?
+  avatar_url       String?
+  provider         String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime
+  birth_year       Int?      @db.SmallInt
+  phone            String?   @unique(map: "profiles_phone_key")
+  phone_verified   Boolean   @default(false)
+  marketing_agreed Boolean   @default(false)
+  nickname         String?
+  accounts         Account[]
+  sessions         Session[]
+
+  @@schema("public")
+}
+
+enum OneDayClassStatus {
+  OPEN
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+
+  @@schema("public")
+}
+
+enum ReservationStatus {
+  HOLD
+  PAID
+  CANCELLED
+  EXPIRED
+  REFUNDED
+  CONFIRMED
+
+  @@schema("public")
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  FAILED
+  CANCELLED
+  PARTIAL_REFUNDED
+  REFUNDED
+
+  @@schema("public")
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+
   @@schema("public")
 }

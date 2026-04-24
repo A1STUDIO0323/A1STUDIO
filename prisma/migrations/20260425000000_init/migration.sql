@@ -1,0 +1,3 @@
+-- Baseline migration 
+-- Database already contains all tables 
+-- This migration marks the current state as the starting point 
