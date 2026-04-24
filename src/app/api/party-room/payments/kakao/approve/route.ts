@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
     const endDateStr = endDate.toISOString().split('T')[0];
 
     const packageInfo = PARTY_ROOM_PACKAGES[packageType as keyof typeof PARTY_ROOM_PACKAGES];
+    const durationHours = packageInfo.hours;
 
     // party_reservations INSERT
     const { data: reservation, error: insertError } = await supabase
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
         start_time: packageInfo.start,
         end_time: packageInfo.end,
         end_date: endDateStr,
+        duration_hours: durationHours,
         price_type: priceType,
         is_event_price: isEvent,
         total_amount: parseInt(amount),

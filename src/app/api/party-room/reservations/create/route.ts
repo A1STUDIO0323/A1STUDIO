@@ -158,32 +158,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const durationHours = packageInfo.hours;
+
     // 6. party_reservations INSERT (실패 시 메시지에 users 권한이 보이면 DB 트리거·RLS를 점검)
+    console.log("[Party Room Create] Selected package (PARTY_ROOM_PACKAGES):", packageInfo);
+    console.log("[Party Room Create] Duration hours:", durationHours);
     console.log("[Party Room Create] About to insert party_reservations", {
       userId: user.id,
       date,
       package_type,
+      duration_hours: durationHours,
     });
+
+    const insertPayload = {
+      user_id: user.id,
+      package_type,
+      date,
+      start_time: packageInfo.start,
+      end_time: packageInfo.end,
+      end_date: endDateStr,
+      duration_hours: durationHours,
+      price_type: pricing.priceType,
+      is_event_price: pricing.isEvent,
+      total_amount: pointsToUse,
+      payment_method: "points",
+      points_used: pointsToUse,
+      status: "PAID",
+      headcount,
+      guest_name,
+      guest_phone,
+      memo,
+    };
+    console.log("[Party Room Create] Insert payload:", insertPayload);
+
     const { data: reservation, error: insertError } = await supabase
       .from("party_reservations")
-      .insert({
-        user_id: user.id,
-        package_type,
-        date,
-        start_time: packageInfo.start,
-        end_time: packageInfo.end,
-        end_date: endDateStr,
-        price_type: pricing.priceType,
-        is_event_price: pricing.isEvent,
-        total_amount: pointsToUse,
-        payment_method: 'points',
-        points_used: pointsToUse,
-        status: 'PAID',
-        headcount,
-        guest_name,
-        guest_phone,
-        memo,
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
