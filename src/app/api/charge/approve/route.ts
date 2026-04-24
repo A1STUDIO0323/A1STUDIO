@@ -104,19 +104,37 @@ export async function GET(request: NextRequest) {
     if (transactionError) throw new Error("충전 내역 생성 실패");
 
     // 4. 보너스 포인트가 있으면 추가 거래 내역 생성
-    if (chargePackage.bonus_points > 0) {
+    const bonusPoints = Math.round(Number(chargePackage.bonus_points ?? 0));
+    if (bonusPoints > 0) {
+      const bonusRateRaw = chargePackage.bonus_rate ?? chargePackage.bonusRate;
+      const bonusRateLabel =
+        bonusRateRaw != null && bonusRateRaw !== "" ? String(bonusRateRaw) : "";
+
+      const bonusTransactionData = {
+        user_id: user.id,
+        type: "bonus" as const,
+        amount: bonusPoints,
+        balance_after: newBalance,
+        description: bonusRateLabel
+          ? `${chargePackage.name} 보너스 ${bonusRateLabel}%`
+          : `${chargePackage.name} 보너스`,
+        reservation_id: null as string | null,
+        // 충전 행과 동일한 payment_id면 DB UNIQUE 위반(400) 가능 → 보너스 전용 키
+        payment_id: `${approval.aid}:bonus`,
+      };
+
+      console.log("[충전 승인] 보너스 거래 데이터:", bonusTransactionData);
+
       const { error: bonusError } = await supabase
         .from("point_transactions")
-        .insert({
-          user_id: user.id,
-          type: "bonus",
-          amount: chargePackage.bonus_points,
-          balance_after: newBalance,
-          description: `${chargePackage.name} 보너스 ${chargePackage.bonus_rate}%`,
-          payment_id: approval.aid,
-        });
+        .insert(bonusTransactionData);
 
-      if (bonusError) throw new Error("보너스 내역 생성 실패");
+      if (bonusError) {
+        console.error("[충전 승인] 보너스 insert 오류:", bonusError);
+        throw new Error(
+          bonusError.message || "보너스 내역 생성 실패"
+        );
+      }
     }
 
     // 쿠키 삭제
