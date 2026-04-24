@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { prisma } from "@/lib/db";
 
 /**
  * Admin 클라이언트 생성 (계정 삭제용)
@@ -158,7 +159,80 @@ export async function POST(request: NextRequest) {
       })
       .eq("user_id", user.id);
 
-    // 5. Supabase Auth 계정 삭제 (Admin API 사용)
+    // 5. FK 정리: auth.users 삭제 전 연결된 public 데이터 처리
+    // (user_points 등이 auth.users를 참조하면 deleteUser가 실패함)
+
+    const { error: txDeleteError } = await supabase
+      .from("point_transactions")
+      .delete()
+      .eq("user_id", user.id);
+    if (txDeleteError) {
+      console.error("[계정탈퇴] point_transactions 삭제 실패:", txDeleteError);
+      return NextResponse.json(
+        { error: "탈퇴 처리 중 포인트 내역 삭제에 실패했습니다", detail: txDeleteError.message },
+        { status: 500 }
+      );
+    }
+
+    const { error: pointsDeleteError } = await supabase
+      .from("user_points")
+      .delete()
+      .eq("user_id", user.id);
+    if (pointsDeleteError) {
+      console.error("[계정탈퇴] user_points 삭제 실패:", pointsDeleteError);
+      return NextResponse.json(
+        { error: "탈퇴 처리 중 포인트 행 삭제에 실패했습니다", detail: pointsDeleteError.message },
+        { status: 500 }
+      );
+    }
+
+    try {
+      await prisma.paymentLock.deleteMany({ where: { userId: user.id } });
+    } catch (lockErr) {
+      console.error("[계정탈퇴] payment_locks 삭제 실패:", lockErr);
+      return NextResponse.json(
+        { error: "탈퇴 처리 중 결제 락 삭제에 실패했습니다" },
+        { status: 500 }
+      );
+    }
+
+    const { error: resUserNullError } = await supabase
+      .from("reservations")
+      .update({ user_id: null })
+      .eq("user_id", user.id);
+    if (resUserNullError) {
+      console.error("[계정탈퇴] reservations user_id 해제 실패:", resUserNullError);
+      return NextResponse.json(
+        { error: "탈퇴 처리 중 예약 연결 해제에 실패했습니다", detail: resUserNullError.message },
+        { status: 500 }
+      );
+    }
+
+    try {
+      const deletedProfiles = await prisma.user.deleteMany({
+        where: { id: user.id },
+      });
+      console.log("[계정탈퇴] Prisma User(profiles) 삭제:", deletedProfiles.count);
+    } catch (profileErr) {
+      console.error("[계정탈퇴] Prisma User 삭제 실패:", profileErr);
+      return NextResponse.json(
+        { error: "탈퇴 처리 중 프로필 삭제에 실패했습니다" },
+        { status: 500 }
+      );
+    }
+
+    const userEmail = user.email?.trim().toLowerCase() ?? "";
+    if (userEmail) {
+      try {
+        await prisma.$executeRaw`
+          DELETE FROM member_roles WHERE email = ${userEmail}
+        `;
+      } catch (roleErr) {
+        console.error("[계정탈퇴] member_roles 삭제 실패:", roleErr);
+      }
+    }
+
+    // 6. Supabase Auth 계정 삭제 (Admin API 사용)
     console.log('[계정탈퇴] Auth 계정 삭제 시작');
     const adminClient = createAdminClient();
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id);
@@ -173,7 +247,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[계정탈퇴] Auth 계정 삭제 완료');
 
-    // 6. 세션 종료 (서버 측)
+    // 7. 세션 종료 (서버 측)
     await supabase.auth.signOut();
     console.log('[계정탈퇴] 세션 종료 완료');
 

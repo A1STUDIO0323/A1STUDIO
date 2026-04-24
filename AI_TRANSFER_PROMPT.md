@@ -1992,8 +1992,73 @@ A1STUDIO/
 
 ---
 
-**작성일**: 2026-04-22  
-**버전**: 2.9 (최신)  
+## 📝 최근 수정 사항 (2026-04-23)
+
+### 1. OAuth 콜백 — 카카오 (`src/app/auth/callback/route.ts`)
+
+- **catch에 `return`**: 카카오 처리 예외 시에도 `NextResponse.redirect`로 종료. 반환 누락 시 하단 **구글 등 공통 OAuth** 블록이 이어져 **온보딩 체크가 두 번** 도는 문제 방지.
+- **온보딩 로그**: 프로필 `findUnique` 후 리다이렉트 분기마다 콘솔 로그(프로필 부재·전화 미인증·완료).
+- **온보딩 완료 + `next`**: 이미 온보딩이 끝난 경우 `next`가 `/onboarding/...`이면 **홈 `/`로** 보냄 — 예약/콜백 루프 완화.
+- **전화번호 중복**: 카카오에서 `kakaoPhone`을 받은 뒤, 저장·`findUnique` 전에 `prisma.user.findUnique({ where: { phone: kakaoPhone } })`로 **다른 `user.id`가 쓰는 번호면** `GET /signup/error?reason=phone_duplicate`로 리다이렉트(동일 `user.id`면 업데이트 허용).
+
+### 2. 파티룸 예약 — 성인/출생연도 (`src/app/party-room/booking/page.tsx`)
+
+- **`useIsAdult === null`**: 출생연도 미확정 시 마이페이지 대신 **`/onboarding/profile?returnTo=/party-room/booking`** 로 보내고 안내 문구 정리.
+- **`useIsAdult` 훅 디버깅** (`src/lib/auth-client.tsx`): 프로필 `fetch`에 **세션 이메일 없음**, **HTTP status**, **API 본문·`birthYear`**, **실패 시 `success`/`profile`/`birthYear`**, **나이·`isAdult`**, **`catch` 에러** 로그 추가(원인 추적용, 운영 전 정리 검토).
+
+### 3. 온보딩 프로필 — 복귀 URL (`src/app/onboarding/profile/ProfileOnboardingClient.tsx`)
+
+- 쿼리 **`next`가 없으면 `returnTo`** 도 `sanitizePostAuthRedirect`에 넘겨 **`nextUrl`**(로그인 callback·저장 후 이동)로 사용.
+
+### 4. 아이디 찾기 (SMS 인증 재사용)
+
+- **`GET /api/find-account`** (`src/app/api/find-account/route.ts`): 쿼리 `phone`, `code` — **`@/lib/sms-otp`** 의 `normalizePhone`·`verifyOtp`로 검증 후 `prisma.user.findMany({ where: { phone } })`, 응답에 **마스킹 이메일·`provider`·`createdAt`**. `export const dynamic = "force-dynamic"`, `runtime = "nodejs"`.
+- **페이지** `src/app/find-account/page.tsx`: `/api/auth/sms/send-code` → 인증번호 입력 → `/api/find-account`, 3분 타이머·재발송·provider 한글 라벨.
+
+### 5. 가입/로그인 UI
+
+- **`src/app/signup/error/page.tsx`**: `reason=phone_duplicate` 시 문구 보강, **`/find-account`**(강조) → **`/login`** → **`/contact`** 순 링크.
+- **`src/app/login/page.tsx`**: OAuth 버튼 아래 **「가입한 계정을 잊으셨나요?」** → `/find-account`.
+
+### 6. 통합 예약 페이지 — 파티룸 탭 (`src/app/booking/page.tsx`)
+
+- **파티룸 예약** 탭 버튼: **`useIsAdult` 미사용**. `handlePartyRoomClick`에서 **`/api/members/profile`**(`cache: 'no-store'`)만 호출해 독립적으로 판단.
+- **프로필 없음·실패** (`!data.success || !data.profile`): **`/login?redirect=/party-room/booking`**.
+- **`birthYear` 없음**: 안내 후 **`/onboarding/profile?returnTo=/party-room/booking`**.
+- **만 19세 미만**: 알림만, 이동 없음.
+- **성인**: **`/party-room/booking`** 로 이동 — 탭으로 `selectedType === 'party-room'` 전환하지 않음(전용 예약 페이지로 통일).
+- **제거**: 이전 **`useIsAdult`** 의존 탭 `useEffect`, **`showAdultModal` / `showProfileModal`** 및 관련 모달 UI.
+- **연습실** 탭·예약 플로우는 변경 없음.
+- *참고*: URL **`/booking?type=party-room`** 으로 들어온 경우에만 기존처럼 **같은 페이지 안의 인라인 파티룸** UI가 열림; 일반 `/booking` 사용자는 파티룸 탭 → 검증 후 **`/party-room/booking`**.
+- **Git (예)**: `feat: /booking 파티룸 탭에 독립적인 성인 체크 추가` — 위 동작 반영.
+
+### 7. 회원 프로필 API — 경로·응답 정리 (`src/app/api/members/profile/route.ts`)
+
+- **경로**: App Router **`src/app/api/members/profile/route.ts`** → **`GET` / `POST` `/api/members/profile`** (존재 확인·단일 소스).
+- **GET**: Supabase 서버 클라이언트로 세션 확인 후 `prisma.user.findUnique({ where: { id: user.id } })`.
+  - **성공·행 있음**: `{ success: true, profile }` — `serializeProfile`로 **`birthYear`·`phone`·`provider` 등 camelCase**, 날짜는 ISO 문자열.
+  - **행 없음**: `{ success: true, profile: null }` (200).
+  - **미인증**: `{ error: "인증이 필요합니다." }` (**401**, `success` 없음) — 브라우저에서 호출 시 **쿠키**가 넘어가야 함.
+- **POST**: Zod(`name`, `birthYear`, `phone`, `phoneVerified`) 검증 후 `upsert`; 응답 `{ success: true, profile }`.
+- **클라이언트 연동**: `useIsAdult`, **`/booking` `handlePartyRoomClick`**, 온보딩 등이 이 GET에 의존; **성인/출생연도 판단**은 응답의 **`profile.birthYear`**(숫자 연도) 기준.
+
+### 8. 계정 삭제 — FK·삭제 순서 (`POST /api/account/delete`, `src/app/api/account/delete/route.ts`)
+
+- **문제**: `auth.admin.deleteUser` 시 **`user_points` 등이 `auth.users`를 참조**하면 DB 오류로 삭제 실패.
+- **처리 순서** (기존 포인트 소멸·예약 취소·비식별화 후):  
+  1) **`point_transactions`** 해당 `user_id` 전부 삭제  
+  2) **`user_points`** 해당 행 삭제  
+  3) **`payment_locks`** — `prisma.paymentLock.deleteMany({ userId })`  
+  4) **`reservations`** — `user_id`를 `null`로 (비식별화된 행은 유지)  
+  5) **`prisma.user.deleteMany`** — `profiles` 및 Prisma 상 **Account/Session CASCADE**  
+  6) **`member_roles`** — 이메일 기준 `DELETE` (실패는 로그만)  
+  7) **`auth.admin.deleteUser`**  
+- **`party_reservations`**: 스키마에 따라 `user_id`가 `auth.users`에 **ON DELETE CASCADE**이면 Auth 삭제 시 연쇄 삭제될 수 있음(운영 스키마 확인).
+
+---
+
+**작성일**: 2026-04-23  
+**버전**: 2.13 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
