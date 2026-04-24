@@ -2044,6 +2044,57 @@ A1STUDIO/
 
 ---
 
+## 📝 최근 수정 사항 (2026-04-24)
+
+### 환불 정책 시스템 완성
+
+**1. 타임존 통일 (서울 기준)**
+
+- 문제: 서버(UTC)와 클라이언트(KST) 날짜 차이로 환불 금액 불일치
+- 해결: `getDaysDifference` 함수에서 `Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul' })` 사용
+- 결과: 서버/클라이언트 모두 동일한 "서울 달력 일수" 계산
+
+**2. 환불 정책 최종 확정**
+
+**연습실:**
+
+- 이용 3일 전: 100% 환불
+- 이용 2일 전: 50% 환불
+- 이용 전날: 취소 불가
+- 이용 당일: 취소 불가
+
+**파티룸:**
+
+- 이용 7일 전 이상: 100% 환불
+- 이용 3일 ~ 6일 전: 50% 환불
+- 이용 전날: 취소 불가
+- 이용 당일: 취소 불가
+
+(코드: `getDaysDifference` 기준 파티룸은 예약일까지 **달력 일수 3일 미만**이면 취소·환불 불가이므로 **이용 2일 전**도 동일 구간에 포함된다.)
+
+**3. SMS 테스트 모드**
+
+- `SMS_PROVIDER="test"` 환경변수 추가
+- 실제 SMS 발송 없이 로그만 출력
+- Development/Preview 환경에서 사용
+
+**4. party_reservations 스키마 확장**
+
+- 컬럼 추가(예): `package_type`, `end_date`, `is_event_price`, `memo`, `payment_method`, `points_used`, `refund_points`, `refund_amount`, `refund_method`, `auth_code`, `room_options`, `special_requests`, `price_type` 등 — **상세 SQL은 본 문서 「최근 수정 사항 (2026-04-24) — 부록: 스키마·RPC 상세」 절 참고**
+- 파티룸 예약·결제·환불 메타 저장에 사용
+
+**5. 마이페이지 환불 금액 수정**
+
+- 클라이언트도 서버와 동일한 `calculatePracticeRoomRefund` / `calculatePartyRoomRefund` 함수 사용
+- 서버-클라이언트 환불 금액 일치
+
+**6. Prisma RLS 우회**
+
+- `users` 테이블 조회를 Supabase PostgREST → **Prisma(DB 직결)** 로 전환하는 경로 정리(파티룸 생성·프로필 등)
+- RLS로 `permission denied` 나던 조회 보완
+
+---
+
 ## 📝 최근 수정 사항 (2026-04-22)
 
 ### 1. Prisma 멀티 스키마 (현행 `prisma/schema.prisma`와 정렬)
@@ -2284,7 +2335,7 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 
 ---
 
-## 📝 최근 수정 사항 (2026-04-24)
+## 📝 최근 수정 사항 (2026-04-24) — 부록: 스키마·RPC 상세
 
 ### 1. party_reservations 테이블 스키마 확장
 
@@ -2499,7 +2550,7 @@ DISABLE TRIGGER validate_reservation_user;
 ---
 
 **작성일**: 2026-04-26  
-**버전**: 2.24 (최신)  
+**버전**: 2.25 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -2923,6 +2974,11 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 ---
 
 ## 📝 최근 수정 사항 (2026-04-26)
+
+### 0. 문서 정리 (2026-04-24 요약 블록)
+
+- **「최근 수정 사항 (2026-04-21)」 직후**에 **환불 정책 시스템 완성** 요약(타임존·정책 문구·SMS 테스트·party_reservations·마이페이지·Prisma) 추가.
+- 기존 긴 **2026-04-24** 기술 절 제목을 **`(2026-04-24) — 부록: 스키마·RPC 상세`** 로 구분(동일 날짜 중복 `##` 방지).
 
 ### 1. 환불·취소 일수(서울) 및 마이페이지 동기화
 
