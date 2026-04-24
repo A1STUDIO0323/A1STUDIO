@@ -105,7 +105,7 @@
 ### 외부 서비스
 ```json
 {
-  "결제": ["Kakao Pay (포인트 충전 & 파티룸)", "Toss Payments (준비중)"],
+  "결제": ["Kakao Pay (포인트 충전 · 연습실·파티룸 직접결제)", "Toss Payments (준비중)"],
   "이메일": "SendGrid 8.1.6",
   "SMS": ["SOLAPI (주력)", "COOLSMS (선택)"],
   "OAuth": ["Google", "Kakao"]
@@ -625,7 +625,11 @@ GET  /auth/callback                      # OAuth 콜백 (Google/Kakao)
 예약 API (연습실)
 GET  /api/reservations                   # 예약 목록 조회
 GET  /api/reservations/available         # 사용 가능한 시간대 조회
-POST /api/reservations/create            # 예약 생성
+POST /api/reservations/create            # 예약 생성 (포인트 결제)
+POST /api/reservations/payments/kakao/ready   # 연습실 카카오페이 결제 준비
+GET  /api/reservations/payments/kakao/approve # 연습실 카카오페이 결제 승인 (콜백)
+GET  /api/reservations/payments/kakao/fail    # 연습실 결제 실패 → /booking?failed=true
+GET  /api/reservations/payments/kakao/cancel  # 연습실 결제 취소 → /booking?cancelled=true
 POST /api/reservations/cancel            # 예약 취소
 POST /api/reservations/holds/expire      # 만료된 HOLD 정리
 
@@ -756,19 +760,33 @@ NEXT_PUBLIC_PARTY_ROOM_EVENT_ACTIVE="true"
 
 ### 3. 예약 프로세스 (연습실)
 
-**포인트 기반 즉시 확정 예약**
+**A. 포인트 결제 (즉시 확정)**
 
 ```
-1. 사용자가 날짜 + 시간 선택 (/booking)
-2. GET /api/reservations/available?date=2026-04-15
-   → 이미 예약된 시간대 + BlockedSlot 조회
-3. 예약 가능 확인 후 "예약하기" 클릭
-4. POST /api/reservations/create
-   - 포인트 잔액 확인
-   - use_points() RPC 호출 (Atomic 차감)
-   - Reservation 생성 (status: "confirmed")
-   - SMS 발송 (예약 확정 알림)
-5. 리다이렉트 → /booking/complete?id={reservationId}&points={차감포인트}
+1. 사용자가 날짜 + 시간 선택 (/booking), 결제 수단 «포인트»
+2. GET /api/reservations/available?date=...
+3. POST /api/reservations/create
+   - acquirePaymentLock("reservation", 날짜_시작_종료)
+   - deductPointsDB → use_points RPC
+   - reservations INSERT (status: PAID, payment_method: points, points_used = total_amount)
+   - sendMessage + getPracticeRoomConfirmMessage (유효한 연락처일 때)
+4. /booking/complete?id=...&points=...
+```
+
+**B. 카카오페이 직접 결제 (`KAKAOPAY_CID`, 파티룸과 별도 URL)**
+
+```
+1. /booking 에서 결제 수단 «카카오페이» 선택 후 결제하기
+2. POST /api/reservations/payments/kakao/ready
+   - 서버에서 금액 재계산(getPriceType + calcPoints), 중복 시간대 검사
+   - acquirePaymentLock("practice-room", partner_order_id)
+   - readyPracticeRoomPayment() → 쿠키: practice_kakao_tid, practice_kakao_order_id, practice_reservation_data
+3. 카카오 결제 페이지로 이동 (모바일은 next_redirect_mobile_url 우선)
+4. GET /api/reservations/payments/kakao/approve?pg_token=...
+   - approvePayment → reservations INSERT (payment_method: kakaopay, kakaopay_*, duration_hours, points_used: 0)
+   - SMS (연습실 템플릿) — 실패해도 예약은 유지
+   - releasePaymentLock, 쿠키 삭제
+5. /booking/complete?id=...&method=kakaopay
 ```
 
 ### 4. 예약 프로세스 (파티룸)
@@ -786,10 +804,9 @@ NEXT_PUBLIC_PARTY_ROOM_EVENT_ACTIVE="true"
    - next_redirect_pc_url로 리다이렉트
 5. 카카오페이 결제 승인
 6. GET /api/party-room/payments/kakao/approve?pg_token=...
-   - Reservation 생성 (status: "PAID")
-   - Payment 생성
-   - SMS 발송
-   - PaymentLock 삭제
+   - party_reservations INSERT (status: confirmed, payment_method: kakaopay, kakaopay_*)
+   - SMS: sendMessage + getPartyRoomConfirmMessage + message_logs (실패해도 예약 유지)
+   - (파티 준비 플로우는 PaymentLock 미사용; 연습실 카카오는 practice-room 락 사용)
 7. 리다이렉트 → /party-room/booking/complete?id={reservationId}
 ```
 
@@ -883,8 +900,9 @@ export const REFUND_POLICY = { cancellationDeadlineHours: 48 }; // 레거시 힌
 1. 세션·본인 `reservations` 행 조회, 상태 `PAID` / `CONFIRMED` / `confirmed` 만 허용  
 2. `canCancelReservation(..., "practice")` — 불가 시 400  
 3. `calculatePracticeRoomRefund(시작일시, total_amount)` — 환불율·금액·사유 (100%일 때 `refundAmount === totalAmount`)  
-4. 예약 `status: "CANCELLED"` 업데이트  
-5. `refundAmount > 0` 이면 `refundPointsDB` (`description`에 환불 사유 포함), 잔액은 `getPointBalance` 등으로 응답
+4. 예약 `status: "CANCELLED"` 업데이트 (`payment_method === kakaopay` 이면 `cancelled_at` 설정 시도 — 컬럼 필요)  
+5. **`payment_method`가 `kakaopay`**: 포인트 환불 없음. 응답에 `kakaopay_refund_pending` 등 안내 — **카카오페이 결제 취소 API(`cancelPayment`)·어드민 수동 환불은 후속 연동**  
+6. **그 외(포인트 등)**: `refundAmount > 0` 이면 `refundPointsDB`, 잔액은 `getPointBalance` 등으로 응답
 
 **파티룸 취소 API** `POST src/app/api/party-room/reservations/cancel/route.ts`
 
@@ -907,7 +925,8 @@ export const REFUND_POLICY = { cancellationDeadlineHours: 48 }; // 레거시 힌
 // src/lib/sms.ts
 
 // 지원 프로바이더: SOLAPI, COOLSMS
-// 환경변수 SMS_PROVIDER로 선택 ("auto" 기본값)
+// 환경변수 SMS_PROVIDER: "auto" | "solapi" | "coolsms" | "test"
+// "test": 실제 발송 없이 로그만, success 반환 (Preview/로컬 검증용)
 
 export async function sendSMS(params: {
   to: string;
@@ -1367,8 +1386,8 @@ TOSS_SECRET_KEY=""
 
 # ── 결제 (KakaoPay) ──
 KAKAOPAY_SECRET_KEY="..."
-KAKAOPAY_CID="TC0ONETIME"                # 포인트 충전용
-KAKAOPAY_PARTY_CID="TC0ONETIME"          # 파티룸 직접 결제용
+KAKAOPAY_CID="TC0ONETIME"                # 포인트 충전 · 연습실 예약 직접결제(readyPracticeRoomPayment)
+KAKAOPAY_PARTY_CID="TC0ONETIME"          # 파티룸 직접 결제용(readyPartyRoomPayment)
 
 # ── SendGrid ──
 SENDGRID_API_KEY="..."
@@ -1376,7 +1395,7 @@ CONTACT_TO_EMAIL="..."
 CONTACT_FROM_EMAIL="..."
 
 # ── SMS (SOLAPI - 주력) ──
-SMS_PROVIDER="auto"
+SMS_PROVIDER="auto"   # 또는 "test" (실발송 없음, 로그만)
 SOLAPI_API_KEY="..."
 SOLAPI_API_SECRET="..."
 SOLAPI_FROM_NUMBER="..."
@@ -1587,10 +1606,11 @@ A1STUDIO/
 │   │       │       └── verify-code/route.ts # SMS 인증번호 확인
 │   │       ├── reservations/
 │   │       │   ├── route.ts
-│   │       │   ├── create/route.ts
+│   │       │   ├── create/route.ts         # 포인트 예약
 │   │       │   ├── cancel/route.ts
 │   │       │   ├── available/route.ts
-│   │       │   └── holds/expire/route.ts
+│   │       │   ├── holds/expire/route.ts
+│   │       │   └── payments/kakao/         # 연습실 카카오페이 ready|approve|fail|cancel
 │   │       ├── party-room/
 │   │       │   ├── reservations/
 │   │       │   └── payments/kakao/
@@ -1642,7 +1662,7 @@ A1STUDIO/
 │       ├── pricing.ts                      # 가격 계산
 │       ├── refund-policy.ts                # 환불 정책
 │       ├── party-room-options.ts           # 파티룸 옵션
-│       ├── kakaopay.ts                     # 카카오페이 API
+│       ├── kakaopay.ts                     # readyPayment/approvePayment, readyPracticeRoomPayment, 파티룸 전용, cancelPayment
 │       ├── payment-lock.ts                 # 결제 락
 │       ├── sms.ts                          # SMS 발송
 │       ├── sms-otp.ts                      # SMS OTP
@@ -1705,8 +1725,8 @@ A1STUDIO/
 - ✅ 회원가입 페이지 (Google/Kakao 소셜만, 약관 동의)
 - ✅ 온보딩 플로우 (프로필 입력, 휴대폰 SMS 인증)
 - ✅ 라우트 가드 미들웨어 (인증 & 온보딩 체크, Prisma 기반)
-- ✅ 예약 시스템 (연습실 - 포인트 결제)
-- ✅ 파티룸 예약 (카카오페이 직접 결제)
+- ✅ 예약 시스템 (연습실 — 포인트 또는 카카오페이)
+- ✅ 파티룸 예약 (포인트 또는 카카오페이 직접 결제)
 - ✅ 포인트 충전 (Kakao Pay)
 - ✅ 마이페이지 (포인트, 예약내역, 계정)
 - ✅ 예약 취소 & 환불
@@ -1728,7 +1748,7 @@ A1STUDIO/
 - ✅ Next.js 미들웨어 (라우트 가드, 온보딩 플로우 강제, runtime: nodejs)
 - ✅ 레거시 코드 정리 (src/proxy.ts 삭제, Header.tsx, login/page.tsx)
 - ✅ 관리자 후기 관리 (Supabase reviews 테이블 직접 조회/수정/삭제)
-- ✅ 카카오페이 결제 연동 (포인트 충전 + 파티룸)
+- ✅ 카카오페이 결제 연동 (포인트 충전 + 연습실·파티룸 직접 결제; `readyPracticeRoomPayment` / 파티 `readyPartyRoomPayment`)
 - ✅ SMS 발송 (SOLAPI/COOLSMS)
 - ✅ 이메일 발송 (SendGrid)
 - ✅ 결제 락 시스템 (중복 결제 방지)
@@ -2534,7 +2554,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 #### 6.3. 파티룸 카카오 승인 (`src/app/api/party-room/payments/kakao/approve/route.ts`)
 
-- `party_reservations` INSERT 시 **`duration_hours`** 동일 규칙 적용
+- `party_reservations` INSERT 시 **`duration_hours`** 동일 규칙 적용, **`kakaopay_payment_status` / `kakaopay_approved_at`** 기록
+- 예약 후 **`sendMessage` + `getPartyRoomConfirmMessage` + `message_logs`** (`try/catch`, SMS 실패해도 완료 리다이렉트)
 
 #### 6.4. 파티룸 예약 취소 (`src/app/api/party-room/reservations/cancel/route.ts`)
 
@@ -2543,6 +2564,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 #### 6.5. 연습실 예약 생성 (`src/app/api/reservations/create/route.ts`)
 
+- **포인트 전용** — 카카오 직결은 **`/api/reservations/payments/kakao/*`**
+- INSERT: **`payment_method: "points"`**, **`points_used`** (= `total_amount`)
 - 전화·이름: **`prisma.users`** (`phone`, `name`). ~~`profiles`~~ / RLS 이슈 회피
 - `guest_name`: DB `name` 우선
 
@@ -2559,7 +2582,7 @@ DISABLE TRIGGER validate_reservation_user;
 **스키마 변경:**
 
 - party_reservations: 위 ALTER 컬럼들 + **`duration_hours` NOT NULL** 대응(앱에서 반드시 설정)
-- reservations: `updated_at` 기본값
+- reservations: `updated_at` 기본값; 운영에서 **`payment_method`**, **`points_used`**, **`kakaopay_*`**, **`duration_hours`**, **`cancelled_at`** 등 직접결제·취소와 맞춰 둘 것
 
 **RPC 함수:**
 
@@ -2589,8 +2612,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 ---
 
-**작성일**: 2026-04-26  
-**버전**: 2.26 (최신)  
+**작성일**: 2026-04-27  
+**버전**: 2.27 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3050,3 +3073,31 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 - `fix: 마이페이지 환불 금액 미리보기 서버 로직과 동기화`
 - `fix: 관리자 예약 취소 기능 수정`
 - `docs: 파티룸 환불 정책 문구 명확화 (이용 전날/당일 추가)`
+
+---
+
+## 📝 최근 수정 사항 (2026-04-27)
+
+### 1. 연습실 카카오페이 직접 결제
+
+- **`src/lib/kakaopay.ts`**: `readyPracticeRoomPayment` — `KAKAOPAY_CID`, 승인/취소/실패 URL을 `/api/reservations/payments/kakao/*` 로 고정.
+- **`POST /api/reservations/payments/kakao/ready`**: 금액 **서버 재계산**(`getPriceType`, `calcPoints`), 시간대 중복 검사, `acquirePaymentLock(userId, "practice-room", partner_order_id, 600)`, 실패 시 `releasePaymentLock`. 쿠키 `practice_*` (httpOnly·production 시 secure).
+- **`GET .../approve`**: `approvePayment` → `reservations` INSERT (`payment_method: kakaopay`, `kakaopay_*`, `duration_hours`, `points_used: 0`, `reservation_type: room`, `room_id: a1-room`) → **`sendMessage` + `getPracticeRoomConfirmMessage` + `logMessage`** → 락 해제·쿠키 삭제 → **`/booking/complete?method=kakaopay`**.
+- **`GET .../fail`**, **`GET .../cancel`**: 각각 `/booking?failed=true`, `/booking?cancelled=true`.
+- **`src/app/booking/page.tsx`**: 연습실만 **포인트 / 카카오페이** 선택 UI, 모바일은 `next_redirect_mobile_url` 우선.
+- **`src/app/booking/complete/page.tsx`**: `method=kakaopay` 시 카카오페이·원 표시.
+- **`POST /api/reservations/create`**: 주석 명시(포인트 전용), INSERT에 **`payment_method: "points"`**, **`points_used`**.
+- **`POST /api/reservations/cancel`**: `payment_method === "kakaopay"` 이면 **포인트 환불 없음**, `cancelled_at`·`kakaopay_refund_pending` 응답 — **카드 환불은 `cancelPayment` 연동 또는 수동** (운영 DB에 `payment_method`, `kakaopay_*`, `cancelled_at` 등 컬럼 필요).
+
+### 2. 파티룸 카카오페이 승인 후 SMS
+
+- **`src/app/api/party-room/payments/kakao/approve/route.ts`**: 예약 INSERT 후 **`sendMessage` + `getPartyRoomConfirmMessage` + `message_logs`** (`try/catch`, SMS 실패 시에도 리다이렉트 유지). INSERT에 `kakaopay_payment_status`, `kakaopay_approved_at` 보강.
+
+### 3. SMS 테스트 모드
+
+- **`src/lib/sms.ts` — `sendSMS`**: `SMS_PROVIDER === "test"` 이면 실제 발송 없이 로그 후 `success: true` (`messageId: sms-test-mode`).
+
+### 4. Git 커밋 참고(예)
+
+- `fix: 파티룸 카카오페이 결제 후 SMS 발송 추가`
+- `feat: 연습실 예약에 카카오페이 결제 추가`
