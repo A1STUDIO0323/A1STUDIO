@@ -142,15 +142,22 @@ function PartyRoomCompleteContent() {
             <AlertCircle className="w-5 h-5 text-[#B98768]" />
             취소·환불 안내
           </h3>
-          <div className="space-y-3 text-sm">
+          <ul className="mb-4 space-y-1 text-sm text-[#6f655d] list-disc list-inside">
+            <li>이용 7일 전 이상: 전액 환불</li>
+            <li>이용 3일 ~ 6일 전: 50% 환불</li>
+            <li>이용 전날: 취소 불가</li>
+            <li>이용 당일: 취소 불가</li>
+          </ul>
+          <div className="space-y-3 border-t border-[#D8CCBC] pt-3 text-sm">
+            <p className="font-semibold text-[#3B342F]">이 예약 기준 취소 마감 시각</p>
             <div>
-              <p className="font-semibold text-[#3B342F]">
-                · {format(fullRefundDeadline, "M월 d일(eee) HH:mm", { locale: ko })}까지: 전액 환불
+              <p className="text-[#6f655d]">
+                · 전액 환불: {format(fullRefundDeadline, "M월 d일(eee) HH:mm", { locale: ko })}까지
               </p>
             </div>
             <div>
-              <p className="font-semibold text-[#3B342F] mb-1">
-                · {format(halfRefundDeadline, "M월 d일(eee) HH:mm", { locale: ko })}까지: 50% 환불
+              <p className="text-[#6f655d] mb-1">
+                · 50% 환불: {format(halfRefundDeadline, "M월 d일(eee) HH:mm", { locale: ko })}까지
               </p>
               {reservation.payment_method === 'kakaopay' && (
                 <p className="ml-4 text-xs text-[#9b9189] bg-yellow-50 border border-yellow-200 rounded p-2">
@@ -158,9 +165,6 @@ function PartyRoomCompleteContent() {
                   포인트는 마이페이지에서 확인하실 수 있습니다.
                 </p>
               )}
-            </div>
-            <div>
-              <p className="font-semibold text-[#3B342F]">· 이후: 취소 불가</p>
             </div>
           </div>
         </div>

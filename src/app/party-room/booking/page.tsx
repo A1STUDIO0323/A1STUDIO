@@ -645,14 +645,17 @@ function PartyRoomBookingContent() {
             <div className="mb-6 rounded-xl bg-[#EFE7DA] p-6">
               <h3 className="text-lg font-bold text-[#3B342F] mb-3">취소·환불 정책</h3>
               <ul className="space-y-2 text-sm text-[#6f655d]">
-                <li>· <span className="font-semibold">7일 전까지:</span> 전액 환불</li>
                 <li>
-                  · <span className="font-semibold">3일 전까지:</span> 50% 환불
+                  · <span className="font-semibold">이용 7일 전 이상:</span> 전액 환불
+                </li>
+                <li>
+                  · <span className="font-semibold">이용 3일 ~ 6일 전:</span> 50% 환불
                   <div className="ml-4 mt-1 text-xs text-[#9b9189]">
                     (카드 결제 시 카드 전액 취소 후 결제금액의 50%가 포인트로 적립됩니다)
                   </div>
                 </li>
-                <li>· <span className="font-semibold">3일 이내:</span> 취소 불가</li>
+                <li>· <span className="font-semibold">이용 전날:</span> 취소 불가</li>
+                <li>· <span className="font-semibold">이용 당일:</span> 취소 불가</li>
               </ul>
             </div>
 

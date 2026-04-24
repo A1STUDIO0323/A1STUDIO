@@ -400,9 +400,10 @@ export default function PricingPage() {
           <div className="rounded-2xl border border-[#D8CCBC] bg-[#F7F3EB] p-6">
             <h3 className="text-lg font-bold text-[#3B342F] mb-3">파티룸</h3>
             <ul className="space-y-2 text-sm text-[#6f655d] list-disc list-inside">
-              <li>7일 전까지: 전액 환불</li>
-              <li>3일 전까지: 50% 환불</li>
-              <li>3일 이내: 취소 불가</li>
+              <li>이용 7일 전 이상: 전액 환불</li>
+              <li>이용 3일 ~ 6일 전: 50% 환불</li>
+              <li>이용 전날: 취소 불가</li>
+              <li>이용 당일: 취소 불가</li>
             </ul>
           </div>
         </div>

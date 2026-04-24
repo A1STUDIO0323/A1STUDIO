@@ -863,10 +863,19 @@ export function canCancelReservation(
   roomType: "practice" | "party" | "practice-room" | "party-room"
 ): { canCancel: boolean; message: string }
 // - practice*: 달력 일수 차이 < 2 → 불가 (전날·당일)
-// - party*: 일수 차이 < 3 → 불가 (문구: 3일 이내 취소 불가)
+// - party*: 일수 차이 < 3 → 불가 (UI 문구: 이용 전날·당일 취소 불가 등과 통일)
 
 export const REFUND_POLICY = { cancellationDeadlineHours: 48 }; // 레거시 힌트
 ```
+
+#### 파티룸 (UI·안내 문구, 연습실과 동일한 「이용 N일 전」 스타일)
+
+- 이용 7일 전 이상: 100% 환불  
+- 이용 3일 ~ 6일 전: 50% 환불  
+- 이용 전날: 취소 불가  
+- 이용 당일: 취소 불가  
+
+(코드: `getDaysDifference` 기준 **3일 미만**이면 취소·환불 불가이므로 **이용 2일 전**도 동일 구간에 포함된다.)
 
 **연습실 취소 API** `POST src/app/api/reservations/cancel/route.ts`
 
@@ -882,7 +891,7 @@ export const REFUND_POLICY = { cancellationDeadlineHours: 48 }; // 레거시 힌
 
 **UI**
 
-- `/pricing`: 환불 규정 — 연습실(3일 전 100%, 2일 전 50%, 전날·당일 **취소 불가**) / 파티룸(7일 전 전액, 3일 전까지 50%, 3일 이내 **취소 불가**)  
+- `/pricing`: 환불 규정 — 연습실(이용 3일 전 100%, 2일 전 50%, 전날·당일 **취소 불가**) / 파티룸(**이용 7일 전 이상** 전액, **이용 3일~6일 전** 50%, **이용 전날·당일** **취소 불가** — 연습실과 문구 스타일 통일)  
 - `/booking`: 연습실 예약 확인 단계에서 **「예약 전 안내」**(환불·예약 확정 문자·변경 안내) — 예약 확정 버튼 위  
 - `/mypage`: 취소 모달에서 `calculatePracticeRoomRefundRate` / `calculatePartyRoomRefundRate`로 안내 문구·환불액 표시
 
@@ -2253,7 +2262,7 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 ### 10. 연습실·파티룸 환불 정책 정리 (`src/lib/refund-policy.ts`, pricing/booking/mypage, 취소 API)
 
 - **`PRACTICE_ROOM_REFUND_POLICY` + `calculatePracticeRoomRefund*`**: **달력 일수(`getDaysDifference`)** — **3일 이상 100%**, **2일 50%**, **전날·당일 0%**. 전액 환불 시 `refundAmount`는 `totalAmount` 그대로. (상세·문구·마이페이지 동기화는 아래 **§11**.)
-- **`PARTY_ROOM_REFUND_POLICY` + `calculatePartyRoomRefund*`**: 동일 **달력 일수** — **7일 이상 100%**, **3~6일 50%**, **3일 미만 0%** (취소 불가 구간).
+- **`PARTY_ROOM_REFUND_POLICY` + `calculatePartyRoomRefund*`**: 동일 **달력 일수** — **7일 이상 100%**, **3~6일 50%**, **3일 미만 0%** (취소 불가; UI에는 연습실과 맞춰 **이용 전날·당일** 취소 불가 등으로 표기, 실제로는 예약일 기준 **2일 전**까지도 취소 불가 구간에 포함).
 - **`canCancelReservation`**: 연습실 **예약일까지 달력 일수가 2일 미만**이면 불가; 파티룸은 **3일 미만**이면 불가. (`POST /api/reservations/cancel` 등)
 - **레거시** `REFUND_POLICY.cancellationDeadlineHours: 48` — 주석상 힌트; 실제 취소·환불은 위 함수들이 기준.
 - **연결 파일**: `src/app/api/reservations/cancel/route.ts`, `src/app/api/party-room/reservations/cancel/route.ts`, `src/app/pricing/page.tsx`, `src/app/booking/page.tsx`(연습실 **예약 전 안내**), `src/app/mypage/page.tsx`(취소 모달 환불 안내).
@@ -2264,7 +2273,7 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 - **`getDaysDifference`**: 예약일·기준일을 **`Asia/Seoul` 달력 연·월·일**로만 비교해 일수 차이 계산 — 브라우저(KST)와 서버(UTC, Vercel 등)에서 `setHours(0)`만 쓸 때 **‘오늘’이 하루 어긋나** 마이페이지 미리보기와 취소 API 결과가 달라지던 문제 방지.
 - **`calculatePartyRoomRefund*`**: 파티룸도 **연속 시간(시간/24h)** 대신 **`getDaysDifference`와 동일한 달력 규칙**으로 7일/3일 구간 적용.
 - **`canCancelReservation`**: `practice` / `party` 외 **`practice-room` · `party-room` 별칭** 허용; 메시지는 「전날·당일 취소 불가」「3일 이내 취소 불가」 등으로 통일.
-- **UI**: 파티룸 `/pricing`, `/party-room/booking`, `/party-room/booking/complete` 등 **「3일 이내 환불 불가」→「취소 불가」**; 연습실 안내는 전날·당일 **취소 불가** 표기.
+- **UI**: 파티룸 `/pricing`, `/party-room/booking`, `/party-room/booking/complete` — **이용 7일 전 이상 / 3일~6일 전 / 전날·당일** 문구로 연습실 스타일 통일; `complete`는 요약 목록 + **이 예약 기준 취소 마감 시각**(전액·50% 데드라인) 병기.
 - **`/mypage`**: `getCancelPolicy`(= `canCancelReservation`)로 **취소 버튼 비활성화** + 안내 문구; 모달·확인 시에도 동일 정책 재검증. 전액 환불 표시 시 `refundRate === 1`이면 `floor` 없이 전액.
 
 ---
@@ -2484,7 +2493,7 @@ DISABLE TRIGGER validate_reservation_user;
 ---
 
 **작성일**: 2026-04-23  
-**버전**: 2.22 (최신)  
+**버전**: 2.23 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
