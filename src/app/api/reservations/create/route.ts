@@ -13,6 +13,7 @@ import { isAdult } from "@/lib/age-check";
 import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
 import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
 import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
+import { prisma } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   let lockKey: string | null = null;
@@ -141,16 +142,19 @@ export async function POST(request: NextRequest) {
       pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
     }
 
-    // 사용자 프로필 정보 조회 (guest_name, guest_phone)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('phone, birth_year')
-      .eq('id', user.id)
-      .single();
+    // 사용자 프로필 — public.users (Prisma, 파티룸 API와 동일). Supabase profiles/users 직접 조회는 RLS로 phone 누락될 수 있음.
+    const userProfile = await prisma.users.findUnique({
+      where: { id: user.id },
+      select: { phone: true, name: true },
+    });
+    console.log("[예약] User profile (Prisma):", userProfile);
 
     // 전화번호 정규화 (82XXXXXXXXXX → 010XXXXXXXX)
-    // 우선순위: 1) profiles 테이블, 2) Supabase Auth
-    const normalizedPhone = normalizePhoneNumber(profile?.phone || user.phone);
+    // 우선순위: 1) users.phone, 2) Supabase Auth user.phone
+    const normalizedPhone = normalizePhoneNumber(userProfile?.phone || user.phone);
+    if (userProfile?.phone || user.phone) {
+      console.log("[예약] 전화번호 확인 (정규화 후):", normalizedPhone || "(정규화 실패)");
+    }
 
     // ✅ 사용자 검증 (2층 안전망)
     if (!(await validateUserExists(userId))) {
@@ -175,8 +179,8 @@ export async function POST(request: NextRequest) {
       id: crypto.randomUUID(), // ID 직접 생성
       room_id: reservation_type === 'party-room' ? 'party-room' : 'a1-room',
       user_id: user.id,
-      guest_name: user.email?.split('@')[0] || '회원',
-      guest_phone: normalizedPhone || '미등록',
+      guest_name: userProfile?.name?.trim() || user.email?.split("@")[0] || "회원",
+      guest_phone: normalizedPhone || "미등록",
       date,
       start_time,
       end_time,
