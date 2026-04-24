@@ -11,6 +11,56 @@
 
 ---
 
+## 🧭 DB·스키마 변경 기본 지침 (SQL / Prisma / FK)
+
+아래는 **Supabase(PostgreSQL)**, **Prisma**, **외래키(FK)** 를 건드릴 때 **다른 시스템과 겹치거나 이중 정의되지 않게** 수정하기 위한 **단계별 절차**다. AI·개발자 모두 이 순서를 기본으로 따른다.
+
+### 1단계: “누가 주인인가” 먼저 정하기
+
+- 같은 데이터를 **Supabase 대시보드 SQL**, **Prisma Migrate**, **Edge Function**, **앱 시드** 등 **두 갈래 이상**에서 동시에 정의·갱신하지 않는다.
+- 예: `public` 테이블 구조는 **Prisma를 진실 원천으로 둘지**, **Supabase에서만 관리할지**를 먼저 정한 뒤, 반대쪽은 **읽기·동기화·문서**만 맞춘다.
+- **`auth` 스키마**(Supabase Auth 관리)와 **`public` 스키마**(앱·Prisma)는 **역할이 다르다**. `auth.users`를 Prisma가 소유하도록 만들지 않는다.
+
+### 2단계: 영향 범위 맵을 머릿속(또는 메모)에 그리기
+
+- **FK가 가리키는 쪽**: `auth.users`인지, `public.users`(또는 `profiles`)인지, 다른 테이블인지.
+- **RLS·Policy**: 해당 테이블에 Row Level Security가 켜져 있으면, SQL로 데이터·구조를 바꿔도 **API 동작이 달라질 수 있다**.
+- **트리거·함수**: `BEFORE DELETE`, `handle_new_user` 등 **이미 걸린 트리거**와 새 FK/삭제 규칙이 **중복 삭제·이중 로그**를 만들지 않는지 확인한다.
+- **앱 코드**: `src/lib/supabase-*`, `prisma.*`, Server Actions, API Route에서 **같은 테이블을 직접 쓰는지** 검색(`grep`)한다.
+
+### 3단계: FK·크로스 스키마 수정 시
+
+- `public.*` → `auth.users` FK는 Prisma(`schemas = ["public"]`만 사용)와 **인트로스펙션 충돌(P4002 등)** 이 나기 쉽다. FK를 추가·삭제·변경하기 전에 **Prisma 문서·이 저장소 `최근 수정 사항`·`prisma/scripts/`** 를 확인한다.
+- FK **대상을 바꿀 때**(예: `auth.users` → `public.users`): **기존 제약 이름**을 `DROP CONSTRAINT IF EXISTS ...` 로 정리한 뒤 **한 번에 하나의 참조 무결성 경로**만 남긴다. **양쪽 모두 살아 있는 이중 FK**를 만들지 않는다.
+- **ON DELETE CASCADE** 는 “한 번 삭제가 연쇄로 어디까지 가는지”를 반드시 검토한다. 결제·감사 로그 등 **보존이 필요한 테이블**과 겹치면 정책을 문서에 명시한다.
+
+### 4단계: SQL을 직접 실행할 때
+
+- **가능하면 스테이징/로컬 복제 DB**에서 먼저 실행한다.
+- 트랜잭션으로 묶을 수 있으면 묶고, **롤백 스크립트 또는 백업 시점**을 남긴다.
+- **이름 충돌 방지**: 새 테이블·인덱스·트리거·함수 이름이 **Supabase 기본 객체·확장·다른 프로젝트 마이그레이션**과 겹치지 않게 `public.` 접두사와 **프로젝트 고유 접두사(예: `a1_`)** 사용을 검토한다.
+- 실행 후 **`최근 수정 사항`**에 “무엇을·왜·어떤 환경에서” 적었다.
+
+### 5단계: Prisma 스키마를 바꿀 때
+
+- `schema.prisma` 변경 → **`npx prisma validate`** → 필요 시 **`prisma migrate dev`** 또는 팀이 정한 배포 절차.
+- **`db pull`로 끌어온 필드명**(snake_case 그대로 등)과 **앱 코드의 필드명**이 어긋나지 않게, 변경 후 **`npm run build`** 로 TypeScript를 확인한다.
+- Prisma에 **없는 테이블**은 앱에서 Raw SQL로만 건드리지 말고, **문서에 “Prisma 비관리”** 라고 표시해 둔다.
+
+### 6단계: 앱·헬퍼와의 정합
+
+- RPC 이름(`use_points`, 컬럼명, OUT 파라미터)과 **헬퍼**(`supabase-points.ts` 등)가 **한 세트**인지 확인한다. DB만 바꾸고 헬퍼를 안 바꾸면 **런타임만 깨진다**.
+- 인증·프로필: Supabase Auth `user.id`와 Prisma `users` 행이 **1:1**이라는 가정이 깨지면(트리거·수동 삭제), **온보딩·예약·포인트** 플로우를 같이 점검한다.
+
+### 7단계: 마무리 체크리스트
+
+- [ ] 같은 변경을 **두 시스템에 중복 반영**하지 않았는가  
+- [ ] FK·트리거·RLS·앱 코드가 **서로 모순**되지 않는가  
+- [ ] `AI_TRANSFER_PROMPT.md` **`최근 수정 사항`**·필요 시 **본 문서 절**을 갱신했는가  
+- [ ] **빌드/스모크 테스트**를 돌렸는가  
+
+---
+
 ## 📋 프로젝트 개요
 
 **프로젝트명**: A1 STUDIO 웹사이트  
@@ -1915,8 +1965,8 @@ A1STUDIO/
 ## 📝 최근 수정 사항 (2026-04-21)
 
 ### 1. OAuth 콜백 — `auth.users.id`와 `profiles`(Prisma User) 즉시 정렬 (`src/app/auth/callback/route.ts`)
-- `exchangeCodeForSession` 성공 후 `supabase.auth.getUser()`로 확정된 사용자에 대해, **`user.id` = `auth.users.id`**로 `prisma.user.upsert` 실행 (email, name, avatarUrl, provider — `/api/members/sync`와 동일한 metadata 매핑 헬퍼 사용).
-- **카카오**에서 이름·출생연도·전화번호 등 추가 반영: 서버 내부 `fetch('/api/members/profile')` 호출 **제거** (같은 요청에서 세션 쿠키가 내부 fetch에 안 실려 401이 나기 쉬움) → **`prisma.user.update`**로 동일 핸들러 내 직접 갱신.
+- `exchangeCodeForSession` 성공 후 `supabase.auth.getUser()`로 확정된 사용자에 대해, **`user.id` = `auth.users.id`**로 `prisma.users.upsert` 실행 (email, name, avatarUrl, provider — `/api/members/sync`와 동일한 metadata 매핑 헬퍼 사용).
+- **카카오**에서 이름·출생연도·전화번호 등 추가 반영: 서버 내부 `fetch('/api/members/profile')` 호출 **제거** (같은 요청에서 세션 쿠키가 내부 fetch에 안 실려 401이 나기 쉬움) → **`prisma.users.update`**로 동일 핸들러 내 직접 갱신.
 - upsert/update 실패 시 `console.error`만 남기고 **리다이렉트(`next`) 흐름은 유지**.
 - **(2026-04-20 후속)** 위 범용 콜백 `upsert`는 **삭제**됨. 현재는 **카카오만** 콜백에서 Kakao API + 조건부 `upsert`로 동기화 — 상세는 **아래 §5** 참고.
 
@@ -1936,7 +1986,7 @@ A1STUDIO/
 - **(후속, 2026-04-22)**: `schemas = ["public"]` + **전 모델/enum** `@@schema("public")` 로 다시 통일. 이 문서의 `## 📝 최근 수정 사항 (2026-04-22)` §1 참고.
 
 ### 5. OAuth 콜백 — 카카오 전용 프로필 동기화 (`src/app/auth/callback/route.ts`)
-- **첫 번째(범용) `prisma.user.upsert` 전체 제거** — 메타데이터 `name`이 닉네임으로 잘못 들어가는 문제 방지. **카카오는 이 파일의 카카오 분기에서만** Prisma 프로필을 맞춤.
+- **첫 번째(범용) `prisma.users.upsert` 전체 제거** — 메타데이터 `name`이 닉네임으로 잘못 들어가는 문제 방지. **카카오는 이 파일의 카카오 분기에서만** Prisma 프로필을 맞춤.
 - **디버깅 로그** (`Provider`, `user_metadata`, `app_metadata` JSON)은 **`user.app_metadata?.provider === 'kakao'` 분기** 안, `try` 시작 직후에만 출력.
 - **카카오 사용자 정보**: `getSession()`의 **`provider_token`**으로 `GET https://kapi.kakao.com/v2/user/me` 호출 → `kakao_account`에서 실명·닉네임·출생연도·전화번호 추출.
 - **전화번호 정규화**: 공백 제거 → **하이픈 제거** → `+82` → 선행 `0` (예: `010…`).
@@ -1973,13 +2023,13 @@ A1STUDIO/
 
 ### 4. OAuth 콜백 — 카카오 온보딩 리다이렉트 타이밍 (`src/app/auth/callback/route.ts`)
 
-- **카카오** 분기: Kakao API + `prisma.user.upsert` 등 처리 **끝난 뒤**, `prisma.user.findUnique`로 **프로필을 다시 읽고** 온보딩 경로(`/onboarding/profile` · `/onboarding/phone`)를 결정한 뒤 **`return NextResponse.redirect(...)`** — 저장 직후 DB 반영이 온보딩 판단에 쓰이도록.
+- **카카오** 분기: Kakao API + `prisma.users.upsert` 등 처리 **끝난 뒤**, `prisma.users.findUnique`로 **프로필을 다시 읽고** 온보딩 경로(`/onboarding/profile` · `/onboarding/phone`)를 결정한 뒤 **`return NextResponse.redirect(...)`** — 저장 직후 DB 반영이 온보딩 판단에 쓰이도록.
 - **그 외 OAuth**(예: Google): 기존과 같이 `// 구글 등 다른 OAuth는 기존 로직 사용` 아래 공통 `if (user?.id) { findUnique ... }` 블록.
 - **Git** (예): `fix: 카카오 OAuth 온보딩 체크 타이밍 수정` 커밋에 해당.
 
 **Supabase — `public.profiles`와 `auth.users` 트리거 (운영 수동 SQL)**
 
-- 앱은 카카오 콜백에서 **`prisma.user.upsert`** (`where: { id: user.id }`, `create`에 전체·`update`는 조건부 `updateData`)로 `profiles`를 맞춤.
+- 앱은 카카오 콜백에서 **`prisma.users.upsert`** (`where: { id: user.id }`, `create`에 전체·`update`는 조건부 `updateData`)로 `profiles`를 맞춤.
 - Supabase에 **`on_auth_user_created` 등으로 `auth.users` INSERT 시 `profiles`를 만드는 트리거**가 있으면, **행 생성 타이밍**과 콜백 `update`-only/upsert 정책이 어긋날 수 있음. 콜백 upsert를 **단일 생성 경로**로 쓰려면 SQL Editor 등에서 (필요할 때만) 트리거를 끔:
   ```sql
   ALTER TABLE auth.users DISABLE TRIGGER on_auth_user_created;
@@ -2156,7 +2206,7 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
   2) **`user_points`** 해당 행 삭제  
   3) **`payment_locks`** — `prisma.paymentLock.deleteMany({ userId })`  
   4) **`reservations`** — `user_id`를 `null`로 (비식별화된 행은 유지)  
-  5) **`prisma.user.deleteMany`** — `profiles` 및 Prisma 상 **Account/Session CASCADE**  
+  5) **`prisma.users.deleteMany`** — `profiles`(테이블/모델명은 스키마 기준) 및 Prisma 상 **Account/Session CASCADE**  
   6) **`member_roles`** — 이메일 기준 `DELETE` (실패는 로그만)  
   7) **`auth.admin.deleteUser`**  
 - **`party_reservations`**: 스키마에 따라 `user_id`가 `auth.users`에 **ON DELETE CASCADE**이면 Auth 삭제 시 연쇄 삭제될 수 있음(운영 스키마 확인).
@@ -2177,8 +2227,8 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 
 ---
 
-**작성일**: 2026-04-24  
-**버전**: 2.14 (최신)  
+**작성일**: 2026-04-25  
+**버전**: 2.16 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
