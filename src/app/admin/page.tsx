@@ -4,15 +4,35 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarCheck, Users, DollarSign, AlertCircle, Filter, CheckCircle2, XCircle, Lock } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
-import { useAdmin } from "@/lib/admin-context";
+import { ADMIN_PASSWORD_SESSION_KEY, useAdmin } from "@/lib/admin-context";
 
-type Status = "HOLD" | "PAID" | "CANCELLED" | "EXPIRED";
-const STATUS_LABEL: Record<Status, string> = { HOLD: "홀드", PAID: "결제완료", CANCELLED: "취소", EXPIRED: "만료" };
+function adminFetchHeaders(): HeadersInit {
+  const pw =
+    typeof window !== "undefined"
+      ? sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY) ?? ""
+      : "";
+  return {
+    "Content-Type": "application/json",
+    "x-admin-password": pw,
+  };
+}
+
+type Status = "HOLD" | "PAID" | "CONFIRMED" | "CANCELLED" | "EXPIRED" | "REFUNDED";
+const STATUS_LABEL: Record<Status, string> = {
+  HOLD: "홀드",
+  PAID: "결제완료",
+  CONFIRMED: "확정",
+  CANCELLED: "취소",
+  EXPIRED: "만료",
+  REFUNDED: "환불완료",
+};
 const STATUS_COLOR: Record<Status, string> = {
   HOLD: "text-amber-500 bg-yellow-950/40",
   PAID: "text-emerald-400 bg-emerald-50",
+  CONFIRMED: "text-emerald-500 bg-emerald-50",
   CANCELLED: "text-red-400 bg-red-50",
   EXPIRED: "text-[#6f655d] bg-[#F7F3EB]",
+  REFUNDED: "text-blue-600 bg-blue-50",
 };
 
 type AdminReservation = {
@@ -24,7 +44,7 @@ type AdminReservation = {
   endTime: string;
   roomId: string;
   totalAmount: number;
-  status: Status;
+  status: string;
 };
 
 type DashboardStats = {
@@ -50,6 +70,7 @@ export default function AdminPage() {
     uniqueGuestCount: 0,
   });
   const [reservations, setReservations] = useState<AdminReservation[]>([]);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const loadDashboard = async () => {
     try {
@@ -75,6 +96,33 @@ export default function AdminPage() {
     if (!isAdmin) return;
     void loadDashboard();
   }, [isAdmin]);
+
+  const handleAdminCancelReservation = async (reservationId: string) => {
+    if (!confirm("정말 이 예약을 취소하시겠습니까? 환불 규정에 따라 포인트가 환불됩니다.")) {
+      return;
+    }
+    setCancellingId(reservationId);
+    try {
+      const response = await fetch("/api/admin/reservations/cancel", {
+        method: "POST",
+        headers: adminFetchHeaders(),
+        body: JSON.stringify({ reservationId }),
+      });
+      const data = (await response.json()) as { error?: string; refund_points?: number };
+      if (!response.ok) {
+        alert(data.error || "취소에 실패했습니다");
+        return;
+      }
+      alert("예약이 취소되었습니다.");
+      await loadDashboard();
+    } catch (e) {
+      console.error("[관리자 취소]", e);
+      alert("예약 취소 중 오류가 발생했습니다.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F7F3EB] px-4">
@@ -120,9 +168,25 @@ export default function AdminPage() {
     );
   }
 
-  const filtered = filterStatus === "ALL"
-    ? reservations
-    : reservations.filter((r) => r.status === filterStatus);
+  const normalizeStatus = (s: string): Status => {
+    const u = s.toUpperCase();
+    if (
+      u === "HOLD" ||
+      u === "PAID" ||
+      u === "CONFIRMED" ||
+      u === "CANCELLED" ||
+      u === "EXPIRED" ||
+      u === "REFUNDED"
+    ) {
+      return u;
+    }
+    return "HOLD";
+  };
+
+  const filtered =
+    filterStatus === "ALL"
+      ? reservations
+      : reservations.filter((r) => normalizeStatus(r.status) === filterStatus);
 
   const statsCards = [
     { label: "이번 달 예약", value: `${stats.monthReservationCount}건`, icon: CalendarCheck, color: "text-[#B98768]" },
@@ -181,7 +245,7 @@ export default function AdminPage() {
             {/* 필터 */}
             <div className="mb-4 flex items-center gap-2">
               <Filter className="h-4 w-4 text-[#6f655d]" />
-              {(["ALL", "PAID", "HOLD", "CANCELLED", "EXPIRED"] as const).map((s) => (
+              {(["ALL", "PAID", "CONFIRMED", "HOLD", "CANCELLED", "EXPIRED"] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => setFilterStatus(s)}
@@ -219,7 +283,9 @@ export default function AdminPage() {
                         예약 데이터가 없습니다.
                       </td>
                     </tr>
-                  ) : filtered.map((res) => (
+                  ) : filtered.map((res) => {
+                    const rowStatus = normalizeStatus(res.status);
+                    return (
                     <tr key={res.id} className="hover:bg-[#EFE7DA]/2 transition-colors">
                       <td className="px-4 py-3 text-xs text-[#9b9189]">{res.id}</td>
                       <td className="px-4 py-3">
@@ -235,18 +301,32 @@ export default function AdminPage() {
                         {formatPrice(res.totalAmount)}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS_COLOR[res.status])}>
-                          {STATUS_LABEL[res.status]}
+                        <span
+                          className={cn(
+                            "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                            STATUS_COLOR[rowStatus]
+                          )}
+                        >
+                          {STATUS_LABEL[rowStatus]}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
-                          {res.status === "PAID" && (
-                            <button className="rounded-lg bg-red-50 p-1.5 text-red-400 hover:bg-red-100 transition-colors" title="취소/환불">
+                          {(rowStatus === "PAID" || rowStatus === "CONFIRMED") && (
+                            <button
+                              type="button"
+                              disabled={cancellingId === res.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleAdminCancelReservation(res.id);
+                              }}
+                              className="rounded-lg bg-red-50 p-1.5 text-red-400 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="취소/환불"
+                            >
                               <XCircle className="h-4 w-4" />
                             </button>
                           )}
-                          {res.status === "HOLD" && (
+                          {rowStatus === "HOLD" && (
                             <button className="rounded-lg bg-emerald-50 p-1.5 text-emerald-400 hover:bg-emerald-100 transition-colors" title="승인">
                               <CheckCircle2 className="h-4 w-4" />
                             </button>
@@ -254,7 +334,8 @@ export default function AdminPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

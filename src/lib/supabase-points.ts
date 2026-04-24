@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 
 /**
  * 포인트 연산 결과
@@ -256,6 +257,97 @@ export async function refundPointsDB(params: {
       newBalance: 0,
       error: err instanceof Error ? err.message : "포인트 환불 중 오류 발생",
     };
+  }
+}
+
+function createServiceRoleSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createSupabaseJsClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+/**
+ * 관리자 취소 등 — 요청에 사용자 세션이 없을 때 `refund_points` RPC (service role)
+ */
+export async function refundPointsDBServiceRole(params: {
+  userId: string;
+  points: number;
+  description: string;
+  reservationId: string;
+}): Promise<PointResult> {
+  const supabase = createServiceRoleSupabase();
+  if (!supabase) {
+    return {
+      success: false,
+      newBalance: 0,
+      error: "SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았습니다",
+    };
+  }
+
+  if (params.points <= 0) {
+    return {
+      success: false,
+      newBalance: 0,
+      error: "환불 포인트는 0보다 커야 합니다",
+    };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("refund_points", {
+      p_user_id: params.userId,
+      p_points: params.points,
+      p_description: params.description,
+      p_reservation_id: params.reservationId,
+    });
+
+    if (error) {
+      console.error("[Refund Points Service Role Error]", error);
+      return {
+        success: false,
+        newBalance: 0,
+        error: error.message || "포인트 환불 실패",
+      };
+    }
+
+    const row = parseRpcRow(data);
+    if (!row?.o_success) {
+      return {
+        success: false,
+        newBalance: 0,
+        error: "포인트 환불 실패",
+      };
+    }
+
+    return {
+      success: true,
+      newBalance: row.o_new_balance ?? 0,
+    };
+  } catch (err) {
+    console.error("[Refund Points Service Role Exception]", err);
+    return {
+      success: false,
+      newBalance: 0,
+      error: err instanceof Error ? err.message : "포인트 환불 중 오류 발생",
+    };
+  }
+}
+
+/** service role로 잔액 조회 (관리자 취소 응답용) */
+export async function getPointBalanceServiceRole(userId: string): Promise<number> {
+  const supabase = createServiceRoleSupabase();
+  if (!supabase) return 0;
+  try {
+    const { data } = await supabase
+      .from("user_points")
+      .select("balance")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return data?.balance ?? 0;
+  } catch {
+    return 0;
   }
 }
 
