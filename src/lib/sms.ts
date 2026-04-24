@@ -147,6 +147,14 @@ export async function sendSMS(params: SendMessageParams): Promise<SendMessageRes
   // SMS_PROVIDER 환경변수로 명시적으로 지정 가능
   const provider = process.env.SMS_PROVIDER || 'auto';
 
+  if (provider === 'test') {
+    console.log('[SMS] TEST 모드 — 실제 발송 없음', {
+      to: params.to,
+      textPreview: params.text.slice(0, 120),
+    });
+    return { success: true, messageId: 'sms-test-mode' };
+  }
+
   if (provider === 'solapi' || provider === 'auto') {
     if (process.env.SOLAPI_API_KEY) {
       console.log('[SMS] SOLAPI 사용');

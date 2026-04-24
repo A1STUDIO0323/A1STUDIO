@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { approvePartyRoomPayment } from "@/lib/kakaopay";
-import { PARTY_ROOM_PACKAGES } from "@/lib/pricing";
+import { PARTY_ROOM_PACKAGES, PartyRoomPackage } from "@/lib/pricing";
 import { cookies } from "next/headers";
+import { formatPhoneNumber, isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone-utils";
+
+function timeToHHMM(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.slice(0, 5);
+  return String(value).slice(0, 5);
+}
 
 /**
  * 카카오페이 결제 승인 (파티룸용)
@@ -80,6 +87,8 @@ export async function GET(request: NextRequest) {
         status: 'confirmed',
         kakaopay_tid: tid,
         kakaopay_order_id: orderId,
+        kakaopay_payment_status: "approved",
+        kakaopay_approved_at: new Date().toISOString(),
         headcount: parseInt(headcount || '10'),
         guest_name: guestName,
         guest_phone: guestPhone,
@@ -104,6 +113,57 @@ export async function GET(request: NextRequest) {
           end_time: '19:00',
           reason: '청소 및 환기 시간',
         });
+    }
+
+    const guestPhoneNorm = normalizePhoneNumber(reservation.guest_phone);
+    if (guestPhoneNorm && isValidPhoneNumber(guestPhoneNorm)) {
+      try {
+        console.log("[파티룸 SMS] 발송 시작");
+        const { sendMessage, logMessage } = await import("@/lib/sms");
+        const { getPartyRoomConfirmMessage } = await import("@/lib/message-templates");
+
+        const guestPhoneDisplay =
+          formatPhoneNumber(guestPhoneNorm) || reservation.guest_phone || guestPhoneNorm;
+        const pkg = packageType as PartyRoomPackage;
+        const messageContent = getPartyRoomConfirmMessage({
+          guestName: reservation.guest_name?.trim() || "회원",
+          guestPhone: guestPhoneDisplay,
+          date: typeof reservation.date === "string" ? reservation.date : String(reservation.date),
+          startTime: timeToHHMM(reservation.start_time),
+          endTime: timeToHHMM(reservation.end_time),
+          roomType: "party",
+          packageType: pkg,
+        });
+
+        const smsResult = await sendMessage({
+          to: guestPhoneNorm,
+          text: messageContent,
+        });
+
+        await logMessage({
+          userId: user.id,
+          reservationId: reservation.id,
+          phoneNumber: guestPhoneDisplay,
+          messageType: "reservation_confirm",
+          content: messageContent,
+          status: smsResult.success ? "success" : "failed",
+          errorMessage: smsResult.error,
+          messageId: smsResult.messageId,
+        });
+
+        if (smsResult.success) {
+          console.log("[파티룸 SMS] 발송 성공:", smsResult.messageId);
+        } else {
+          console.warn("[파티룸 SMS] 발송 실패:", smsResult.error);
+        }
+      } catch (smsError) {
+        console.error("[파티룸 SMS] 예외 발생:", smsError);
+      }
+    } else {
+      console.log(
+        "[파티룸 SMS] 유효한 연락처 없음 — 발송 건너뜀:",
+        reservation.guest_phone ?? "(없음)"
+      );
     }
 
     // 쿠키 정리
