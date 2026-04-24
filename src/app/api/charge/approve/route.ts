@@ -90,18 +90,35 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. point_transactions에 충전 내역 추가
+    const chargePoints = Math.round(Number(chargePackage.total_points ?? 0));
+    const chargeBalanceAfter = Math.round(currentBalance + chargePoints);
+    const chargeTransactionPayload = {
+      user_id: user.id,
+      type: "charge" as const,
+      amount: chargePoints,
+      balance_after: chargeBalanceAfter,
+      description: `${chargePackage.name} 충전`,
+      payment_id: approval.aid,
+      reservation_id: null as string | null,
+    };
+
+    console.log("[충전 거래] INSERT 직전 데이터:", chargeTransactionPayload);
+
     const { error: transactionError } = await supabase
       .from("point_transactions")
-      .insert({
-        user_id: user.id,
-        type: "charge",
-        amount: chargePackage.amount,
-        balance_after: currentBalance + chargePackage.amount,
-        description: `${chargePackage.name} 충전`,
-        payment_id: approval.aid,
-      });
+      .insert(chargeTransactionPayload);
 
-    if (transactionError) throw new Error("충전 내역 생성 실패");
+    if (transactionError) {
+      console.error("[충전 거래 내역 실패]", {
+        message: transactionError.message,
+        code: transactionError.code,
+        details: transactionError.details,
+        hint: transactionError.hint,
+      });
+      throw new Error("충전 내역 생성 실패");
+    }
+
+    console.log("[충전 거래] INSERT 성공");
 
     // 4. 보너스 포인트가 있으면 추가 거래 내역 생성 (실패해도 포인트는 이미 반영됨 → 전체 실패 처리 안 함)
     const bonusPoints = Math.round(Number(chargePackage.bonus_points ?? 0));
