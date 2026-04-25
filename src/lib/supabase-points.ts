@@ -208,7 +208,8 @@ export async function refundPointsDB(params: {
   userId: string;
   points: number;
   description: string;
-  reservationId: string;
+  /** 예약 미생성 시 환불 등 — RPC가 NULL 허용 시 생략 */
+  reservationId?: string | null;
 }): Promise<PointResult> {
   const supabase = await createClient();
 
@@ -225,7 +226,7 @@ export async function refundPointsDB(params: {
       p_user_id: params.userId,
       p_points: params.points,
       p_description: params.description,
-      p_reservation_id: params.reservationId,
+      p_reservation_id: params.reservationId ?? null,
     });
 
     if (error) {

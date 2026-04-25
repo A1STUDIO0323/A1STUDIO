@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { deductPointsDB } from "@/lib/supabase-points";
+import { deductPointsDB, refundPointsDB } from "@/lib/supabase-points";
 import { 
   getPriceType, 
   calcPoints, 
@@ -209,46 +209,40 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error("예약 생성 실패:", insertError);
-      
-      // 포인트 환불 처리
-      console.log("포인트 환불 시작...");
-      
-      // 1. 현재 잔액 조회
-      const { data: currentPoints, error: pointsError } = await supabase
-        .from('user_points')
-        .select('balance')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      if (pointsError) {
-        console.error('[ReservationCreate] 포인트 조회 실패:', pointsError);
+      console.error("[예약 생성 실패] 포인트 자동 환불 시도:", insertError);
+
+      if (lockKey && userId) {
+        await releasePaymentLock(userId, "reservation", lockKey);
       }
-      
-      if (currentPoints) {
-        // 2. 잔액 업데이트
-        await supabase
-          .from('user_points')
-          .update({ 
-            balance: currentPoints.balance + pointsToUse,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-        
-        // 3. 환불 거래 기록
-        await supabase
-          .from('point_transactions')
-          .insert({
-            user_id: user.id,
-            type: 'refund',
-            amount: pointsToUse,
-            balance_after: currentPoints.balance + pointsToUse,
-            description: `예약 실패로 인한 환불 (${date} ${start_time}~${end_time})`,
-            reservation_id: null,
-          });
+
+      const refundResult = await refundPointsDB({
+        userId: user.id,
+        points: pointsToUse,
+        description: `예약 생성 실패 자동 환불 (${date} ${start_time}~${end_time})`,
+        reservationId: null,
+      });
+
+      if (refundResult.success) {
+        console.log("[자동 환불 완료] 복구 잔액:", refundResult.newBalance);
+        return NextResponse.json(
+          {
+            error:
+              "예약 생성에 실패했습니다. 포인트는 환불되었습니다.",
+            balance_after: refundResult.newBalance,
+          },
+          { status: 500 }
+        );
       }
-      
-      throw new Error(`예약 생성에 실패했습니다: ${insertError.message}`);
+
+      console.error("[자동 환불 실패]", refundResult.error);
+      return NextResponse.json(
+        {
+          error:
+            "예약 생성 및 포인트 환불에 실패했습니다. 고객센터로 문의해 주세요.",
+          needsManualRefund: true,
+        },
+        { status: 500 }
+      );
     }
 
     // 17:00~19:00 버퍼 슬롯 자동 생성 (낮 패키지 예약 시)
