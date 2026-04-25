@@ -2,8 +2,8 @@
 
 <!--
   AI_TRANSFER_PROMPT.md
-  버전: 2.30
-  최종 수정: 2026-04-23
+  버전: 2.31
+  최종 수정: 2026-04-25
   작성자: A1 STUDIO 개발팀
 -->
 
@@ -85,6 +85,21 @@ $$;
    - 환불 실패: **500** + `needsManualRefund: true` 등.
 
 **영향:** 포인트 차감·예약 생성 불일치 시 **RPC 기반**으로 환불 경로 통일, RLS로 인한 수동 UPDATE 실패 위험 감소.
+
+---
+
+### 글로벌 에러 UI·프로덕션 로거·미들웨어 (2026-04-25, 커밋 `cf43f93`)
+
+**목표:** 결제·예약 **코드 경로는 건드리지 않고** UX·운영 안정성만 보강.
+
+**반영:**
+
+1. **`src/app/error.tsx`** — App Router 글로벌 에러 바운더리, `reset`, 개발 시 스택 표시.
+2. **`src/app/not-found.tsx`** — 404 페이지(홈·예약·문의 링크).
+3. **`src/lib/logger.ts`** — 개발/프로덕션 분기 로그(`payment`·`info`는 프로덕션에서 메시지 위주). 라우트 연동은 선택.
+4. **`middleware.ts`** — 프로필 검증 **`catch`**에서 **프로덕션만** `/login` 리다이렉트, **개발**은 통과(경고 로그).
+
+**영향:** 처리되지 않은 렌더 예외·404 대응, 프로덕션에서 프로필 API 실패 시 무방비 통과 완화.
 
 ---
 
@@ -1865,6 +1880,9 @@ A1STUDIO/
 - **`src/lib/supabase-points.ts`** — `deductPointsDB`, **`refundPointsDB`** (`reservationId` 선택·NULL 허용), `chargePointsDB` 등
 - **`src/app/api/reservations/create/route.ts`** — 포인트 예약, INSERT 실패 시 **`refundPointsDB` + `releasePaymentLock`**
 - **`src/app/api/reservations/payments/kakao/*`**, **`src/app/api/party-room/payments/kakao/*`** — 카카오 ready/approve/fail/cancel 및 락 정리
+- **`src/app/error.tsx`**, **`src/app/not-found.tsx`** — 글로벌 예외·404 UI (`cf43f93`)
+- **`src/lib/logger.ts`** — 프로덕션 안전 콘솔 래퍼(점진 연동)
+- **`middleware.ts`** — 프로필 검증 예외 시 프로덕션 `/login`
 
 ---
 
@@ -1880,7 +1898,8 @@ A1STUDIO/
 - ✅ 인증 시스템 (Google/Kakao OAuth, Phone OTP - 소셜 로그인만)
 - ✅ 회원가입 페이지 (Google/Kakao 소셜만, 약관 동의)
 - ✅ 온보딩 플로우 (프로필 입력, 휴대폰 SMS 인증)
-- ✅ 라우트 가드 미들웨어 (인증 & 온보딩 체크, Prisma 기반)
+- ✅ 라우트 가드 미들웨어 (인증 & 온보딩 체크, Prisma 기반; 프로필 검증 예외 시 **프로덕션** `/login`)
+- ✅ 글로벌 **`error.tsx`** · **`not-found.tsx`** (처리되지 않은 예외·404 UX)
 - ✅ 예약 시스템 (연습실 — 포인트 또는 카카오페이)
 - ✅ 파티룸 예약 (포인트 또는 카카오페이 직접 결제)
 - ✅ 포인트 충전 (Kakao Pay)
@@ -2509,7 +2528,7 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 - **UI**: 파티룸 `/pricing`, `/party-room/booking`, `/party-room/booking/complete` — **이용 7일 전 이상 / 3일~6일 전 / 전날·당일** 문구로 연습실 스타일 통일; `complete`는 요약 목록 + **이 예약 기준 취소 마감 시각**(전액·50% 데드라인) 병기.
 - **`/mypage`**: `getCancelPolicy`(= `canCancelReservation`)로 **취소 버튼 비활성화** + 안내 문구; 모달·확인 시에도 동일 정책 재검증. 전액 환불 표시 시 `refundRate === 1`이면 `floor` 없이 전액.
 
-### 12. 글로벌 에러·404·로거·미들웨어 (안정성, 결제/예약 코드 비터치)
+### 12. 글로벌 에러·404·로거·미들웨어 (안정성, 결제/예약 코드 비터치, 커밋 `cf43f93`·2026-04-25)
 
 - **`src/app/error.tsx`**: App Router **글로벌 에러 UI** — `reset`, 홈 링크, 개발 시 스택 `details`.
 - **`src/app/not-found.tsx`**: **404** — 홈·`/booking`·`/contact` 안내.
@@ -2775,8 +2794,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 ---
 
-**작성일**: 2026-04-23  
-**버전**: 2.30 (최신)  
+**작성일**: 2026-04-25  
+**버전**: 2.31 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3287,6 +3306,8 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 
 ## 📝 최근 수정 사항 (2026-04-29)
 
+> **역사 기록:** 이 절은 당시 문서 대규모 구조 갱신 배치를 남긴 것이다. **현재 문서 버전·최종 수정일**은 파일 **상단 HTML 주석**과 **아래 고정 메타**(`**작성일**` / `**버전**`)를 본다. 이후 **`cf43f93`**(글로벌 error/not-found·logger·middleware) 등은 **`## 🔧 최근 주요 변경사항`** 및 **`## 📝 최근 수정 사항 (2026-04-25)`** 참고.
+
 ### 1. 문서 구조 갱신
 
 - 상단 **HTML 메타 주석**(버전·최종 수정일·작성자).
@@ -3296,4 +3317,21 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 
 ### 2. Git 커밋 참고
 
-- `docs: AI_TRANSFER PaymentLock·환불·안정성·테스트 반영 (v2.29)` (본 커밋)
+- `docs: AI_TRANSFER PaymentLock·환불·안정성·테스트 반영 (v2.29)` (당시 문서 전용 커밋; 이후 버전은 상단 메타 기준)
+
+---
+
+## 📝 최근 수정 사항 (2026-04-25)
+
+### 1. AI_TRANSFER_PROMPT.md 최신화 (문서만)
+
+- 상단·하단 메타 **v2.31** / **최종 수정 2026-04-25** — 실제 코드 반영 커밋 `cf43f93` 일자와 정합.
+- **`## 🔧 최근 주요 변경사항`**에 **`cf43f93`** 요약 절 추가(글로벌 error/not-found, `logger`, middleware 프로덕션 `/login`).
+- **`## 📂 파일 구조` → `### 결제 및 예약 안정성`**: 앱 공통 안정성 경로 보강.
+- **`## 🎯 현재 상태 요약`**: 글로벌 에러·404·미들웨어 동작 한 줄 반영.
+- **`## 📝 최근 수정 사항 (2026-04-23)` §12**: 커밋·일자 명시.
+- 말미 **`## 📝 최근 수정 사항 (2026-04-29)`**: 역사 기록 안내(blockquote).
+
+### 2. Git 커밋 참고 (코드, 이미 반영됨)
+
+- `cf43f93` — `feat: 안정성 개선 - 에러 페이지, 프로덕션 로거, middleware 개선`
