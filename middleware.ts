@@ -169,8 +169,18 @@ export async function middleware(request: NextRequest) {
       }
     }
   } catch (err) {
-    // 프로필 API 오류 시 조용히 통과 (UX 우선)
     console.error("[middleware] profile check error:", err);
+
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[middleware] Production: redirecting to login due to profile error"
+      );
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    console.warn(
+      "[middleware] Development: allowing access despite profile error"
+    );
   }
 
   return response;

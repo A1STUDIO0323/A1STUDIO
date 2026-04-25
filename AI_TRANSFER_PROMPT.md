@@ -1,5 +1,12 @@
 # A1 STUDIO 웹사이트 - 완전한 프로젝트 컨텍스트
 
+<!--
+  AI_TRANSFER_PROMPT.md
+  버전: 2.30
+  최종 수정: 2026-04-23
+  작성자: A1 STUDIO 개발팀
+-->
+
 > 이 문서는 A1 STUDIO 웹사이트의 전체 구조, 기능, 코드베이스를 다른 AI 어시스턴트(GPT, Claude 등)에게 전달하기 위한 포괄적인 가이드입니다.
 
 ## 📌 문서 갱신 규칙 (AI / 개발자)
@@ -8,6 +15,134 @@
 - **날짜**: 시스템/대화에 주어진 오늘 날짜(예: 2026-04-22)를 쓴다.
 - **문서 끝 메타**: 작업이 이 문서를 건드릴 때마다 `**작성일**`·`**버전**`을 갱신한다. (이전 `최근 수정 사항`의 구체 서술은 **삭제하지 말고** 누적한다.)
 - **자동 강제(에이전트)**: 이 저장소 루트의 `.cursor/rules/ai-transfer-prompt-sync.mdc`에 동일 취지의 규칙을 둔다. Cursor/에이전트는 코드 변경 수행 시 위 절차를 **기본 수행**으로 둔다.
+
+---
+
+## 🔧 최근 주요 변경사항
+
+요약·운영 관점에서 자주 참조하는 변경이다. (일자는 **문서화 기준**이며, 정확한 반영 시점은 `git log`로 확인한다.)
+
+### PaymentLock 자동 삭제 및 만료 락 정리 (2026-04-25, 커밋 `b83db1b`)
+
+**문제:**
+
+- 카카오페이 결제 취소/실패 시 `payment_locks` 행이 남아 재시도 시 **409** 가 나기 쉬움.
+- 만료 전까지 사용자가 대기해야 하는 UX.
+
+**해결:**
+
+1. **`src/lib/payment-lock.ts` 헬퍼**
+   - `deleteExpiredPaymentLocksForUser(userId, lockType)` — 해당 사용자·타입의 **만료된 락만** 삭제.
+   - `getActivePaymentLocksForUser(userId, lockType)` — **활성 락** 조회, `retryAfter`(초) 계산에 사용.
+2. **연습실·파티룸 카카오 `fail` / `cancel`**
+   - 쿠키의 주문 ID로 **`releasePaymentLock`** 후 관련 쿠키 삭제.
+   - 락 해제 중 예외가 나도 **리다이렉트는 진행** (로그만 남김).
+3. **`ready` 라우트** (`practice-room` / `party-room`)
+   - ready 직전 **만료 락 정리** 후, 활성 락이 있으면 **409 + `retryAfter`**.
+   - `acquirePaymentLock` 실패 시에도 가능하면 동일 **409** 패턴, 아니면 **500**.
+4. **클라이언트** (`/booking`, `/party-room/booking`)
+   - **409** 이고 응답에 **`retryAfter`** 가 있으면 “약 N분 후 재시도” 등 안내.
+   - **`retryAfter` 없음** (예: 시간대 중복 409)은 기존처럼 **`error` 메시지**만 표시.
+
+**영향:** 취소/실패 후 즉시 재시도 가능, 재시도 대기 시간 안내 명확화.
+
+---
+
+### 예약 생성 실패 시 포인트 자동 환불 (2026-04-25, 커밋 `d0aa9ae`)
+
+**문제:**
+
+- `deductPointsDB` 성공 후 `reservations` INSERT 실패 시, 예전에는 **`user_points` 직접 UPDATE** 로 환불을 시도했으나 **RLS** 등으로 실패할 수 있어 포인트가 복구되지 않을 위험이 있음.
+
+**해결:**
+
+1. **`refundPointsDB` 시그니처** (`src/lib/supabase-points.ts`)
+   - `reservationId`를 **`reservationId?: string | null`** 로 선택화.
+   - RPC 호출: `p_reservation_id: params.reservationId ?? null` — **예약 행이 없을 때 환불** 지원.
+2. **Supabase `refund_points` RPC**
+   - 운영 DB에서 **`p_reservation_id`에 `NULL`(또는 기본값) 허용**이 되어 있어야 한다. 기존이 `OUT` 파라미터형이면 **동일 취지로** 시그니처를 맞춘다. 아래는 **목표 예시**일 뿐이며, 실제 정의는 대시보드·마이그레이션과 **반드시 대조**할 것.
+
+```sql
+-- 예시: NULL 허용 (실제 프로젝트의 refund_points 정의와 일치시킬 것)
+CREATE OR REPLACE FUNCTION public.refund_points(
+  p_user_id UUID,
+  p_points INTEGER,
+  p_description TEXT,
+  p_reservation_id UUID DEFAULT NULL
+)
+RETURNS TABLE (success BOOLEAN, new_balance INTEGER)  -- 또는 기존 OUT/o_* 호환 유지
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+-- ... 잔액 증가 + point_transactions 기록 ...
+$$;
+```
+
+3. **`POST /api/reservations/create`** (`src/app/api/reservations/create/route.ts`)
+   - INSERT 실패 시 **`releasePaymentLock`**(예약 락) 후 **`refundPointsDB`** 호출.
+   - 환불 성공: **500** + “예약 생성에 실패했습니다. 포인트는 환불되었습니다.” + `balance_after`.
+   - 환불 실패: **500** + `needsManualRefund: true` 등.
+
+**영향:** 포인트 차감·예약 생성 불일치 시 **RPC 기반**으로 환불 경로 통일, RLS로 인한 수동 UPDATE 실패 위험 감소.
+
+---
+
+## 🔍 안정성 검토 (2026-04-25)
+
+문서·코드 리뷰 관점의 **참고용 평가**이며, 점수는 상대적 지표다.
+
+### 전문가 평가 결과 (요약)
+
+**종합 점수:** 80/100 — 프로덕션 운영에 **참고 가능**한 수준(지속 개선 권장).
+
+**해결된 Critical 급 이슈 (코드 반영):**
+
+1. **결제·예약 불일치** — 예약 INSERT 실패 시 **`refundPointsDB`** 자동 환불.
+2. **PaymentLock 동시성** — 만료 정리, fail/cancel/approve에서 **`releasePaymentLock`**, ready에서 **409 + `retryAfter`**.
+3. **포인트 손실 완화** — 환불을 **SECURITY DEFINER RPC** 경로로 통일(운영 DB 정의 전제).
+
+**남은 Warning (선택 개선):**
+
+4. **Middleware** — 프로필 `catch`는 프로덕션에서 `/login` 처리(2026-04-23); 그 외 경로·시나리오 추가 강화는 선택.
+5. **타입 안전성** — `as any` 등 점진적 제거.
+
+**Good Points:**
+
+- `.env*` gitignore, Zod 검증, RLS + Prisma 병행, 성인 검증, 포인트 차감 후 예약 생성 순서 등.
+- 글로벌 **`error.tsx` · `not-found.tsx`**(2026-04-23), **`src/lib/logger.ts`**(프로덕션 안전 로그 유틸, 연동은 선택).
+
+**개선 우선순위 (선택):** 미들웨어 추가 시나리오 → 레이아웃별 에러 UI → 타입 정리.
+
+---
+
+## 🧪 중요 테스트 시나리오
+
+### 결제·예약 안정성
+
+**1. 포인트 정상 예약**
+
+- `/booking`에서 포인트로 예약 → 차감 → `reservations` 행 생성 → (연락처 유효 시) 확정 SMS → 완료 페이지.
+
+**2. 연습실 카카오페이 정상**
+
+- 카카오 결제 완료 → approve → 예약 행·`kakaopay_*` → SMS → `payment_locks`에 `practice-room` 잔여 없음.
+
+**3. 예약 INSERT 실패 후 환불**
+
+- 의도적으로 INSERT 실패(스테이징에서 스키마 불일치 등) 시 응답에 “포인트는 환불되었습니다” 또는 `needsManualRefund`, `user_points`·`point_transactions`에 환불 기록 확인.
+
+**4. 카카오 취소/실패 후 재시도**
+
+- 결제창 취소 → cancel/fail URL → 쿠키 삭제·락 해제 → 같은 사용자로 ready 재호출 시 **409 없이** 진행 가능(활성 락만 없을 때).
+
+**5. 진행 중 결제(활성 락)**
+
+- 이전 결제가 아직 만료 전일 때 ready → **409 + `retryAfter`**, 클라이언트 분 단위 안내.
+
+**6. 시간대 중복 409**
+
+- `retryAfter` **없는** 409 → “이미 예약된 시간대” 등 **서버 `error` 문구**만 표시되는지 확인.
 
 ---
 
@@ -1677,7 +1812,7 @@ A1STUDIO/
 │       ├── refund-policy.ts                # 환불 정책
 │       ├── party-room-options.ts           # 파티룸 옵션
 │       ├── kakaopay.ts                     # readyPayment/approvePayment, readyPracticeRoomPayment, 파티룸 전용, cancelPayment
-│       ├── payment-lock.ts                 # 결제 락
+│       ├── payment-lock.ts                 # 결제 락 (만료/활성 조회 헬퍼 포함)
 │       ├── sms.ts                          # SMS 발송
 │       ├── sms-otp.ts                      # SMS OTP
 │       ├── message-templates.ts            # 메시지 템플릿
@@ -1723,6 +1858,13 @@ A1STUDIO/
 └── docs/
     └── SMS_SETUP.md                        # SMS 설정 가이드
 ```
+
+### 결제 및 예약 안정성 (주요 파일)
+
+- **`src/lib/payment-lock.ts`** — `acquirePaymentLock` / `releasePaymentLock`, **`deleteExpiredPaymentLocksForUser`**, **`getActivePaymentLocksForUser`**
+- **`src/lib/supabase-points.ts`** — `deductPointsDB`, **`refundPointsDB`** (`reservationId` 선택·NULL 허용), `chargePointsDB` 등
+- **`src/app/api/reservations/create/route.ts`** — 포인트 예약, INSERT 실패 시 **`refundPointsDB` + `releasePaymentLock`**
+- **`src/app/api/reservations/payments/kakao/*`**, **`src/app/api/party-room/payments/kakao/*`** — 카카오 ready/approve/fail/cancel 및 락 정리
 
 ---
 
@@ -2367,6 +2509,13 @@ SELECT * FROM public.auth_deletion_logs ORDER BY deleted_at DESC LIMIT 10;
 - **UI**: 파티룸 `/pricing`, `/party-room/booking`, `/party-room/booking/complete` — **이용 7일 전 이상 / 3일~6일 전 / 전날·당일** 문구로 연습실 스타일 통일; `complete`는 요약 목록 + **이 예약 기준 취소 마감 시각**(전액·50% 데드라인) 병기.
 - **`/mypage`**: `getCancelPolicy`(= `canCancelReservation`)로 **취소 버튼 비활성화** + 안내 문구; 모달·확인 시에도 동일 정책 재검증. 전액 환불 표시 시 `refundRate === 1`이면 `floor` 없이 전액.
 
+### 12. 글로벌 에러·404·로거·미들웨어 (안정성, 결제/예약 코드 비터치)
+
+- **`src/app/error.tsx`**: App Router **글로벌 에러 UI** — `reset`, 홈 링크, 개발 시 스택 `details`.
+- **`src/app/not-found.tsx`**: **404** — 홈·`/booking`·`/contact` 안내.
+- **`src/lib/logger.ts`**: **프로덕션 안전 로거**(`log`/`debug`는 개발만, `payment`·`info`는 프로덕션에서 메시지 위주). 기존 라우트는 미연결(필요 시 점진 도입).
+- **`middleware.ts`**: 프로필 검증 **`catch`**에서 **프로덕션만** `/login` 리다이렉트, **개발**은 기존처럼 통과(경고 로그). 결제·예약 API 경로는 건드리지 않음.
+
 ---
 
 ## 📝 최근 수정 사항 (2026-04-24) — 부록: 스키마·RPC 상세
@@ -2626,8 +2775,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 ---
 
-**작성일**: 2026-04-28  
-**버전**: 2.28 (최신)  
+**작성일**: 2026-04-23  
+**버전**: 2.30 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3133,3 +3282,18 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 ### 2. Git 커밋 참고
 
 - `fix: PaymentLock 자동 삭제 및 만료 락 정리 구현`
+
+---
+
+## 📝 최근 수정 사항 (2026-04-29)
+
+### 1. 문서 구조 갱신
+
+- 상단 **HTML 메타 주석**(버전·최종 수정일·작성자).
+- **`## 🔧 최근 주요 변경사항`**: PaymentLock 정리(`b83db1b`), 예약 실패 자동 환불(`d0aa9ae`) — 문제/해결/영향 요약.
+- **`## 🔍 안정성 검토 (2026-04-25)`**, **`## 🧪 중요 테스트 시나리오`** 추가.
+- **`## 📂 파일 구조`** 하위에 **`### 결제 및 예약 안정성 (주요 파일)`** 보강.
+
+### 2. Git 커밋 참고
+
+- `docs: AI_TRANSFER PaymentLock·환불·안정성·테스트 반영 (v2.29)` (본 커밋)
