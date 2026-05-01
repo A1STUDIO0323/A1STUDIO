@@ -54,7 +54,7 @@ type DashboardStats = {
   uniqueGuestCount: number;
 };
 
-const TABS = ["예약 관리", "시간 블록", "요금 관리", "후기 관리", "공지 관리"];
+const TABS = ["예약 관리", "시간 블록", "요금 관리", "후기 관리", "게시판 관리", "공지 관리"];
 
 export default function AdminPage() {
   const { isAdmin, adminLogin, adminLogout } = useAdmin();
@@ -343,9 +343,25 @@ export default function AdminPage() {
         )}
 
         {/* 다른 탭들 (플레이스홀더) */}
-        {activeTab !== 0 && activeTab !== 3 && (
+        {activeTab !== 0 && activeTab !== 3 && activeTab !== 4 && (
           <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-[#D8CCBC] text-[#b0a89e]">
             {TABS[activeTab]} 기능 구현 예정
+          </div>
+        )}
+
+        {/* 게시판 관리 탭 */}
+        {activeTab === 4 && (
+          <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-center">
+            <h3 className="text-lg font-bold text-[#3B342F]">게시판 관리</h3>
+            <p className="mt-2 text-sm text-[#6f655d]">
+              게시글을 복수 선택해 일괄 삭제할 수 있습니다.
+            </p>
+            <Link
+              href="/admin/board"
+              className="mt-4 inline-flex rounded-lg bg-[#B98768] px-5 py-2.5 text-sm font-bold text-[#F7F3EB] transition-all hover:bg-[#a9785c]"
+            >
+              게시판 관리 페이지로 이동
+            </Link>
           </div>
         )}
 

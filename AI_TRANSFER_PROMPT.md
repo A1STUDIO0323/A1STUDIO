@@ -2,7 +2,7 @@
 
 <!--
   AI_TRANSFER_PROMPT.md
-  버전: 2.45
+  버전: 2.46
   최종 수정: 2026-05-01
   작성자: A1 STUDIO 개발팀
 -->
@@ -2817,7 +2817,7 @@ DISABLE TRIGGER validate_reservation_user;
 ---
 
 **작성일**: 2026-05-01  
-**버전**: 2.45 (최신)  
+**버전**: 2.46 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3376,6 +3376,12 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 - **`/board/write`** : **카테고리 텍스트** 단일 입력(드롭다운 없음).
 - **`/board/[id]`** : `categoryText` 뱃지.
 - **`/board/guide`** : 이용 안내(공지 `/notices` 링크). `motion` 미사용·정적 카드 레이아웃.
+
+### 관리자 게시판 (`/admin/board`) — 목록 조회·복수 선택 삭제
+
+- **`src/app/api/admin/board/route.ts`**: Supabase 세션 필요(비로그인 **401**) · 헤더 **`x-admin-password`** = 서버 **`ADMIN_PASSWORD`**(다른 관리자 게시판/후기 API와 동일) · **`GET`** 페이지네이션(`page`,`limit`, 응답 `pagination.total` 등) · **`DELETE`** JSON `{ postIds }` 후 `deleteMany`(댓글·좋아요는 Prisma 스키마 `onDelete` 전제로 연쇄 삭제).
+- **`src/app/admin/board/page.tsx`**: 관리 세션 기반 로드 · 체크박스 일괄 삭제 확인 후 API 호출.
+- **`src/app/admin/page.tsx`**: 탭 **「게시판 관리」** 추가, `/admin/board` 이동 링크.
 
 ---
 
