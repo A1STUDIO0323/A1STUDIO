@@ -2,7 +2,7 @@
 
 <!--
   AI_TRANSFER_PROMPT.md
-  버전: 2.42
+  버전: 2.44
   최종 수정: 2026-05-01
   작성자: A1 STUDIO 개발팀
 -->
@@ -2817,7 +2817,7 @@ DISABLE TRIGGER validate_reservation_user;
 ---
 
 **작성일**: 2026-05-01  
-**버전**: 2.42 (최신)  
+**버전**: 2.44 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3334,6 +3334,7 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 - **`src/lib/constants.ts`**: 게시판 메뉴에서 **자유게시판** 항목 제거, 부모 **`href`** 를 `/notices` 로 변경.
 - **Prisma/schema·마이그레이션 미변경** — DB에 `board_posts` 테이블이 남아 있어도 앱은 참조하지 않음.
 - *(역사)* `## 📝 최근 수정 사항 (2026-04-22)` **§3** 을 **폐기·역사** 로 재표기함(중복 서술 정리).
+- *(갱신)* 이후 **`src/app/api/board/**`** 에 Prisma `BoardCategory` · `BoardPost` · `BoardComment` · `BoardLike` 기반 API가 **별도 재구축**됨 — 아래 **「자유게시판 API」** 절.
 
 ### AI_TRANSFER_PROMPT 최신화 (문서만, v2.40)
 
@@ -3351,6 +3352,22 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 
 - **추가 모델(4종)**: `BoardCategory`(→ `board_categories`), `BoardPost`(→ **`board_posts`**), `BoardComment`(→ `board_comments`), `BoardLike`(→ `board_likes`). 모두 **`@@schema("public")`**, 레거코드와 동일하게 DB 컬럼은 필요한 필드에 **`@map` snake_case** 정렬.
 - **마이그레이션 미실행**(요청 규칙): 운영 DB에 테이블이 없으면 **앱에서 Prisma CRUD 호출 전** Supabase DDL·마이그레이션으로 스키마를 맞춰야 함.
+
+### 자유게시판 API (Prisma·Supabase 세션)
+
+- **`GET/POST /api/board/categories`** — 목록(활성만, 공식 우선), 생성(로그인·`slug` 유니크).
+- **`GET /api/board`** — 쿼리 `categorySlug`, `page`, `limit`(최대 100), 숨김 제외, 미리보기 문자열.
+- **`POST /api/board/create`** — 작성(로그인, 선택 `categorySlug`).
+- **`GET/DELETE /api/board/[id]`** — 상세(조회수 +1, 댓글 최상위+대댓글), 삭제(작성자만).
+- **`POST /api/board/[id]/comments`** — 댓글·대댓글(`parentId`는 동일 게시글 댓글만).
+- **`POST /api/board/[id]/like`** — 좋아요 토글(`postId_userId`).
+- 공통: `export const dynamic = "force-dynamic"` · `@/lib/db`, `@/lib/supabase/server` 의 `getUser()` 인증 분기.
+
+### 자유게시판 UI (클라이언트 페이지)
+
+- **`/board`** (`src/app/board/page.tsx`): 카테고리 칩·`/api/board/categories` · `/api/board` 목록·페이지네이션. `useSearchParams` 는 **`Suspense`** 로 감싼 래퍼 제공. CSS 변수·`motion/react`·rounded-2xl 패턴.
+- **`/board/write`** (`src/app/board/write/page.tsx`): 폼 → `POST /api/board/create`.
+- **`/board/[id]`** (`src/app/board/[id]/page.tsx`): 상세·좋아요·댓글·작성자 삭제(`GET /api/members/profile` 의 `profile.id` 와 `post.authorId` 비교). 라우트 식별자는 **`useParams`**.
 
 ---
 
