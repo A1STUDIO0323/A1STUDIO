@@ -38,7 +38,7 @@ interface PostDetail {
   title: string;
   content: string;
   authorId: string;
-  category: { name: string; slug: string } | null;
+  categoryText: string | null;
   views: number;
   likeCount: number;
   comments: Comment[];
@@ -196,10 +196,10 @@ export default function BoardDetailPage() {
             목록으로
           </button>
 
-          {post.category && (
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)]">
-              {post.category.name}
-            </p>
+          {post.categoryText && (
+            <span className="mb-4 inline-block rounded-xl bg-[var(--color-bg)] px-3 py-1 text-sm text-[var(--color-text-muted)]">
+              {post.categoryText}
+            </span>
           )}
 
           <h1 className="font-serif text-2xl font-bold text-[var(--color-text)] sm:text-4xl md:text-[2.75rem]">

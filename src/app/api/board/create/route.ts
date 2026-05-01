@@ -22,9 +22,9 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       title?: string;
       content?: string;
-      categorySlug?: string;
+      categoryText?: string | null;
     };
-    const { title, content, categorySlug } = body;
+    const { title, content, categoryText } = body;
 
     if (!title?.trim() || !content?.trim()) {
       return NextResponse.json(
@@ -33,27 +33,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let categoryId: string | null = null;
-    if (categorySlug?.trim()) {
-      const category = await prisma.boardCategory.findUnique({
-        where: { slug: categorySlug.trim() },
-      });
+    let finalCategoryText: string | null = null;
+    if (categoryText?.trim()) {
+      const trimmed = categoryText.trim();
 
-      if (!category) {
+      if (trimmed.length > 20) {
         return NextResponse.json(
-          { success: false, error: "카테고리를 찾을 수 없습니다" },
-          { status: 404 }
+          { success: false, error: "카테고리는 20자 이하로 입력해주세요" },
+          { status: 400 }
         );
       }
 
-      categoryId = category.id;
+      const bannedWords = ["욕설", "비속어", "광고"];
+      if (bannedWords.some((word) => trimmed.includes(word))) {
+        return NextResponse.json(
+          { success: false, error: "부적절한 카테고리명입니다" },
+          { status: 400 }
+        );
+      }
+
+      finalCategoryText = trimmed;
     }
 
     const post = await prisma.boardPost.create({
       data: {
         title: title.trim(),
         content: content.trim(),
-        categoryId,
+        categoryText: finalCategoryText,
         authorId: user.id,
       },
     });
@@ -63,6 +69,7 @@ export async function POST(request: NextRequest) {
       post: {
         id: post.id,
         title: post.title,
+        categoryText: post.categoryText,
       },
     });
   } catch (error) {

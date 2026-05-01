@@ -1,32 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-}
-
 export default function BoardWritePage() {
   const router = useRouter();
-  const [categories, setCategories] = useState<Category[]>([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [categorySlug, setCategorySlug] = useState("");
+  const [categoryText, setCategoryText] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/board/categories", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data: { success?: boolean; categories?: Category[] }) => {
-        if (data.success && data.categories) setCategories(data.categories);
-      })
-      .catch(() => {});
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,10 +25,11 @@ export default function BoardWritePage() {
       const res = await fetch("/api/board/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           title: title.trim(),
           content: content.trim(),
-          categorySlug: categorySlug || null,
+          categoryText: categoryText.trim() || null,
         }),
       });
 
@@ -69,107 +53,80 @@ export default function BoardWritePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] py-12 sm:py-16">
-      <div className="mx-auto max-w-3xl px-4">
+    <div className="min-h-screen bg-[var(--color-bg)] pb-20 pt-24">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="rounded-2xl bg-[var(--color-surface)] p-8"
         >
-          <Link
-            href="/board"
-            className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)]"
-          >
-            ← 목록
-          </Link>
-          <h1 className="mt-4 font-serif text-3xl font-bold text-[var(--color-text)] md:text-4xl">
+          <h1 className="mb-8 text-3xl font-bold text-[var(--color-text)]">
             글쓰기
           </h1>
-        </motion.div>
 
-        <motion.form
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.05 }}
-          onSubmit={handleSubmit}
-          className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:p-8"
-        >
-          <div className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label
-                htmlFor="board-category"
-                className="mb-2 block text-sm font-medium text-[var(--color-text-muted)]"
-              >
-                카테고리 (선택)
+              <label className="mb-2 block text-sm font-medium text-[var(--color-text)]">
+                카테고리 (선택, 직접 입력)
               </label>
-              <select
-                id="board-category"
-                value={categorySlug}
-                onChange={(e) => setCategorySlug(e.target.value)}
+              <input
+                type="text"
+                value={categoryText}
+                onChange={(e) => setCategoryText(e.target.value)}
+                placeholder="예: 보컬 팁, 댄스 후기, 연습실 꿀팁 (20자 이내)"
                 className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-              >
-                <option value="">카테고리 없음 (전체 게시판)</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.slug}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                maxLength={20}
+              />
+              <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+                같은 카테고리가 10개 이상 모이면 정식 카테고리로 승격됩니다
+              </p>
             </div>
 
             <div>
-              <label
-                htmlFor="board-title"
-                className="mb-2 block text-sm font-medium text-[var(--color-text-muted)]"
-              >
+              <label className="mb-2 block text-sm font-medium text-[var(--color-text)]">
                 제목 *
               </label>
               <input
-                id="board-title"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="제목을 입력하세요"
-                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
                 maxLength={200}
               />
             </div>
 
             <div>
-              <label
-                htmlFor="board-content"
-                className="mb-2 block text-sm font-medium text-[var(--color-text-muted)]"
-              >
+              <label className="mb-2 block text-sm font-medium text-[var(--color-text)]">
                 내용 *
               </label>
               <textarea
-                id="board-content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="내용을 입력하세요"
                 rows={15}
-                className="w-full resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                className="w-full resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
               />
             </div>
 
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <div className="flex gap-4">
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-6 py-3 text-[var(--color-text)] transition-colors hover:bg-[var(--color-border)] sm:flex-none sm:min-w-[120px]"
+                className="flex-1 rounded-xl bg-[var(--color-bg)] px-6 py-3 text-[var(--color-text)] transition-colors hover:bg-[var(--color-border)]"
               >
                 취소
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 rounded-xl bg-[var(--color-accent)] px-6 py-3 font-semibold text-white transition-colors hover:bg-[var(--color-accent-hover)] disabled:opacity-60 sm:flex-none sm:min-w-[160px]"
+                className="flex-1 rounded-xl bg-[var(--color-accent)] px-6 py-3 text-white transition-colors hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
               >
                 {submitting ? "작성 중..." : "작성 완료"}
               </button>
             </div>
-          </div>
-        </motion.form>
+          </form>
+        </motion.div>
       </div>
     </div>
   );

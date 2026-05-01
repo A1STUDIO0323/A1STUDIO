@@ -4,12 +4,15 @@ import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/board?categorySlug=free&page=1&limit=20
+// GET /api/board?category=보컬%20팁&page=1&limit=20
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const categorySlug = searchParams.get("categorySlug");
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+    const categoryText = searchParams.get("category");
+    const page = Math.max(
+      1,
+      parseInt(searchParams.get("page") || "1", 10) || 1
+    );
     const limitRaw = parseInt(searchParams.get("limit") || "20", 10) || 20;
     const limit = Math.min(100, Math.max(1, limitRaw));
     const skip = (page - 1) * limit;
@@ -18,19 +21,8 @@ export async function GET(request: NextRequest) {
       isHidden: false,
     };
 
-    if (categorySlug) {
-      const category = await prisma.boardCategory.findUnique({
-        where: { slug: categorySlug },
-      });
-
-      if (!category) {
-        return NextResponse.json(
-          { success: false, error: "카테고리를 찾을 수 없습니다" },
-          { status: 404 }
-        );
-      }
-
-      where.categoryId = category.id;
+    if (categoryText) {
+      where.categoryText = categoryText;
     }
 
     const [posts, total] = await Promise.all([
@@ -39,10 +31,16 @@ export async function GET(request: NextRequest) {
         orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
         skip,
         take: limit,
-        include: {
-          category: {
-            select: { name: true, slug: true },
-          },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          authorId: true,
+          categoryText: true,
+          views: true,
+          isNotice: true,
+          isPinned: true,
+          createdAt: true,
           _count: {
             select: {
               comments: true,
@@ -61,10 +59,10 @@ export async function GET(request: NextRequest) {
         title: post.title,
         content:
           post.content.length > 100
-            ? post.content.substring(0, 100)
+            ? `${post.content.substring(0, 100)}...`
             : post.content,
         authorId: post.authorId,
-        category: post.category,
+        categoryText: post.categoryText,
         views: post.views,
         isNotice: post.isNotice,
         isPinned: post.isPinned,

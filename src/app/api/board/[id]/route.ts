@@ -13,23 +13,38 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     const post = await prisma.boardPost.findUnique({
       where: { id },
-      include: {
-        category: {
-          select: { name: true, slug: true },
-        },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        authorId: true,
+        categoryText: true,
+        views: true,
+        isNotice: true,
+        isPinned: true,
+        isHidden: true,
+        createdAt: true,
         comments: {
           where: { isHidden: false, parentId: null },
           orderBy: { createdAt: "asc" },
-          include: {
+          select: {
+            id: true,
+            content: true,
+            authorId: true,
+            createdAt: true,
             replies: {
               where: { isHidden: false },
               orderBy: { createdAt: "asc" },
+              select: {
+                id: true,
+                content: true,
+                authorId: true,
+                createdAt: true,
+              },
             },
           },
         },
-        _count: {
-          select: { likes: true },
-        },
+        _count: { select: { likes: true } },
       },
     });
 
@@ -52,7 +67,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         title: post.title,
         content: post.content,
         authorId: post.authorId,
-        category: post.category,
+        categoryText: post.categoryText,
         views: post.views + 1,
         isNotice: post.isNotice,
         isPinned: post.isPinned,

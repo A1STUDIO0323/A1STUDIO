@@ -2,7 +2,7 @@
 
 <!--
   AI_TRANSFER_PROMPT.md
-  버전: 2.44
+  버전: 2.45
   최종 수정: 2026-05-01
   작성자: A1 STUDIO 개발팀
 -->
@@ -2817,7 +2817,7 @@ DISABLE TRIGGER validate_reservation_user;
 ---
 
 **작성일**: 2026-05-01  
-**버전**: 2.44 (최신)  
+**버전**: 2.45 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3334,7 +3334,7 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 - **`src/lib/constants.ts`**: 게시판 메뉴에서 **자유게시판** 항목 제거, 부모 **`href`** 를 `/notices` 로 변경.
 - **Prisma/schema·마이그레이션 미변경** — DB에 `board_posts` 테이블이 남아 있어도 앱은 참조하지 않음.
 - *(역사)* `## 📝 최근 수정 사항 (2026-04-22)` **§3** 을 **폐기·역사** 로 재표기함(중복 서술 정리).
-- *(갱신)* 이후 **`src/app/api/board/**`** 에 Prisma `BoardCategory` · `BoardPost` · `BoardComment` · `BoardLike` 기반 API가 **별도 재구축**됨 — 아래 **「자유게시판 API」** 절.
+- *(갱신)* 이후 **`src/app/api/board/**`** 에 Prisma `BoardPost` · `BoardComment` · `BoardLike` 기반 API가 **재구축**됨 — 아래 **「자유게시판 API」** 절. **`BoardCategory` 모델은 제거**되고 **`BoardPost.categoryText`** 자유 텍스트 + 집계 기반 정식 카테고리로 전환(아래 **「자유게시판 카테고리 `categoryText`」**).
 
 ### AI_TRANSFER_PROMPT 최신화 (문서만, v2.40)
 
@@ -3348,26 +3348,34 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 - **`package.json`**: `scripts.build` 및 `postinstall` 에 이미 `prisma generate` 포함 **(변경 없을 수 있음)** — Vercel 루트 스크립트와 이중 실행은 허용 오버헤드 목적 허용.
 - **`.vercelignore`**: 없거나 `prisma/` 제외 패턴 없음 유지 (**스키마는 배포에 필요**).
 
-### Prisma 자유게시판 모델 — 스키마만 (`prisma/schema.prisma`)
+### Prisma 자유게시판 모델 (`prisma/schema.prisma`)
 
-- **추가 모델(4종)**: `BoardCategory`(→ `board_categories`), `BoardPost`(→ **`board_posts`**), `BoardComment`(→ `board_comments`), `BoardLike`(→ `board_likes`). 모두 **`@@schema("public")`**, 레거코드와 동일하게 DB 컬럼은 필요한 필드에 **`@map` snake_case** 정렬.
-- **마이그레이션 미실행**(요청 규칙): 운영 DB에 테이블이 없으면 **앱에서 Prisma CRUD 호출 전** Supabase DDL·마이그레이션으로 스키마를 맞춰야 함.
+- **`BoardCategory` 삭제**(테이블 `board_categories` 스키마에서 제외).
+- **`BoardPost`**: `categoryText`(→ `category_text`, 선택 문자열)·`comments`/`likes` 관계.`@@map("board_posts")` · `@@index([categoryText])` 등.
+- **`BoardComment`**, **`BoardLike`**: 변경 없음(게시글에 종속).
+- **운영 DB**: DDL/마이그레이션은 별도.(`category_id` 등 레거시 컬럼이 있으면 앱 로직과 **대조 필요** — 마이그레이션 금지 시나리오도 있음.)
+
+### 자유게시판 카테고리 `categoryText` (임계치 10건)
+
+- 글 작성 시 **20자 이하 자유 입력**(선택). 동일 문자열이 **숨김 제외 게시글**에 **10건 이상**이면 **`GET /api/board/categories`** 에 `{ name, count, isOfficial: true }` 로 노출(집계: `groupBy categoryText`).
+- 목록 필터 **`GET /api/board?category=`** 는 **완전 일치** `categoryText` 쿼리.
+- 간단 금칙어(`욕설`/`비속어`/`광고` 포함 문자열 차단 등)는 **`POST /api/board/create`** 에서 처리.
 
 ### 자유게시판 API (Prisma·Supabase 세션)
 
-- **`GET/POST /api/board/categories`** — 목록(활성만, 공식 우선), 생성(로그인·`slug` 유니크).
-- **`GET /api/board`** — 쿼리 `categorySlug`, `page`, `limit`(최대 100), 숨김 제외, 미리보기 문자열.
-- **`POST /api/board/create`** — 작성(로그인, 선택 `categorySlug`).
-- **`GET/DELETE /api/board/[id]`** — 상세(조회수 +1, 댓글 최상위+대댓글), 삭제(작성자만).
-- **`POST /api/board/[id]/comments`** — 댓글·대댓글(`parentId`는 동일 게시글 댓글만).
-- **`POST /api/board/[id]/like`** — 좋아요 토글(`postId_userId`).
-- 공통: `export const dynamic = "force-dynamic"` · `@/lib/db`, `@/lib/supabase/server` 의 `getUser()` 인증 분기.
+- **`GET /api/board/categories`** — 정식 카테고리만(임계치 이상), `threshold` 응답 포함. (**`POST` 없음**.)
+- **`GET /api/board`** — 쿼리 **`category`**(텍스트), `page`, `limit`(최대 100), 숨김 제외·미리보기.
+- **`POST /api/board/create`** — `categoryText`(선택, 검증 포함).
+- **`GET/DELETE /api/board/[id]`** — 상세에 `categoryText`, 조회수 +1·댓글 트리, 삭제는 작성자.
+- **`POST /api/board/[id]/comments`**, **`POST /api/board/[id]/like`** — 기존과 동일.
+- 공통: `export const dynamic = "force-dynamic"` · `@/lib/db` 등.
 
 ### 자유게시판 UI (클라이언트 페이지)
 
-- **`/board`** (`src/app/board/page.tsx`): 카테고리 칩·`/api/board/categories` · `/api/board` 목록·페이지네이션. `useSearchParams` 는 **`Suspense`** 로 감싼 래퍼 제공. CSS 변수·`motion/react`·rounded-2xl 패턴.
-- **`/board/write`** (`src/app/board/write/page.tsx`): 폼 → `POST /api/board/create`.
-- **`/board/[id]`** (`src/app/board/[id]/page.tsx`): 상세·좋아요·댓글·작성자 삭제(`GET /api/members/profile` 의 `profile.id` 와 `post.authorId` 비교). 라우트 식별자는 **`useParams`**.
+- **`/board`** : 정식 카테고리 칩 + 검색(입력 문자열을 `?category=` 로 이동). `/api/board/categories`, `/api/board`.
+- **`/board/write`** : **카테고리 텍스트** 단일 입력(드롭다운 없음).
+- **`/board/[id]`** : `categoryText` 뱃지.
+- **`/board/guide`** : 이용 안내(공지 `/notices` 링크). `motion` 미사용·정적 카드 레이아웃.
 
 ---
 
