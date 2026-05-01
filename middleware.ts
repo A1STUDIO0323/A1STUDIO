@@ -169,6 +169,7 @@ export async function middleware(request: NextRequest) {
       }
     }
   } catch (err) {
+    console.error("[middleware] session refresh failed:", err);
     console.error("[middleware] profile check error:", err);
 
     if (process.env.NODE_ENV === "production") {

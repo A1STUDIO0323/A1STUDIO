@@ -135,7 +135,9 @@ export async function getActivePaymentLocksForUser(
 /**
  * 사용자의 모든 만료되지 않은 락 조회
  */
-export async function getUserActiveLocks(userId: string): Promise<any[]> {
+type PaymentLockRow = Record<string, unknown>;
+
+export async function getUserActiveLocks(userId: string): Promise<PaymentLockRow[]> {
   try {
     const supabase = await createClient();
     

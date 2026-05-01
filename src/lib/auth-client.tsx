@@ -5,6 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";
 import { isAdult as birthYearIsAdult } from "@/lib/age-check";
+import { logger } from "@/lib/logger";
 
 type AuthUser = {
   id: string;
@@ -149,12 +150,14 @@ export async function signIn(
   const redirectTo = `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`;
 
   if (typeof window !== "undefined") {
-    console.log("[signIn OAuth] Provider:", provider);
-    console.log("[signIn OAuth] Redirect URL:", redirectTo);
-    console.log("[signIn OAuth] Post-callback path:", next);
-    console.log("[signIn OAuth] Remember me:", rememberMe);
-    console.log("[signIn OAuth] Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
-    console.log("[signIn OAuth] Supabase Key configured:", !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+    if (process.env.NODE_ENV !== "production") {
+      logger.log("[signIn OAuth] Provider:", provider);
+      logger.log("[signIn OAuth] Redirect URL:", redirectTo);
+      logger.log("[signIn OAuth] Post-callback path:", next);
+      logger.log("[signIn OAuth] Remember me:", rememberMe);
+      logger.log("[signIn OAuth] Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+      logger.log("[signIn OAuth] Supabase Key configured:", !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+    }
   }
 
   // 카카오 로그인 시 필수 동의 항목 설정 (GoTrue/OAuth는 공백 구분 scope 문자열 사용)
@@ -178,8 +181,10 @@ export async function signIn(
   }
 
   if (typeof window !== "undefined") {
-    console.log("[signIn OAuth] Response data:", data);
-    console.log("%c[signIn OAuth] 카카오 로그인 페이지로 리다이렉트 중...", "color: green; font-weight: bold");
+    if (process.env.NODE_ENV !== "production") {
+      logger.log("[signIn OAuth] Response data:", data);
+      logger.log("%c[signIn OAuth] 카카오 로그인 페이지로 리다이렉트 중...", "color: green; font-weight: bold");
+    }
   }
 
   return { ok: true };
@@ -215,6 +220,7 @@ export function useIsAdult(): { loading: boolean; isAdult: boolean | null } {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get("refresh")) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- bump refreshKey when ?refresh= for profile reload
         setRefreshKey(Date.now());
       }
     }
@@ -222,25 +228,42 @@ export function useIsAdult(): { loading: boolean; isAdult: boolean | null } {
 
   useEffect(() => {
     if (status === "loading") {
-      setState({ loading: true, isAdult: null });
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loading branch snapshot guard
+      setState((prev) =>
+        prev.loading && prev.isAdult === null
+          ? prev
+          : { loading: true, isAdult: null }
+      );
       return;
     }
 
     if (status !== "authenticated" || !session?.user?.id) {
-      console.log("[useIsAdult] 비로그인 또는 세션 없음 → 판단 종료");
-      setState({ loading: false, isAdult: null });
+      if (process.env.NODE_ENV !== "production") {
+        logger.log("[useIsAdult] 비로그인 또는 세션 없음 → 판단 종료");
+      }
+      setState((prev) =>
+        prev.loading === false && prev.isAdult === null
+          ? prev
+          : { loading: false, isAdult: null }
+      );
       return;
     }
 
     let cancelled = false;
-    setState({ loading: true, isAdult: null });
+    setState((prev) =>
+      prev.loading === true && prev.isAdult === null
+        ? prev
+        : { loading: true, isAdult: null }
+    );
 
     void fetch("/api/members/profile", {
       cache: "no-store",
       headers: { "Cache-Control": "no-cache" },
     })
       .then((res) => {
-        console.log("[useIsAdult] HTTP:", res.status, res.ok);
+        if (process.env.NODE_ENV !== "production") {
+          logger.log("[useIsAdult] HTTP:", res.status, res.ok);
+        }
         return res.json();
       })
       .then((data: {
@@ -248,26 +271,34 @@ export function useIsAdult(): { loading: boolean; isAdult: boolean | null } {
         profile?: { birthYear?: number | null; birth_year?: number | null };
       }) => {
         if (cancelled) return;
-        console.log("[useIsAdult] API 응답:", data);
+        if (process.env.NODE_ENV !== "production") {
+          logger.log("[useIsAdult] API 응답:", data);
+        }
         const profile = data.profile;
         const birthYear =
           profile?.birthYear ?? profile?.birth_year ?? null;
-        console.log("[useIsAdult] birthYear (camelCase):", profile?.birthYear);
-        console.log("[useIsAdult] birth_year (snake_case):", profile?.birth_year);
-        console.log("[useIsAdult] resolved birthYear:", birthYear);
+        if (process.env.NODE_ENV !== "production") {
+          logger.log("[useIsAdult] birthYear (camelCase):", profile?.birthYear);
+          logger.log("[useIsAdult] birth_year (snake_case):", profile?.birth_year);
+          logger.log("[useIsAdult] resolved birthYear:", birthYear);
+        }
 
         if (!data.success || birthYear == null) {
-          console.log("[useIsAdult] 성인 판단 불가:", {
-            success: data.success,
-            hasProfile: !!profile,
-            birthYear,
-          });
+          if (process.env.NODE_ENV !== "production") {
+            logger.log("[useIsAdult] 성인 판단 불가:", {
+              success: data.success,
+              hasProfile: !!profile,
+              birthYear,
+            });
+          }
           setState({ loading: false, isAdult: null });
           return;
         }
 
         const adult = birthYearIsAdult(new Date(birthYear, 11, 31));
-        console.log("[useIsAdult] isAdult (서버와 동일 기준, 연말 기준일):", adult);
+        if (process.env.NODE_ENV !== "production") {
+          logger.log("[useIsAdult] isAdult (서버와 동일 기준, 연말 기준일):", adult);
+        }
         setState({ loading: false, isAdult: adult });
       })
       .catch((err) => {

@@ -1,6 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 
 export function createClient(useLocalStorage: boolean = true) {
+  void useLocalStorage;
   // Supabase SSR의 기본 쿠키 storage 사용 (storage 옵션 제거)
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

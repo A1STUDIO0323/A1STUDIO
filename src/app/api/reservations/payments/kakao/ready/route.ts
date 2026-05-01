@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     const startHour = parseInt(startTime.split(":")[0], 10);
     const priceType = getPriceType(reservationDate, startHour);
     const duration = calcDuration(startTime, endTime);
-    const pricing = calcPoints(priceType as any, duration, reservationDate);
+    const pricing = calcPoints(priceType, duration, reservationDate);
     const totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
 
     partner_order_id = `practice-${user.id}-${Date.now()}`;

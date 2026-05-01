@@ -32,7 +32,7 @@ type ApproveResponse = {
 const KAKAOPAY_API_BASE = "https://open-api.kakaopay.com/online/v1/payment";
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __a1KakaoTidMap: Map<string, string> | undefined;
 }
 

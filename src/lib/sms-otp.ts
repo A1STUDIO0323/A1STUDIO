@@ -8,7 +8,7 @@ const OTP_TTL_MS = 3 * 60 * 1000; // 3분
 const MAX_VERIFY_ATTEMPTS = 5;
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __a1SmsOtpStore: Map<string, OtpEntry> | undefined;
 }
 

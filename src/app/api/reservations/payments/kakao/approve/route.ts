@@ -59,9 +59,18 @@ export async function GET(request: NextRequest) {
       cookieStore.get("practice_kakao_order_id")?.value ?? null;
     const rawData = cookieStore.get("practice_reservation_data")?.value;
 
-    if (!tid || !partner_order_id || !rawData) {
+    if (!tid || tid.trim() === "") {
+      return NextResponse.json({ error: "tid_missing" }, { status: 400 });
+    }
+
+    if (!partner_order_id || !rawData) {
       console.error("[연습실 카카오페이] 쿠키 정보 없음");
       return NextResponse.redirect(new URL("/booking?failed=true", request.url));
+    }
+
+    const requestTid = searchParams.get("tid");
+    if (requestTid != null && requestTid !== "" && requestTid !== tid) {
+      return NextResponse.json({ error: "tid_mismatch" }, { status: 400 });
     }
 
     let reservationData: PracticeReservationCookie;
@@ -88,7 +97,7 @@ export async function GET(request: NextRequest) {
     const startHour = parseInt(startTime.split(":")[0], 10);
     const priceType = getPriceType(reservationDate, startHour);
     const duration = calcDuration(startTime, endTime);
-    const pricing = calcPoints(priceType as any, duration, reservationDate);
+    const pricing = calcPoints(priceType, duration, reservationDate);
     const totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
 
     if (Math.abs(totalAmount - reservationData.totalAmount) > 0) {

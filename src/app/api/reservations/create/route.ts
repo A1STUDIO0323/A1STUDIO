@@ -8,6 +8,7 @@ import {
   calcPartyRoomPoints,
   PARTY_ROOM_MAX_HEADCOUNT,
   PartyRoomPackage,
+  type PriceType,
 } from "@/lib/pricing";
 import { isAdult } from "@/lib/age-check";
 import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
       const startHour = parseInt(start_time.split(":")[0]);
       priceType = getPriceType(reservationDate, startHour);
       duration = calcDuration(start_time, end_time);
-      const pricing = calcPoints(priceType as any, duration, reservationDate);
+      const pricing = calcPoints(priceType as PriceType, duration, reservationDate);
       pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
     }
 

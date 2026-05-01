@@ -166,9 +166,24 @@ export async function POST(request: NextRequest) {
       amount,
     });
 
+    const tid = kakaoResult.tid;
+    if (!tid || String(tid).trim() === "") {
+      await releasePaymentLock(user.id, "party-room", orderId);
+      return NextResponse.json(
+        { error: "kakao_tid_missing" },
+        { status: 500 }
+      );
+    }
+
     // 7. 쿠키에 결제 정보 저장
     const cookieStore = await cookies();
-    cookieStore.set("party_kakao_tid", kakaoResult.tid, { maxAge: 900 }); // 15분
+    cookieStore.set("party_kakao_tid", tid, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600,
+    });
     cookieStore.set("party_order_id", orderId, { maxAge: 900 });
     cookieStore.set("party_package_type", package_type, { maxAge: 900 });
     cookieStore.set("party_date", date, { maxAge: 900 });
@@ -182,7 +197,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       redirect_url: kakaoResult.next_redirect_pc_url,
-      tid: kakaoResult.tid,
+      tid,
     });
   } catch (error) {
     console.error("카카오페이 결제 준비 오류:", error);

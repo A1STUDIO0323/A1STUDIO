@@ -2,8 +2,8 @@
 
 <!--
   AI_TRANSFER_PROMPT.md
-  버전: 2.31
-  최종 수정: 2026-04-25
+  버전: 2.41
+  최종 수정: 2026-05-01
   작성자: A1 STUDIO 개발팀
 -->
 
@@ -103,6 +103,19 @@ $$;
 
 ---
 
+### Root `global-error`·OAuth 콘솔 가드·미들웨어 보강 로그·파티룸 tid 검증 (2026-04-25)
+
+**목표:** 레이아웃·루트 실패 대응, 운영 콘솔 노이즈 감소, 결제 승인 요청 교차 검증 준비.
+
+**반영:**
+
+1. **`src/app/global-error.tsx`** — App Router **최상위** 에러 경계(`<html lang="ko"><body>…`), `globals.css` 로 CSS 변수 적용, 문구·`reset`만. **`console.error(error)`는 `NODE_ENV !== 'production'` 일 때만** (프로덕션 콘솔 억제).
+2. **`src/lib/auth-client.tsx`**, **`src/app/auth/callback/route.ts`** — (1차) **`console.log` / `console.warn`** 만 **`process.env.NODE_ENV !== 'production'`** 가드, **`console.error`는 그대로**; (2차) 동일 경로는 **`logger`** 로 치환 — `## 📝 최근 수정 사항 (2026-04-25)` **§4**·`src/lib/logger.ts`.
+3. **`middleware.ts`** (프로젝트 루트; `src/middleware.ts` 없음) — 프로필 fetch **`catch`** 안에 **`console.error('[middleware] session refresh failed:', err)`** 추가(production 포함). 리다이렉트·분기는 기존과 동일.
+4. **`GET /api/party-room/payments/kakao/approve`** — 쿼리 **`tid`** 가 비어 있지 않으면 쿠키 **`party_kakao_tid`** 와 다를 때 **400** JSON **`{ error: 'tid_mismatch' }`** 후 즉시 return. 카카오 기본 성공 리다이렉트는 **`pg_token` 위주**라, **`tid` 쿼리가 없으면 이 검증은 발동하지 않음** — 상시 교차검증은 ready 단계 **`approval_url`** 에 `tid` 부착 등 후속 검토(코드 내 **`// TODO(stability):`**).
+
+---
+
 ## 🔍 안정성 검토 (2026-04-25)
 
 문서·코드 리뷰 관점의 **참고용 평가**이며, 점수는 상대적 지표다.
@@ -125,7 +138,7 @@ $$;
 **Good Points:**
 
 - `.env*` gitignore, Zod 검증, RLS + Prisma 병행, 성인 검증, 포인트 차감 후 예약 생성 순서 등.
-- 글로벌 **`error.tsx` · `not-found.tsx`**(2026-04-23), **`src/lib/logger.ts`**(프로덕션 안전 로그 유틸, 연동은 선택).
+- 글로벌 **`error.tsx` · `not-found.tsx` · `global-error.tsx`**, **`src/lib/logger.ts`**(프로덕션 안전 로그 유틸, 연동은 선택), OAuth 경로 **`console.log`/`warn` 운영 억제**, 파티룸 승인 **`tid`/`party_kakao_tid` 불일치 400**.
 
 **개선 우선순위 (선택):** 미들웨어 추가 시나리오 → 레이아웃별 에러 UI → 타입 정리.
 
@@ -158,6 +171,10 @@ $$;
 **6. 시간대 중복 409**
 
 - `retryAfter` **없는** 409 → “이미 예약된 시간대” 등 **서버 `error` 문구**만 표시되는지 확인.
+
+**7. 파티룸 카카오 승인 `tid` 불일치(선택)**
+
+- `GET /api/party-room/payments/kakao/approve?pg_token=…&tid=…` 에서 **`tid` ≠ 쿠키 `party_kakao_tid`** 이면 **400** `tid_mismatch`. (기본 카카오 리다이렉트에 `tid`가 없으면 본 검증은 스킵될 수 있음.)
 
 ---
 
@@ -1880,9 +1897,10 @@ A1STUDIO/
 - **`src/lib/supabase-points.ts`** — `deductPointsDB`, **`refundPointsDB`** (`reservationId` 선택·NULL 허용), `chargePointsDB` 등
 - **`src/app/api/reservations/create/route.ts`** — 포인트 예약, INSERT 실패 시 **`refundPointsDB` + `releasePaymentLock`**
 - **`src/app/api/reservations/payments/kakao/*`**, **`src/app/api/party-room/payments/kakao/*`** — 카카오 ready/approve/fail/cancel 및 락 정리
-- **`src/app/error.tsx`**, **`src/app/not-found.tsx`** — 글로벌 예외·404 UI (`cf43f93`)
+- **`src/app/error.tsx`**, **`src/app/not-found.tsx`**, **`src/app/global-error.tsx`** — 세그먼트·루트 에러·404 UI
 - **`src/lib/logger.ts`** — 프로덕션 안전 콘솔 래퍼(점진 연동)
-- **`middleware.ts`** — 프로필 검증 예외 시 프로덕션 `/login`
+- **`middleware.ts`** — 프로필 검증 예외 시 프로덕션 `/login`; **`catch`에 `session refresh failed` 로그**
+- **`GET /api/party-room/payments/kakao/approve`** — 선택적 쿼리 **`tid`** 와 쿠키 **`party_kakao_tid`** 교차 검증(`tid_mismatch`)
 
 ---
 
@@ -1899,7 +1917,7 @@ A1STUDIO/
 - ✅ 회원가입 페이지 (Google/Kakao 소셜만, 약관 동의)
 - ✅ 온보딩 플로우 (프로필 입력, 휴대폰 SMS 인증)
 - ✅ 라우트 가드 미들웨어 (인증 & 온보딩 체크, Prisma 기반; 프로필 검증 예외 시 **프로덕션** `/login`)
-- ✅ 글로벌 **`error.tsx`** · **`not-found.tsx`** (처리되지 않은 예외·404 UX)
+- ✅ 글로벌 **`error.tsx`** · **`not-found.tsx`** · **`global-error.tsx`** (세그먼트·루트 예외·404 UX)
 - ✅ 예약 시스템 (연습실 — 포인트 또는 카카오페이)
 - ✅ 파티룸 예약 (포인트 또는 카카오페이 직접 결제)
 - ✅ 포인트 충전 (Kakao Pay)
@@ -2305,11 +2323,15 @@ A1STUDIO/
 - **`MemberRole`**: `member_roles` — `email` PK, `role`(예: `"CM"`), `created_at` / `updated_at`.  
 - **`prisma db push`**: Supabase·기존 데이터에 따라 `reviews` 유니크·`blocked_slots` PK 등 **데이터 손실 경고**가 날 수 있음 — `--accept-data-loss` 여부는 별도 검토.
 
-### 3. 자유게시판 — Prisma 모델 없이 Raw SQL
+### 3. 자유게시판 (`board_posts`) — **폐기** *(역사 기록, 2026-04-22 시점 서술)*
 
-- `public.board_posts` + `public.profiles` 조인: **`src/lib/board-db.ts`** (`Prisma.$queryRaw` / `$executeRaw`).
+**현행(2026-05-01 이후):** 자유게시판·`board_posts` 앱 코드 **삭제**. `src/`·`prisma/`에서 **`board_posts` 문자열 없음**이 정상. DB에 테이블이 남아 있어도 앱은 참조하지 않음. 삭제 파일·네비 권장 안은 **`## 📝 최근 수정 사항 (2026-05-01)`** 참고.
+
+**당시(2026-04-22) 구현 요약 (더 이상 코드에 없음):**
+
+- `public.board_posts` + `public.profiles` 조인: `src/lib/board-db.ts` (`Prisma.$queryRaw` / `$executeRaw`).
 - `src/app/board/page.tsx`, `src/app/board/[id]/page.tsx`, `src/app/api/board/route.ts`에서 위 헬퍼 사용. (게시 `id` 생성: `randomUUID()`.)
-- *참고*: 스키마에 `BoardPost` **모델이 없을 수 있음** — 문서/코드는 **테이블이 DB에 있고 Raw로만 접근**하는 전제에 맞춤.
+- *당시 참고*: Prisma에 `BoardPost` 모델 없이 Raw만 쓰는 전제.
 
 ### 4. OAuth 콜백 — 카카오 온보딩 리다이렉트 타이밍 (`src/app/auth/callback/route.ts`)
 
@@ -2794,8 +2816,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 ---
 
-**작성일**: 2026-04-25  
-**버전**: 2.31 (최신)  
+**작성일**: 2026-05-01  
+**버전**: 2.41 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3304,6 +3326,29 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 
 ---
 
+## 📝 최근 수정 사항 (2026-05-01)
+
+### 자유게시판(`board_posts`) 기능 제거
+
+- **삭제**: `src/lib/board-db.ts`, `src/app/board/**`(목록·상세·글쓰기), `POST /api/board`(`src/app/api/board/route.ts`), `src/components/board/BoardWriteForm.tsx`.
+- **`src/lib/constants.ts`**: 게시판 메뉴에서 **자유게시판** 항목 제거, 부모 **`href`** 를 `/notices` 로 변경.
+- **Prisma/schema·마이그레이션 미변경** — DB에 `board_posts` 테이블이 남아 있어도 앱은 참조하지 않음.
+- *(역사)* `## 📝 최근 수정 사항 (2026-04-22)` **§3** 을 **폐기·역사** 로 재표기함(중복 서술 정리).
+
+### AI_TRANSFER_PROMPT 최신화 (문서만, v2.40)
+
+- **2026-04-22 §3**: 활성 기능처럼 읽히지 않도록 **현행 vs 당시(역사)** 를 분리했다.
+- **코드 정합 검증**: `src/`·`prisma/` 에서 **`board_posts` 검색 0건** 이 현행 목표다.
+- **`NAV_LINKS` 점검**: 게시판에 **`/board`·「자유게시판」** 이 남아 있으면 라우트가 없어 **깨진 링크**가 된다. 위 삭제와 맞추려면 **`src/lib/constants.ts`** 에서 부모 `href` 를 `/notices` 로 두고 자유게시판 항목을 제거할 것 **(워크트리별로 확인)**.
+
+### Vercel 빌드 — Prisma Client 생성 명시 (`vercel.json`)
+
+- **루트 `vercel.json`** (추가): `buildCommand` = `prisma generate && npm run build`, `installCommand` = `npm install`, `framework` = `nextjs`, **`$schema`**: `openapi.vercel.sh` (배포 시 대시보드와 무관하게 generate→빌드 순서 고정).
+- **`package.json`**: `scripts.build` 및 `postinstall` 에 이미 `prisma generate` 포함 **(변경 없을 수 있음)** — Vercel 루트 스크립트와 이중 실행은 허용 오버헤드 목적 허용.
+- **`.vercelignore`**: 없거나 `prisma/` 제외 패턴 없음 유지 (**스키마는 배포에 필요**).
+
+---
+
 ## 📝 최근 수정 사항 (2026-04-29)
 
 > **역사 기록:** 이 절은 당시 문서 대규모 구조 갱신 배치를 남긴 것이다. **현재 문서 버전·최종 수정일**은 파일 **상단 HTML 주석**과 **아래 고정 메타**(`**작성일**` / `**버전**`)를 본다. 이후 **`cf43f93`**(글로벌 error/not-found·logger·middleware) 등은 **`## 🔧 최근 주요 변경사항`** 및 **`## 📝 최근 수정 사항 (2026-04-25)`** 참고.
@@ -3323,9 +3368,9 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 
 ## 📝 최근 수정 사항 (2026-04-25)
 
-### 1. AI_TRANSFER_PROMPT.md 최신화 (문서만)
+### 1. AI_TRANSFER_PROMPT.md 최신화 (문서만, 당시 기록)
 
-- 상단·하단 메타 **v2.31** / **최종 수정 2026-04-25** — 실제 코드 반영 커밋 `cf43f93` 일자와 정합.
+- 상단·하단 메타는 이후 **v2.31 → v2.33 → v2.34**로 누적 갱신됨(현재 **v2.34** / **최종 수정 2026-04-25**). 아래 `cf43f93` 반영·안정성 절은 **당시** 문서 작업을 보존한 것.
 - **`## 🔧 최근 주요 변경사항`**에 **`cf43f93`** 요약 절 추가(글로벌 error/not-found, `logger`, middleware 프로덕션 `/login`).
 - **`## 📂 파일 구조` → `### 결제 및 예약 안정성`**: 앱 공통 안정성 경로 보강.
 - **`## 🎯 현재 상태 요약`**: 글로벌 에러·404·미들웨어 동작 한 줄 반영.
@@ -3335,3 +3380,44 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 ### 2. Git 커밋 참고 (코드, 이미 반영됨)
 
 - `cf43f93` — `feat: 안정성 개선 - 에러 페이지, 프로덕션 로거, middleware 개선`
+
+### 3. 안정성 보강 추가 (2026-04-25, 문서 반영)
+
+- **`src/app/global-error.tsx`**: 루트 에러 바운더리, 프로덕션에서 전체 `error` 객체 `console.error` 억제.
+- **`src/lib/auth-client.tsx`**, **`src/app/auth/callback/route.ts`** (1차): `console.log` / `console.warn` 는 비프로덕션 가드; **(2차, 아래 §4)** 동일 경로는 `logger`로 치환 — 동작·레벨별 정책은 `src/lib/logger.ts`·§4 참고.
+- **`middleware.ts`**: `catch`에 **`[middleware] session refresh failed`** 로그.
+- **`src/app/api/party-room/payments/kakao/approve/route.ts`**: 쿼리 `tid` ≠ 쿠키 `party_kakao_tid` → **400** `tid_mismatch`; 카카오 기본 콜백만으로는 `tid` 없을 수 있음(`TODO(stability)`).
+
+### 4. 안정성 2차 보완 (2026-04-25, 코드)
+
+- **`next.config.ts`**: `headers()` — 전 경로 `/:path*`에 **HSTS**(`Strict-Transport-Security`), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` 설정. (`images`·`experimental` 등 기존 옵션 그대로)
+- **로거** (`src/lib/logger.ts` 확인 후): `src/lib/auth-client.tsx`, `src/app/auth/callback/route.ts` — `console.log`/`console.warn` → `logger` (프로덕션 `log`는 무음, `error`는 유지)
+- **타입**: `calcPoints` 호출 3곳 — `getPriceType` 결과는 `as PriceType` 또는 단언 제거(연습실 kakao ready/approve); `Header.tsx` — `NAV_LINKS` 항목 `NavLinkItem` 교차 타입으로 `isNew` 정리(기존 `link as any` 제거)
+- **파티룸 카카오 ready** (`src/app/api/party-room/payments/kakao/ready/route.ts`): `readyPayment` 응답 `tid` 없음/빈 문자열 시 **500** `kakao_tid_missing` + 락 해제; `tid` 있을 때 `party_kakao_tid` 쿠키 `httpOnly`·`secure`(production)·`sameSite: lax`·`maxAge: 600`. 성공 JSON 필드(`redirect_url`, `tid`) 유지
+
+### 5. AI_TRANSFER_PROMPT.md 정합 (2026-04-25, 문서)
+
+- **메타·버전**: HTML 주석·말미 `**작성일**` / `**버전**` = **2.34** (당시 최신), **최종 수정 2026-04-25** — 이후 **§6**에서 **v2.35**로 누적.
+- **§1**: 구 메타 `v2.31`만 언급하던 문구를 **버전 누적·당시 v2.34**로 정리(역사 보존).
+- **§3 vs §4**: `auth-client` / `auth/callback` — **1차(가드)** 와 **2차(logger)** 서술을 나란히 명시해 모순 제거.
+- **참고** (`src/lib/logger.ts`): `log`·`info`·`debug`·`warn`·`error`·`payment` 는 항목별로 다름 — 상세는 소스·§4 확인.
+
+### 6. AI_TRANSFER_PROMPT.md·안정성 3차 (2026-04-25)
+
+- **문서**: HTML 주석·말미 `**작성일**` / `**버전**` → **2.35** (당시), 이후 **§7**에서 **v2.36** 누적.
+- **`src/lib/auth-client.tsx` (3차 검증)**: `console.log` / `console.warn` 잔여 **없음** (2차 §4 반영됨). `console.error` **2곳** 유지. `import { logger } from '@/lib/logger'` 기존. **코드 diff 없음** 가능. `npm run build` 통과(검증 시점 기준).
+
+### 7. 보안·안정성 4차 (2026-04-25)
+
+- **`GET /api/reservations/payments/kakao/approve`**: 쿠키 **`practice_kakao_tid`** 없음·빈 문자열 → **400** `tid_missing`; 쿼리 **`tid`** 존재·비공백이고 쿠키 값과 불일치 → **400** `tid_mismatch` (파티룸 승인과 동일 패턴). 그 다음 기존 `approvePayment`·예약 INSERT.
+- **`POST /api/admin/auth`**: **`ADMIN_PASSWORD_HASH`** 있으면 **`bcryptjs`** `compare`; 없으면 **`ADMIN_PASSWORD`** 평문 비교 + **`console.warn`** 평문 fallback 안내.
+- **`POST /api/contact`**: HTML 파트에 **`escapeHtml`** 로 name·phone·subject·message 이스케이프 (`text` 본문 미변경).
+- **`useIsAdult`** (`auth-client`): `loading` 분기 **`setState`** 동일 값 생략 가드.
+- **ESLint `--fix`**: exit **1**, 잔존 위반 **다수** — 자동수정만 선택 유지·롤백 분리는 워킹트리 혼재 시 사용자 판단.
+
+### 8. ESLint `set-state-in-effect` 등 (2026-04-25, 5차)
+
+- **`src/lib/auth-client.tsx`**: `?refresh=` 시 **`setRefreshKey(Date.now())`** + 해당 줄 **`eslint-disable-next-line`**; `loading`/비인증·페치 전 **`setState`** 는 함수형 가드(미발동 줄은 disable 생략).
+- **`Header.tsx`** (`pathname` 동기화), **`EquipmentDetailView.tsx`**, **`admin-context.tsx`**: 필요 줄 **`eslint-disable-next-line`** + 동작 동일한 `setState`.
+- **`src/lib/payment-lock.ts`**: `getUserActiveLocks` 반환 **`PaymentLockRow[]`** (`Record<string, unknown>`).
+- **미사용 변수 정리**: `Header`, `charge/cancel`, `login`, `guide`, `Hero`, 파티룸 카카오 승인, `supabase/client` 등 — **`npm run lint`** 에 오류·경고 잔존.

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Star } from "lucide-react";
 import { STUDIO_DESCRIPTION, STUDIO_NAME, STUDIO_TAGLINE } from "@/lib/constants";
 

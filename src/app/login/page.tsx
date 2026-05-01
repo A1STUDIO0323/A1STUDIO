@@ -3,7 +3,7 @@
 import { signIn, useSession } from "@/lib/auth-client";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { STUDIO_NAME } from "@/lib/constants";
 import { AlertCircle } from "lucide-react";
 import { sanitizePostAuthRedirect } from "@/lib/safe-redirect";

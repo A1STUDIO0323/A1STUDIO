@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import type { User as SupabaseAuthUser } from '@supabase/supabase-js';
 
 function prismaPayloadFromAuthUser(user: SupabaseAuthUser) {
@@ -76,11 +77,13 @@ export async function GET(request: Request) {
   if (user && user.app_metadata?.provider === 'kakao') {
     try {
       // 카카오 메타데이터 구조 확인용 디버깅 로그
-      console.log('=== OAuth 콜백 디버깅 ===');
-      console.log('Provider:', user.app_metadata?.provider);
-      console.log('User metadata:', JSON.stringify(user.user_metadata, null, 2));
-      console.log('App metadata:', JSON.stringify(user.app_metadata, null, 2));
-      console.log('========================');
+      if (process.env.NODE_ENV !== 'production') {
+        logger.log('=== OAuth 콜백 디버깅 ===');
+        logger.log('Provider:', user.app_metadata?.provider);
+        logger.log('User metadata:', JSON.stringify(user.user_metadata, null, 2));
+        logger.log('App metadata:', JSON.stringify(user.app_metadata, null, 2));
+        logger.log('========================');
+      }
 
       const { avatarUrl, provider } = prismaPayloadFromAuthUser(user);
 
@@ -106,7 +109,9 @@ export async function GET(request: Request) {
 
           if (kakaoUserResponse.ok) {
             const kakaoUserData = await kakaoUserResponse.json();
-            console.log('[auth/callback] 카카오 API 응답:', JSON.stringify(kakaoUserData, null, 2));
+            if (process.env.NODE_ENV !== 'production') {
+              logger.log('[auth/callback] 카카오 API 응답:', JSON.stringify(kakaoUserData, null, 2));
+            }
 
             // 실명 추출
             if (kakaoUserData.kakao_account?.name) {
@@ -131,7 +136,9 @@ export async function GET(request: Request) {
                 .replace('+82', '0'); // +82 → 0
             }
           } else {
-            console.warn('[auth/callback] 카카오 API 응답 실패:', kakaoUserResponse.status);
+            if (process.env.NODE_ENV !== 'production') {
+              logger.warn('[auth/callback] 카카오 API 응답 실패:', kakaoUserResponse.status);
+            }
           }
         }
       } catch (error) {
@@ -201,13 +208,15 @@ export async function GET(request: Request) {
               },
             });
           }
-          console.log('[auth/callback] 카카오 프로필 자동 저장 완료:', {
-            name: kakaoRealName,
-            nickname: kakaoNickname,
-            birth_year: kakaoBirthyear,
-            phone: kakaoPhone,
-            updateData,
-          });
+          if (process.env.NODE_ENV !== 'production') {
+            logger.log('[auth/callback] 카카오 프로필 자동 저장 완료:', {
+              name: kakaoRealName,
+              nickname: kakaoNickname,
+              birth_year: kakaoBirthyear,
+              phone: kakaoPhone,
+              updateData,
+            });
+          }
         } catch (err) {
           console.error('[auth/callback] 카카오 프로필 저장 오류:', err);
         }
@@ -221,27 +230,36 @@ export async function GET(request: Request) {
 
       let redirectPath = next || '/';
 
-      console.log('[auth/callback] === 온보딩 체크 시작 ===');
-      console.log('[auth/callback] profile:', JSON.stringify(profile));
-      console.log('[auth/callback] !name:', !profile?.name, '!birth_year:', !profile?.birth_year, '!phone_verified:', !profile?.phone_verified);
+      if (process.env.NODE_ENV !== 'production') {
+        logger.log('[auth/callback] === 온보딩 체크 시작 ===');
+        logger.log('[auth/callback] profile:', JSON.stringify(profile));
+        logger.log('[auth/callback] !name:', !profile?.name, '!birth_year:', !profile?.birth_year, '!phone_verified:', !profile?.phone_verified);
+      }
 
       if (!profile?.name || !profile?.birth_year) {
         redirectPath = '/onboarding/profile';
-        console.log('[auth/callback] → /onboarding/profile (이름 또는 출생연도 없음)');
+        if (process.env.NODE_ENV !== 'production') {
+          logger.log('[auth/callback] → /onboarding/profile (이름 또는 출생연도 없음)');
+        }
       } else if (!profile?.phone_verified) {
         redirectPath = '/onboarding/phone';
-        console.log('[auth/callback] → /onboarding/phone (전화번호 미인증)');
+        if (process.env.NODE_ENV !== 'production') {
+          logger.log('[auth/callback] → /onboarding/phone (전화번호 미인증)');
+        }
       } else {
         // 온보딩 완료: next가 온보딩 경로면 무시하고 홈으로
         const isOnboardingPath = next?.startsWith('/onboarding');
         redirectPath = isOnboardingPath ? '/' : (next || '/');
-        console.log('[auth/callback] → 홈 (온보딩 완료)', 'next:', next, '→', redirectPath);
+        if (process.env.NODE_ENV !== 'production') {
+          logger.log('[auth/callback] → 홈 (온보딩 완료)', 'next:', next, '→', redirectPath);
+        }
       }
 
-      console.log('[auth/callback] 최종 redirectPath:', redirectPath);
-      console.log('[auth/callback] ========================');
-
-      console.log('[auth/callback] 카카오 리다이렉트:', redirectPath, '프로필:', profile);
+      if (process.env.NODE_ENV !== 'production') {
+        logger.log('[auth/callback] 최종 redirectPath:', redirectPath);
+        logger.log('[auth/callback] ========================');
+        logger.log('[auth/callback] 카카오 리다이렉트:', redirectPath, '프로필:', profile);
+      }
       return NextResponse.redirect(new URL(redirectPath, request.url));
     } catch (err) {
       console.error('[auth/callback] 카카오 처리 중 오류:', err);
@@ -274,7 +292,9 @@ export async function GET(request: Request) {
         redirectPath = next || '/';
       }
 
-      console.log('[auth/callback] 리다이렉트:', redirectPath, '프로필:', profile);
+      if (process.env.NODE_ENV !== 'production') {
+        logger.log('[auth/callback] 리다이렉트:', redirectPath, '프로필:', profile);
+      }
       return NextResponse.redirect(new URL(redirectPath, request.url));
     } catch (err) {
       console.error('[auth/callback] 온보딩 리다이렉트 오류:', err);

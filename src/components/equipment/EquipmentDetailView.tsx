@@ -19,6 +19,7 @@ export function EquipmentDetailView({ equipment }: Props) {
     equipment.images[selectedImageIndex] ?? equipment.images[0] ?? null;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset error overlay when image source changes
     setMainImageFailed(false);
   }, [selectedImageIndex, equipment.id, imageSrc]);
 

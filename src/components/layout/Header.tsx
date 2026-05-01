@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronRight, Music2, LogIn, LogOut, User, ShieldCheck, Menu, X, Wallet } from "lucide-react";
 import { signIn, signOut, useSession } from "@/lib/auth-client";
@@ -10,14 +10,12 @@ import { cn } from "@/lib/utils";
 import { NAV_LINKS, STUDIO_NAME } from "@/lib/constants";
 import { useAdmin } from "@/lib/admin-context";
 import { registerMemberProfile, useMemberRole } from "@/lib/member-role";
-import { isAuthFlowPath, sanitizePostAuthRedirect } from "@/lib/safe-redirect";
 import { createClient } from "@/lib/supabase/client";
 
-const PHONE_OTP_ENABLED = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
+type NavLinkItem = (typeof NAV_LINKS)[number] & { isNew?: boolean };
 
 export default function Header() {
   const pathname = usePathname();
-  const router = useRouter();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { data: session, status } = useSession();
@@ -33,6 +31,7 @@ export default function Header() {
 
   // 페이지 이동 시 드로어 닫기
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close drawer on route change
     setMobileOpen(false);
   }, [pathname]);
 
@@ -97,7 +96,7 @@ export default function Header() {
 
           {/* 데스크탑 네비게이션 (lg 이상) */}
           <nav className="hidden lg:flex min-w-0 flex-1 items-center justify-center gap-0.5 overflow-visible px-4">
-            {NAV_LINKS.map((link) =>
+            {NAV_LINKS.map((link: NavLinkItem) =>
               link.children ? (
                 <div
                   key={link.href}
@@ -119,7 +118,7 @@ export default function Header() {
                     )}
                   >
                     {link.label}
-                    {(link as any).isNew && (
+                    {link.isNew && (
                       <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
                         NEW
                       </span>
@@ -156,7 +155,7 @@ export default function Header() {
                   )}
                 >
                   {link.label}
-                  {(link as any).isNew && (
+                  {link.isNew && (
                     <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
                       NEW
                     </span>
@@ -410,7 +409,7 @@ export default function Header() {
 
         {/* 네비게이션 목록 */}
         <nav className="flex-1 overflow-y-auto px-3 py-3">
-          {NAV_LINKS.map((link) =>
+          {NAV_LINKS.map((link: NavLinkItem) =>
             link.children ? (
               <div key={link.href}>
                 <button
@@ -427,7 +426,7 @@ export default function Header() {
                   )}
                 >
                   {link.label}
-                  {(link as any).isNew && (
+                  {link.isNew && (
                     <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
                       NEW
                     </span>
@@ -470,7 +469,7 @@ export default function Header() {
                 )}
               >
                 {link.label}
-                {(link as any).isNew && (
+                {link.isNew && (
                   <span className="ml-1.5 rounded-full bg-[#B98768] px-1.5 py-0.5 text-[10px] font-bold text-white">
                     NEW
                   </span>

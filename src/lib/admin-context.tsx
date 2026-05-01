@@ -24,6 +24,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate admin flag from sessionStorage
       setIsAdmin(sessionStorage.getItem(SESSION_KEY) === "true");
     }
   }, []);

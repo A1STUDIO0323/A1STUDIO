@@ -51,8 +51,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/party-room/booking?failed=true", request.url));
     }
 
+    // TODO(stability): 카카오 기본 리다이렉트는 pg_token만 붙임.tid 쿼리는 ready의 approval_url에 붙이면 교차검증이 상시 동작함.
+    const requestTid = searchParams.get("tid");
+    if (requestTid != null && requestTid !== "" && requestTid !== tid) {
+      return NextResponse.json({ error: "tid_mismatch" }, { status: 400 });
+    }
+
     // 카카오페이 결제 승인
-    const approvalResult = await approvePartyRoomPayment({
+    await approvePartyRoomPayment({
       tid,
       partner_order_id: orderId,
       partner_user_id: user.id,

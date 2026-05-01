@@ -2,6 +2,15 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
 import sgMail from "@sendgrid/mail";
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function POST(req: NextRequest) {
   const { name, phone, subject, message } = await req.json();
 
@@ -34,20 +43,20 @@ export async function POST(req: NextRequest) {
             <table style="width:100%;border-collapse:collapse">
               <tr>
                 <td style="padding:8px 0;color:#71717a;width:100px;font-size:14px">이름</td>
-                <td style="padding:8px 0;font-weight:600;font-size:14px">${name}</td>
+                <td style="padding:8px 0;font-weight:600;font-size:14px">${escapeHtml(name)}</td>
               </tr>
               <tr>
                 <td style="padding:8px 0;color:#71717a;font-size:14px">연락처</td>
-                <td style="padding:8px 0;font-weight:600;font-size:14px">${phone}</td>
+                <td style="padding:8px 0;font-weight:600;font-size:14px">${escapeHtml(phone)}</td>
               </tr>
               <tr>
                 <td style="padding:8px 0;color:#71717a;font-size:14px">문의 유형</td>
-                <td style="padding:8px 0;font-weight:600;font-size:14px">${subject}</td>
+                <td style="padding:8px 0;font-weight:600;font-size:14px">${escapeHtml(subject)}</td>
               </tr>
             </table>
             <hr style="border:none;border-top:1px solid #e4e4e7;margin:16px 0"/>
             <p style="color:#71717a;font-size:13px;margin:0 0 8px">문의 내용</p>
-            <p style="white-space:pre-line;font-size:14px;line-height:1.7;margin:0">${message}</p>
+            <p style="white-space:pre-line;font-size:14px;line-height:1.7;margin:0">${escapeHtml(message)}</p>
           </div>
         </div>
       `,
