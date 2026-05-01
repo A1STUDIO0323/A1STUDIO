@@ -2,7 +2,7 @@
 
 <!--
   AI_TRANSFER_PROMPT.md
-  버전: 2.41
+  버전: 2.42
   최종 수정: 2026-05-01
   작성자: A1 STUDIO 개발팀
 -->
@@ -2817,7 +2817,7 @@ DISABLE TRIGGER validate_reservation_user;
 ---
 
 **작성일**: 2026-05-01  
-**버전**: 2.41 (최신)  
+**버전**: 2.42 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3338,7 +3338,7 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 ### AI_TRANSFER_PROMPT 최신화 (문서만, v2.40)
 
 - **2026-04-22 §3**: 활성 기능처럼 읽히지 않도록 **현행 vs 당시(역사)** 를 분리했다.
-- **코드 정합 검증**: `src/`·`prisma/` 에서 **`board_posts` 검색 0건** 이 현행 목표다.
+- **코드 정합**(앱 레이어): **`src/`** 에 레거시 Raw **`board_posts`** 접근 문자열 없음 유지 목표.(**`prisma/schema.prisma`** 의 `BoardPost @@map("board_posts")` 는 별개 — 문자열 검색에 잡힐 수 있음.)
 - **`NAV_LINKS` 점검**: 게시판에 **`/board`·「자유게시판」** 이 남아 있으면 라우트가 없어 **깨진 링크**가 된다. 위 삭제와 맞추려면 **`src/lib/constants.ts`** 에서 부모 `href` 를 `/notices` 로 두고 자유게시판 항목을 제거할 것 **(워크트리별로 확인)**.
 
 ### Vercel 빌드 — Prisma Client 생성 명시 (`vercel.json`)
@@ -3346,6 +3346,11 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 - **루트 `vercel.json`** (추가): `buildCommand` = `prisma generate && npm run build`, `installCommand` = `npm install`, `framework` = `nextjs`, **`$schema`**: `openapi.vercel.sh` (배포 시 대시보드와 무관하게 generate→빌드 순서 고정).
 - **`package.json`**: `scripts.build` 및 `postinstall` 에 이미 `prisma generate` 포함 **(변경 없을 수 있음)** — Vercel 루트 스크립트와 이중 실행은 허용 오버헤드 목적 허용.
 - **`.vercelignore`**: 없거나 `prisma/` 제외 패턴 없음 유지 (**스키마는 배포에 필요**).
+
+### Prisma 자유게시판 모델 — 스키마만 (`prisma/schema.prisma`)
+
+- **추가 모델(4종)**: `BoardCategory`(→ `board_categories`), `BoardPost`(→ **`board_posts`**), `BoardComment`(→ `board_comments`), `BoardLike`(→ `board_likes`). 모두 **`@@schema("public")`**, 레거코드와 동일하게 DB 컬럼은 필요한 필드에 **`@map` snake_case** 정렬.
+- **마이그레이션 미실행**(요청 규칙): 운영 DB에 테이블이 없으면 **앱에서 Prisma CRUD 호출 전** Supabase DDL·마이그레이션으로 스키마를 맞춰야 함.
 
 ---
 
