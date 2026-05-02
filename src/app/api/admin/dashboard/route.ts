@@ -36,6 +36,7 @@ export async function GET() {
           roomId: true,
           totalAmount: true,
           status: true,
+          createdAt: true,
         },
       }),
     ]);

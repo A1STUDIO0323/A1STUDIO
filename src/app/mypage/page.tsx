@@ -87,6 +87,7 @@ function MyPageContent() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [hidingId, setHidingId] = useState<string | null>(null);
 
   // 계정 정보 관련
   const [profileData, setProfileData] = useState<any>(null);
@@ -160,7 +161,7 @@ function MyPageContent() {
 
   const loadReservations = async (userId: string) => {
     const supabase = createClient();
-    
+
     // 연습실 예약
     const { data: roomReservations } = await supabase
       .from("reservations")
@@ -176,26 +177,82 @@ function MyPageContent() {
       .eq("user_id", userId)
       .order("date", { ascending: false });
 
-    // 두 예약을 합쳐서 날짜순 정렬
+    // 숨김 처리된 예약 조회 (RLS로 본인 것만)
+    const { data: hiddenRows } = await supabase
+      .from("hidden_reservations")
+      .select("reservation_id, reservation_type");
+    const hiddenSet = new Set(
+      (hiddenRows || []).map(
+        (h: any) => `${h.reservation_type}:${h.reservation_id}`
+      )
+    );
+
+    // 두 예약을 합쳐서 날짜순 정렬 (숨김 처리된 것 제외)
     const allReservations = [
-      ...(roomReservations || []).map((r: any) => ({ 
-        ...r, 
+      ...(roomReservations || []).map((r: any) => ({
+        ...r,
         reservation_type: 'room',
         points_used: r.total_amount, // total_amount를 points_used로 매핑
       })),
-      ...(partyReservations || []).map((r: any) => ({ 
-        ...r, 
+      ...(partyReservations || []).map((r: any) => ({
+        ...r,
         reservation_type: 'party-room',
         points_used: r.payment_method === 'points' ? r.total_amount : 0,
       })),
-    ].sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
-      return dateB.getTime() - dateA.getTime();
-    });
-    
+    ]
+      .filter(
+        (r: any) => !hiddenSet.has(`${r.reservation_type}:${r.id}`)
+      )
+      .sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB.getTime() - dateA.getTime();
+      });
+
     setReservations(allReservations);
     setLoadingReservations(false);
+  };
+
+  /** 숨기기 버튼 노출 조건: 취소/환불 완료 또는 이용 완료(종료 시각 과거) */
+  const canHideReservation = (reservation: Reservation): boolean => {
+    const cancelledStatuses = ["CANCELLED", "cancelled", "REFUNDED", "EXPIRED"];
+    if (cancelledStatuses.includes(reservation.status)) return true;
+
+    const activeStatuses = ["PAID", "CONFIRMED", "confirmed", "completed"];
+    if (activeStatuses.includes(reservation.status)) {
+      const endDateTime = new Date(
+        `${reservation.date}T${reservation.end_time}`
+      );
+      if (!isNaN(endDateTime.getTime()) && endDateTime.getTime() < Date.now()) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const handleHideReservation = async (reservation: Reservation) => {
+    if (!user) return;
+    if (!confirm("이 예약을 내역에서 숨기시겠습니까?\n(데이터는 보존되며 관리자에게는 그대로 표시됩니다)")) {
+      return;
+    }
+    setHidingId(reservation.id);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("hidden_reservations").insert({
+        user_id: user.id,
+        reservation_id: reservation.id,
+        reservation_type:
+          reservation.reservation_type === "party-room" ? "party-room" : "room",
+      });
+      if (error) {
+        console.error("[숨기기 실패]", error);
+        alert("숨김 처리에 실패했습니다.");
+        return;
+      }
+      await loadReservations(user.id);
+    } finally {
+      setHidingId(null);
+    }
   };
 
   const handleCancelReservation = async () => {
@@ -647,6 +704,18 @@ function MyPageContent() {
                             {cancelUi.policyMessage}
                           </p>
                         )}
+                      </div>
+                    )}
+
+                    {canHideReservation(reservation) && (
+                      <div className="pt-4 border-t border-[#D8CCBC]">
+                        <button
+                          onClick={() => void handleHideReservation(reservation)}
+                          disabled={hidingId === reservation.id}
+                          className="w-full rounded-lg border border-[#D8CCBC] px-4 py-2 text-sm font-semibold text-[#6f655d] transition-colors hover:bg-[#F7F3EB] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {hidingId === reservation.id ? "숨기는 중..." : "내역에서 숨기기"}
+                        </button>
                       </div>
                     )}
                   </div>

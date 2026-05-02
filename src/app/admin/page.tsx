@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarCheck, Users, DollarSign, AlertCircle, Filter, CheckCircle2, XCircle, Lock } from "lucide-react";
+import { CalendarCheck, Users, DollarSign, AlertCircle, Filter, CheckCircle2, XCircle, Lock, Search, ArrowUp, ArrowDown } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 import { ADMIN_PASSWORD_SESSION_KEY, useAdmin } from "@/lib/admin-context";
 
@@ -45,6 +45,7 @@ type AdminReservation = {
   roomId: string;
   totalAmount: number;
   status: string;
+  createdAt: string;
 };
 
 type DashboardStats = {
@@ -71,6 +72,8 @@ export default function AdminPage() {
   });
   const [reservations, setReservations] = useState<AdminReservation[]>([]);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const loadDashboard = async () => {
     try {
@@ -183,10 +186,25 @@ export default function AdminPage() {
     return "HOLD";
   };
 
-  const filtered =
+  const statusFiltered =
     filterStatus === "ALL"
       ? reservations
       : reservations.filter((r) => normalizeStatus(r.status) === filterStatus);
+
+  const q = searchQuery.trim().toLowerCase();
+  const searched = q
+    ? statusFiltered.filter((r) =>
+        r.id.toLowerCase().includes(q) ||
+        r.guestName.toLowerCase().includes(q) ||
+        r.guestPhone.toLowerCase().includes(q)
+      )
+    : statusFiltered;
+
+  const filtered = [...searched].sort((a, b) => {
+    const ka = `${a.date} ${a.startTime}`;
+    const kb = `${b.date} ${b.startTime}`;
+    return sortDir === "asc" ? ka.localeCompare(kb) : kb.localeCompare(ka);
+  });
 
   const statsCards = [
     { label: "이번 달 예약", value: `${stats.monthReservationCount}건`, icon: CalendarCheck, color: "text-[#B98768]" },
@@ -258,8 +276,19 @@ export default function AdminPage() {
                 </button>
               ))}
             </div>
-            <div className="mb-3 flex justify-end">
-              <button onClick={() => void loadDashboard()} className="text-xs text-[#9b9189] hover:text-[#3B342F]">
+            {/* 검색 + 새로고침 */}
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9b9189]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="예약번호 · 예약자명 · 전화번호 검색"
+                  className="w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] py-2 pl-9 pr-3 text-sm text-[#3B342F] placeholder:text-[#b0a89e] focus:border-[#B98768] focus:outline-none"
+                />
+              </div>
+              <button onClick={() => void loadDashboard()} className="self-end text-xs text-[#9b9189] hover:text-[#3B342F]">
                 새로고침
               </button>
             </div>
@@ -270,7 +299,18 @@ export default function AdminPage() {
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold text-[#3B342F]">예약번호</th>
                     <th className="px-4 py-3 text-left font-semibold text-[#3B342F]">예약자</th>
-                    <th className="px-4 py-3 text-left font-semibold text-[#3B342F]">날짜/시간</th>
+                    <th className="px-4 py-3 text-left font-semibold text-[#3B342F]">
+                      <button
+                        type="button"
+                        onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                        className="inline-flex items-center gap-1 hover:text-[#B98768] transition-colors"
+                        title="날짜/시간 정렬"
+                      >
+                        날짜/시간
+                        {sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-left font-semibold text-[#3B342F]">신청일시</th>
                     <th className="px-4 py-3 text-right font-semibold text-[#3B342F]">금액</th>
                     <th className="px-4 py-3 text-center font-semibold text-[#3B342F]">상태</th>
                     <th className="px-4 py-3 text-center font-semibold text-[#3B342F]">액션</th>
@@ -279,7 +319,7 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-white/5 bg-[#F7F3EB]">
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-[#9b9189]">
+                      <td colSpan={7} className="px-4 py-10 text-center text-[#9b9189]">
                         예약 데이터가 없습니다.
                       </td>
                     </tr>
@@ -296,6 +336,24 @@ export default function AdminPage() {
                         {res.date}
                         <br />
                         <span className="text-xs">{res.startTime} – {res.endTime}</span>
+                      </td>
+                      <td className="px-4 py-3 text-[#6f655d]">
+                        {(() => {
+                          const d = new Date(res.createdAt);
+                          if (isNaN(d.getTime())) return <span className="text-xs text-[#b0a89e]">-</span>;
+                          const yyyy = d.getFullYear();
+                          const mm = String(d.getMonth() + 1).padStart(2, "0");
+                          const dd = String(d.getDate()).padStart(2, "0");
+                          const hh = String(d.getHours()).padStart(2, "0");
+                          const mi = String(d.getMinutes()).padStart(2, "0");
+                          return (
+                            <>
+                              {yyyy}-{mm}-{dd}
+                              <br />
+                              <span className="text-xs">{hh}:{mi}</span>
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-[#3B342F]">
                         {formatPrice(res.totalAmount)}
