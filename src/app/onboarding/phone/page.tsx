@@ -41,6 +41,10 @@ export default function OnboardingPhonePage() {
       const link = target.closest("a");
 
       if (link && !link.getAttribute("href")?.startsWith("#")) {
+        // 예외: 명시적으로 허용된 링크는 통과
+        if (link.getAttribute("data-allow-navigation") === "true") {
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         alert("전화번호 인증을 완료해주세요.");
@@ -253,7 +257,7 @@ export default function OnboardingPhonePage() {
             <p>{error}</p>
             {isPhoneDuplicate && (
               <p className="mt-1">
-                <Link href="/find-account" className="underline font-semibold">여기</Link>
+                <Link href="/find-account" data-allow-navigation="true" className="underline font-semibold">여기</Link>
                 를 눌러 계정을 찾으세요.
               </p>
             )}
