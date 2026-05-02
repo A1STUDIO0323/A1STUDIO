@@ -16,6 +16,7 @@ export default function OnboardingPhonePage() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPhoneDuplicate, setIsPhoneDuplicate] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
@@ -190,8 +191,10 @@ export default function OnboardingPhonePage() {
       if (!profileRes.ok) {
         if (profileData.errorCode === "PHONE_ALREADY_EXISTS") {
           setError("이 전화번호는 이미 다른 계정에서 사용 중입니다.");
+          setIsPhoneDuplicate(true);
         } else {
           setError(profileData.error || "프로필 업데이트에 실패했습니다.");
+          setIsPhoneDuplicate(false);
         }
         setLoading(false);
         return;
@@ -247,7 +250,13 @@ export default function OnboardingPhonePage() {
         {error && (
           <div role="alert" className="mb-4 text-sm px-3 py-2 rounded-lg"
             style={{ background: "#FEE2E2", color: "#B91C1C" }}>
-            {error}
+            <p>{error}</p>
+            {isPhoneDuplicate && (
+              <p className="mt-1">
+                <Link href="/find-account" className="underline font-semibold">여기</Link>
+                를 눌러 계정을 찾으세요.
+              </p>
+            )}
           </div>
         )}
 
