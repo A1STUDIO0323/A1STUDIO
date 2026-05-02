@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       const orderId = cookieStore.get("party_order_id")?.value ?? null;
       if (orderId) {
         console.log("[파티룸 결제 실패] PaymentLock 해제 시작:", orderId);
-        await releasePaymentLock(user.id, "party-room", orderId);
+        await releasePaymentLock(user.id, "reservation", orderId);
         console.log("[파티룸 결제 실패] PaymentLock 해제 완료");
       }
     }

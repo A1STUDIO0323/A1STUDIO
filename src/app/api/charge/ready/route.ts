@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { readyPayment } from "@/lib/kakaopay";
 import { acquirePaymentLock } from "@/lib/payment-lock";
+import {
+  getPaymentErrorMessage,
+  reasonFromCaughtKakaoError,
+  type PaymentErrorReason,
+} from "@/lib/payment-errors";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +15,11 @@ export async function POST(request: NextRequest) {
     // 로그인 확인
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+      const reason: PaymentErrorReason = "auth_required";
+      return NextResponse.json(
+        { error: getPaymentErrorMessage(reason), reason },
+        { status: 401 }
+      );
     }
 
     // 요청 body 파싱
@@ -18,7 +27,11 @@ export async function POST(request: NextRequest) {
     const { package_id } = body;
 
     if (!package_id) {
-      return NextResponse.json({ error: "package_id가 필요합니다" }, { status: 400 });
+      const reason: PaymentErrorReason = "validation_failed";
+      return NextResponse.json(
+        { error: getPaymentErrorMessage(reason), reason },
+        { status: 400 }
+      );
     }
 
     // 충전 패키지 조회
@@ -30,7 +43,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (packageError || !chargePackage) {
-      return NextResponse.json({ error: "유효하지 않은 패키지입니다" }, { status: 404 });
+      const reason: PaymentErrorReason = "validation_failed";
+      return NextResponse.json(
+        { error: getPaymentErrorMessage(reason), reason },
+        { status: 404 }
+      );
     }
 
     // 결제 중복 방지 락 획득
@@ -38,8 +55,9 @@ export async function POST(request: NextRequest) {
     const lockAcquired = await acquirePaymentLock(user.id, "charge", lockKey, 600); // 10분
     
     if (!lockAcquired) {
+      const reason: PaymentErrorReason = "payment_in_progress";
       return NextResponse.json(
-        { error: "이미 진행 중인 결제가 있습니다. 잠시 후 다시 시도해주세요." },
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 409 }
       );
     }
@@ -90,9 +108,13 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("결제 준비 오류:", error);
+    const reason =
+      error instanceof Error && (/카카오페이/i.test(error.message) || /\{[\s\S]*\}/.test(error.message))
+        ? reasonFromCaughtKakaoError(error)
+        : "server_error";
+    console.error("결제 준비 오류:", reason, error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "결제 준비에 실패했습니다" },
+      { error: getPaymentErrorMessage(reason), reason },
       { status: 500 }
     );
   }

@@ -5,6 +5,7 @@ import { PARTY_ROOM_PACKAGES, PartyRoomPackage } from "@/lib/pricing";
 import { cookies } from "next/headers";
 import { formatPhoneNumber, isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone-utils";
 import { releasePaymentLock } from "@/lib/payment-lock";
+import { getPaymentErrorMessage } from "@/lib/payment-errors";
 
 function timeToHHMM(value: unknown): string {
   if (value == null) return "";
@@ -54,7 +55,13 @@ export async function GET(request: NextRequest) {
     // TODO(stability): 카카오 기본 리다이렉트는 pg_token만 붙임.tid 쿼리는 ready의 approval_url에 붙이면 교차검증이 상시 동작함.
     const requestTid = searchParams.get("tid");
     if (requestTid != null && requestTid !== "" && requestTid !== tid) {
-      return NextResponse.json({ error: "tid_mismatch" }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: getPaymentErrorMessage("kakao_invalid_tid"),
+          reason: "kakao_invalid_tid" as const,
+        },
+        { status: 400 }
+      );
     }
 
     // 카카오페이 결제 승인
@@ -173,7 +180,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await releasePaymentLock(user.id, "party-room", orderId);
+    await releasePaymentLock(user.id, "reservation", orderId);
 
     // 쿠키 정리
     cookieStore.delete("party_kakao_tid");
@@ -202,7 +209,7 @@ export async function GET(request: NextRequest) {
       const cookieStore = await cookies();
       const oid = cookieStore.get("party_order_id")?.value ?? null;
       if (user && oid) {
-        await releasePaymentLock(user.id, "party-room", oid);
+        await releasePaymentLock(user.id, "reservation", oid);
       }
     } catch (e) {
       console.error("[파티룸 승인] 락 해제 실패:", e);

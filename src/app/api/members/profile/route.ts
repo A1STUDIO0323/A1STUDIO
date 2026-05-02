@@ -97,6 +97,31 @@ export async function POST(request: NextRequest) {
 
     const { name, birthYear, phone, phoneVerified } = parsed.data;
 
+    const existingUser = await prisma.users.findUnique({
+      where: { id: user.id },
+    });
+
+    // 전화번호 업데이트 시 중복 체크
+    if (phone && phone !== existingUser?.phone) {
+      const phoneExists = await prisma.users.findFirst({
+        where: {
+          phone: phone,
+          id: { not: user.id }, // 본인 제외
+        },
+      });
+
+      if (phoneExists) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "이미 다른 계정에서 사용 중인 전화번호입니다.",
+            errorCode: "PHONE_ALREADY_EXISTS",
+          },
+          { status: 409 } // Conflict
+        );
+      }
+    }
+
     // Prisma upsert — auth user id 기준
     const updatedProfile = await prisma.users.upsert({
       where: { id: user.id },

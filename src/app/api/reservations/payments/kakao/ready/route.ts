@@ -12,6 +12,11 @@ import { cookies } from "next/headers";
 import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
 import { prisma } from "@/lib/db";
 import { normalizePhoneNumber } from "@/lib/phone-utils";
+import {
+  getPaymentErrorMessage,
+  reasonFromCaughtKakaoError,
+  type PaymentErrorReason,
+} from "@/lib/payment-errors";
 
 /**
  * 연습실 카카오페이 결제 준비
@@ -29,7 +34,11 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+      const reason: PaymentErrorReason = "auth_required";
+      return NextResponse.json(
+        { error: getPaymentErrorMessage(reason), reason },
+        { status: 401 }
+      );
     }
     userId = user.id;
 
@@ -41,14 +50,18 @@ export async function POST(request: NextRequest) {
     };
 
     if (!date || !startTime || !endTime) {
+      const reason: PaymentErrorReason = "validation_failed";
       return NextResponse.json(
-        { error: "date, startTime, endTime이 필요합니다" },
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 400 }
       );
     }
 
     if (!(await validateUserExists(user.id))) {
-      return NextResponse.json(USER_NOT_FOUND_ERROR, { status: 400 });
+      return NextResponse.json(
+        { ...USER_NOT_FOUND_ERROR, reason: "validation_failed" as const },
+        { status: 400 }
+      );
     }
 
     const { data: existingReservations, error: checkError } = await supabase
@@ -65,16 +78,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingReservations && existingReservations.length > 0) {
+      const reason: PaymentErrorReason = "slot_already_booked";
       return NextResponse.json(
-        { error: "이미 예약된 시간대입니다" },
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 409 }
       );
     }
 
-    await deleteExpiredPaymentLocksForUser(user.id, "practice-room");
+    await deleteExpiredPaymentLocksForUser(user.id, "reservation");
     const activePracticeLocks = await getActivePaymentLocksForUser(
       user.id,
-      "practice-room"
+      "reservation"
     );
     if (activePracticeLocks.length > 0) {
       const nowMs = Date.now();
@@ -94,7 +108,8 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json(
         {
-          error: "이미 진행 중인 결제가 있습니다",
+          error: getPaymentErrorMessage("payment_in_progress"),
+          reason: "payment_in_progress",
           retryAfter,
         },
         { status: 409 }
@@ -111,7 +126,7 @@ export async function POST(request: NextRequest) {
     partner_order_id = `practice-${user.id}-${Date.now()}`;
     const lockOk = await acquirePaymentLock(
       user.id,
-      "practice-room",
+      "reservation",
       partner_order_id,
       600
     );
@@ -119,7 +134,7 @@ export async function POST(request: NextRequest) {
     if (!lockOk) {
       const again = await getActivePaymentLocksForUser(
         user.id,
-        "practice-room"
+        "reservation"
       );
       if (again.length > 0) {
         const nowMs = Date.now();
@@ -133,12 +148,19 @@ export async function POST(request: NextRequest) {
           Math.ceil((minExpires - nowMs) / 1000)
         );
         return NextResponse.json(
-          { error: "이미 진행 중인 결제가 있습니다", retryAfter },
+          {
+            error: getPaymentErrorMessage("payment_in_progress"),
+            reason: "payment_in_progress",
+            retryAfter,
+          },
           { status: 409 }
         );
       }
       return NextResponse.json(
-        { error: "결제 락 생성에 실패했습니다" },
+        {
+          error: getPaymentErrorMessage("lock_acquire_failed"),
+          reason: "lock_acquire_failed",
+        },
         { status: 500 }
       );
     }
@@ -192,14 +214,18 @@ export async function POST(request: NextRequest) {
       redirect_url: kakaoResult.next_redirect_pc_url,
     });
   } catch (error) {
-    console.error("[연습실 카카오페이] 결제 준비 오류:", error);
+    let reason: PaymentErrorReason = "server_error";
+    if (error instanceof Error && (/카카오페이/i.test(error.message) || /\{[\s\S]*\}/.test(error.message))) {
+      reason = reasonFromCaughtKakaoError(error);
+    }
+    console.error("[연습실 카카오페이] 결제 준비 오류:", reason, error);
     if (userId && partner_order_id) {
-      await releasePaymentLock(userId, "practice-room", partner_order_id);
+      await releasePaymentLock(userId, "reservation", partner_order_id);
     }
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "결제 준비에 실패했습니다",
+        error: getPaymentErrorMessage(reason),
+        reason,
       },
       { status: 500 }
     );

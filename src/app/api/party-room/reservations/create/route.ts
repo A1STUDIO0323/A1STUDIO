@@ -6,6 +6,10 @@ import { calcPartyRoomPoints, PartyRoomPackage, PARTY_ROOM_MAX_HEADCOUNT, PARTY_
 import { isAdult } from "@/lib/age-check";
 import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
 import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
+import {
+  getPaymentErrorMessage,
+  type PaymentErrorReason,
+} from "@/lib/payment-errors";
 
 /**
  * 파티룸 예약 생성 (포인트 결제)
@@ -21,7 +25,11 @@ export async function POST(request: NextRequest) {
     // 로그인 확인
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+      const reason: PaymentErrorReason = "auth_required";
+      return NextResponse.json(
+        { error: getPaymentErrorMessage(reason), reason },
+        { status: 401 }
+      );
     }
     
     userId = user.id;
@@ -42,26 +50,31 @@ export async function POST(request: NextRequest) {
     const guest_phone = normalizePhoneNumber(rawGuestPhone || user.phone) || rawGuestPhone;
 
     if (!package_type || !date) {
+      const reason: PaymentErrorReason = "validation_failed";
       return NextResponse.json(
-        { error: "package_type과 date가 필요합니다" },
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 400 }
       );
     }
 
     if (!['day', 'night', 'allday'].includes(package_type)) {
       return NextResponse.json(
-        { error: "유효하지 않은 패키지 타입입니다" },
+        {
+          error: "유효하지 않은 패키지 타입입니다",
+          reason: "validation_failed" as const,
+        },
         { status: 400 }
       );
     }
 
     // 결제 중복 방지 락 획득
     lockKey = `party_${date}_${package_type}`;
-    const lockAcquired = await acquirePaymentLock(user.id, "party-room", lockKey, 300); // 5분
+    const lockAcquired = await acquirePaymentLock(user.id, "reservation", lockKey, 300); // 5분
     
     if (!lockAcquired) {
+      const reason: PaymentErrorReason = "payment_in_progress";
       return NextResponse.json(
-        { error: "이미 진행 중인 예약이 있습니다. 잠시 후 다시 시도해주세요." },
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 409 }
       );
     }
@@ -76,8 +89,12 @@ export async function POST(request: NextRequest) {
       });
     } catch (prismaErr) {
       console.error("[Party Room Create] Prisma users lookup failed:", prismaErr);
+      const reason: PaymentErrorReason = "server_error";
       return NextResponse.json(
-        { error: "프로필 확인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." },
+        {
+          error: getPaymentErrorMessage(reason),
+          reason,
+        },
         { status: 500 }
       );
     }
@@ -92,6 +109,7 @@ export async function POST(request: NextRequest) {
         {
           error:
             "파티룸 예약을 위해서는 출생연도 정보가 필요합니다. 마이페이지에서 프로필을 완성해주세요.",
+          reason: "validation_failed" as const,
         },
         { status: 403 }
       );
@@ -104,14 +122,23 @@ export async function POST(request: NextRequest) {
     if (!isAdultUser) {
       console.log("[Party Room Create] Age verification failed");
       return NextResponse.json(
-        { error: "파티룸은 만 19세 이상 성인만 예약 가능합니다." },
+        {
+          error: "파티룸은 만 19세 이상 성인만 예약 가능합니다.",
+          reason: "validation_failed" as const,
+        },
         { status: 403 }
       );
     }
 
     // 2. 최대 인원 검증
     if (headcount > PARTY_ROOM_MAX_HEADCOUNT) {
-      return NextResponse.json({ error: '최대 10명까지 이용 가능' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: '최대 10명까지 이용 가능',
+          reason: "validation_failed" as const,
+        },
+        { status: 400 }
+      );
     }
 
     // 3. 중복 예약 확인 (PAID, HOLD, CONFIRMED 상태 모두 포함)
@@ -133,8 +160,12 @@ export async function POST(request: NextRequest) {
       .or(`date.eq.${date},end_date.eq.${date}`);
 
     if (existingReservations && existingReservations.length > 0) {
+      const reason: PaymentErrorReason = "slot_already_booked";
       return NextResponse.json(
-        { error: "이미 예약된 날짜입니다" },
+        {
+          error: getPaymentErrorMessage(reason),
+          reason,
+        },
         { status: 409 }
       );
     }
@@ -152,8 +183,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (!pointResult.success) {
+      const low =
+        typeof pointResult.error === "string" &&
+        /부족|insufficient|잔액/i.test(pointResult.error);
+      const reason: PaymentErrorReason = low
+        ? "insufficient_points"
+        : "points_deduct_failed";
       return NextResponse.json(
-        { error: pointResult.error || "포인트 차감 실패" },
+        {
+          error: low
+            ? getPaymentErrorMessage("insufficient_points")
+            : pointResult.error || getPaymentErrorMessage("points_deduct_failed"),
+          reason,
+        },
         { status: 400 }
       );
     }
@@ -313,7 +355,7 @@ export async function POST(request: NextRequest) {
 
     // 예약 성공 시 락 해제
     if (lockKey && userId) {
-      await releasePaymentLock(userId, "party-room", lockKey);
+      await releasePaymentLock(userId, "reservation", lockKey);
     }
 
     return NextResponse.json({
@@ -326,12 +368,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     // 에러 발생 시 락 해제
     if (lockKey && userId) {
-      await releasePaymentLock(userId, "party-room", lockKey);
+      await releasePaymentLock(userId, "reservation", lockKey);
     }
-    
-    console.error("파티룸 예약 생성 오류:", error);
+
+    const reason: PaymentErrorReason = "server_error";
+    console.error("파티룸 예약 생성 오류:", reason, error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "예약 생성에 실패했습니다" },
+      { error: getPaymentErrorMessage(reason), reason },
       { status: 500 }
     );
   }

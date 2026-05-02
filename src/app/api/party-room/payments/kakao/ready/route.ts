@@ -10,6 +10,11 @@ import {
   getActivePaymentLocksForUser,
   releasePaymentLock,
 } from "@/lib/payment-lock";
+import {
+  getPaymentErrorMessage,
+  reasonFromCaughtKakaoError,
+  type PaymentErrorReason,
+} from "@/lib/payment-errors";
 
 /**
  * 카카오페이 결제 준비 (파티룸용)
@@ -25,7 +30,11 @@ export async function POST(request: NextRequest) {
     // 로그인 확인
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+      const reason: PaymentErrorReason = "auth_required";
+      return NextResponse.json(
+        { error: getPaymentErrorMessage(reason), reason },
+        { status: 401 }
+      );
     }
     userId = user.id;
 
@@ -40,8 +49,9 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!package_type || !date) {
+      const reason: PaymentErrorReason = "validation_failed";
       return NextResponse.json(
-        { error: "package_type과 date가 필요합니다" },
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 400 }
       );
     }
@@ -59,20 +69,30 @@ export async function POST(request: NextRequest) {
         {
           error:
             "파티룸 예약을 위해서는 출생연도 정보가 필요합니다. 마이페이지에서 프로필을 완성해주세요.",
+          reason: "validation_failed" as const,
         },
         { status: 403 }
       );
     }
     if (!isAdult(new Date(birthYear, 11, 31))) {
       return NextResponse.json(
-        { error: "파티룸은 만 19세 이상 성인만 예약 가능합니다." },
+        {
+          error: "파티룸은 만 19세 이상 성인만 예약 가능합니다.",
+          reason: "validation_failed" as const,
+        },
         { status: 403 }
       );
     }
 
     // 2. 최대 인원 검증
     if (headcount > PARTY_ROOM_MAX_HEADCOUNT) {
-      return NextResponse.json({ error: '최대 10명까지 이용 가능' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "최대 10명까지 이용 가능",
+          reason: "validation_failed" as const,
+        },
+        { status: 400 }
+      );
     }
 
     // 3. 중복 예약 확인 (PAID, HOLD, CONFIRMED 상태 모두 포함)
@@ -84,15 +104,18 @@ export async function POST(request: NextRequest) {
 
     if (existingReservations && existingReservations.length > 0) {
       return NextResponse.json(
-        { error: "이미 예약된 날짜입니다" },
+        {
+          error: getPaymentErrorMessage("slot_already_booked"),
+          reason: "slot_already_booked" as const,
+        },
         { status: 409 }
       );
     }
 
-    await deleteExpiredPaymentLocksForUser(user.id, "party-room");
+    await deleteExpiredPaymentLocksForUser(user.id, "reservation");
     const activePartyLocks = await getActivePaymentLocksForUser(
       user.id,
-      "party-room"
+      "reservation"
     );
     if (activePartyLocks.length > 0) {
       const nowMs = Date.now();
@@ -112,7 +135,8 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json(
         {
-          error: "이미 진행 중인 결제가 있습니다",
+          error: getPaymentErrorMessage("payment_in_progress"),
+          reason: "payment_in_progress" as const,
           retryAfter,
         },
         { status: 409 }
@@ -129,12 +153,12 @@ export async function POST(request: NextRequest) {
 
     const lockOk = await acquirePaymentLock(
       user.id,
-      "party-room",
+      "reservation",
       orderId,
       600
     );
     if (!lockOk) {
-      const again = await getActivePaymentLocksForUser(user.id, "party-room");
+      const again = await getActivePaymentLocksForUser(user.id, "reservation");
       if (again.length > 0) {
         const nowMs = Date.now();
         let minExpires = Infinity;
@@ -147,12 +171,19 @@ export async function POST(request: NextRequest) {
           Math.ceil((minExpires - nowMs) / 1000)
         );
         return NextResponse.json(
-          { error: "이미 진행 중인 결제가 있습니다", retryAfter },
+          {
+            error: getPaymentErrorMessage("payment_in_progress"),
+            reason: "payment_in_progress" as const,
+            retryAfter,
+          },
           { status: 409 }
         );
       }
       return NextResponse.json(
-        { error: "결제 락 생성에 실패했습니다" },
+        {
+          error: getPaymentErrorMessage("lock_acquire_failed"),
+          reason: "lock_acquire_failed" as const,
+        },
         { status: 500 }
       );
     }
@@ -168,9 +199,12 @@ export async function POST(request: NextRequest) {
 
     const tid = kakaoResult.tid;
     if (!tid || String(tid).trim() === "") {
-      await releasePaymentLock(user.id, "party-room", orderId);
+      await releasePaymentLock(user.id, "reservation", orderId);
       return NextResponse.json(
-        { error: "kakao_tid_missing" },
+        {
+          error: getPaymentErrorMessage("kakao_invalid_tid"),
+          reason: "kakao_invalid_tid" as const,
+        },
         { status: 500 }
       );
     }
@@ -200,12 +234,19 @@ export async function POST(request: NextRequest) {
       tid,
     });
   } catch (error) {
-    console.error("카카오페이 결제 준비 오류:", error);
+    let reason: PaymentErrorReason = "server_error";
+    if (
+      error instanceof Error &&
+      (/카카오페이/i.test(error.message) || /\{[\s\S]*\}/.test(error.message))
+    ) {
+      reason = reasonFromCaughtKakaoError(error);
+    }
+    console.error("카카오페이 결제 준비 오류:", reason, error);
     if (userId && orderId) {
-      await releasePaymentLock(userId, "party-room", orderId);
+      await releasePaymentLock(userId, "reservation", orderId);
     }
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "결제 준비에 실패했습니다" },
+      { error: getPaymentErrorMessage(reason), reason },
       { status: 500 }
     );
   }

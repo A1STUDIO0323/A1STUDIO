@@ -22,7 +22,7 @@ export async function GET() {
           "[연습실 결제 실패] PaymentLock 해제 시작:",
           partner_order_id
         );
-        await releasePaymentLock(user.id, "practice-room", partner_order_id);
+        await releasePaymentLock(user.id, "reservation", partner_order_id);
         console.log("[연습실 결제 실패] PaymentLock 해제 완료");
       }
 

@@ -9,6 +9,7 @@ import {
   isValidPhoneNumber,
   normalizePhoneNumber,
 } from "@/lib/phone-utils";
+import { getPaymentErrorMessage } from "@/lib/payment-errors";
 
 function timeToHHMM(value: unknown): string {
   if (value == null) return "";
@@ -60,7 +61,13 @@ export async function GET(request: NextRequest) {
     const rawData = cookieStore.get("practice_reservation_data")?.value;
 
     if (!tid || tid.trim() === "") {
-      return NextResponse.json({ error: "tid_missing" }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: getPaymentErrorMessage("kakao_invalid_tid"),
+          reason: "kakao_invalid_tid" as const,
+        },
+        { status: 400 }
+      );
     }
 
     if (!partner_order_id || !rawData) {
@@ -70,7 +77,13 @@ export async function GET(request: NextRequest) {
 
     const requestTid = searchParams.get("tid");
     if (requestTid != null && requestTid !== "" && requestTid !== tid) {
-      return NextResponse.json({ error: "tid_mismatch" }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: getPaymentErrorMessage("kakao_invalid_tid"),
+          reason: "kakao_invalid_tid" as const,
+        },
+        { status: 400 }
+      );
     }
 
     let reservationData: PracticeReservationCookie;
@@ -216,7 +229,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await releasePaymentLock(user.id, "practice-room", partner_order_id);
+    await releasePaymentLock(user.id, "reservation", partner_order_id);
 
     cookieStore.delete("practice_kakao_tid");
     cookieStore.delete("practice_kakao_order_id");
@@ -231,7 +244,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[연습실 카카오페이] 승인 오류:", error);
     if (lockUserId && partner_order_id) {
-      await releasePaymentLock(lockUserId, "practice-room", partner_order_id);
+      await releasePaymentLock(lockUserId, "reservation", partner_order_id);
     }
     cookieStore.delete("practice_kakao_tid");
     cookieStore.delete("practice_kakao_order_id");

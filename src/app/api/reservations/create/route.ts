@@ -15,6 +15,10 @@ import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
 import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
 import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
 import { prisma } from "@/lib/db";
+import {
+  getPaymentErrorMessage,
+  type PaymentErrorReason,
+} from "@/lib/payment-errors";
 
 /**
  * 연습실·파티룸 예약 — 포인트 결제
@@ -31,7 +35,11 @@ export async function POST(request: NextRequest) {
     // 로그인 확인
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+      const reason: PaymentErrorReason = "auth_required";
+      return NextResponse.json(
+        { error: getPaymentErrorMessage(reason), reason },
+        { status: 401 }
+      );
     }
     
     userId = user.id;
@@ -48,8 +56,9 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!date || !start_time || !end_time) {
+      const reason: PaymentErrorReason = "validation_failed";
       return NextResponse.json(
-        { error: "date, start_time, end_time이 필요합니다" },
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 400 }
       );
     }
@@ -59,8 +68,9 @@ export async function POST(request: NextRequest) {
     const lockAcquired = await acquirePaymentLock(user.id, "reservation", lockKey, 300); // 5분
     
     if (!lockAcquired) {
+      const reason: PaymentErrorReason = "payment_in_progress";
       return NextResponse.json(
-        { error: "이미 진행 중인 예약이 있습니다. 잠시 후 다시 시도해주세요." },
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 409 }
       );
     }
@@ -78,32 +88,54 @@ export async function POST(request: NextRequest) {
       
       if (birthYear == null) {
         return NextResponse.json(
-          { error: '파티룸 예약을 위해서는 생년월일 정보가 필요합니다. 프로필을 완성해주세요.' }, 
+          {
+            error:
+              '파티룸 예약을 위해서는 생년월일 정보가 필요합니다. 프로필을 완성해주세요.',
+            reason: "validation_failed" as const,
+          },
           { status: 403 }
         );
       }
       
       if (!isAdult(new Date(birthYear, 11, 31))) {
         return NextResponse.json(
-          { error: '파티룸은 만 19세 이상 성인만 예약 가능합니다.' }, 
+          {
+            error: '파티룸은 만 19세 이상 성인만 예약 가능합니다.',
+            reason: "validation_failed" as const,
+          },
           { status: 403 }
         );
       }
 
       // 2. 패키지 타입 검증
       if (!package_type || !['day', 'night', 'allday'].includes(package_type)) {
-        return NextResponse.json({ error: '패키지 선택 필요' }, { status: 400 });
+        return NextResponse.json(
+          { error: '패키지 선택 필요', reason: "validation_failed" as const },
+          { status: 400 }
+        );
       }
 
       // 3. 최대 인원 검증
       if (headcount && headcount > PARTY_ROOM_MAX_HEADCOUNT) {
-        return NextResponse.json({ error: '최대 10명까지 이용 가능' }, { status: 400 });
+        return NextResponse.json(
+          {
+            error: '최대 10명까지 이용 가능',
+            reason: "validation_failed" as const,
+          },
+          { status: 400 }
+        );
       }
 
       // 4. 17:00~19:00 시작 시간 차단 (야간 패키지는 19:00부터만)
       const startHour = parseInt(start_time.split(":")[0]);
       if (startHour >= 17 && startHour < 19 && package_type !== 'day') {
-        return NextResponse.json({ error: '야간 패키지는 19:00부터 시작 가능합니다' }, { status: 400 });
+        return NextResponse.json(
+          {
+            error: '야간 패키지는 19:00부터 시작 가능합니다',
+            reason: "validation_failed" as const,
+          },
+          { status: 400 }
+        );
       }
     }
 
@@ -120,8 +152,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingReservations && existingReservations.length > 0) {
+      const reason: PaymentErrorReason = "slot_already_booked";
       return NextResponse.json(
-        { error: "이미 예약된 시간대입니다" },
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 409 }
       );
     }
@@ -164,7 +197,10 @@ export async function POST(request: NextRequest) {
 
     // ✅ 사용자 검증 (2층 안전망)
     if (!(await validateUserExists(userId))) {
-      return NextResponse.json(USER_NOT_FOUND_ERROR, { status: 400 });
+      return NextResponse.json(
+        { ...USER_NOT_FOUND_ERROR, reason: "validation_failed" as const },
+        { status: 400 }
+      );
     }
 
     const pointResult = await deductPointsDB({
@@ -174,8 +210,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (!pointResult.success) {
+      const low =
+        typeof pointResult.error === "string" &&
+        /부족|insufficient|잔액/i.test(pointResult.error);
+      const reason: PaymentErrorReason = low
+        ? "insufficient_points"
+        : "points_deduct_failed";
       return NextResponse.json(
-        { error: pointResult.error || "포인트 차감 실패" },
+        {
+          error: low
+            ? getPaymentErrorMessage("insufficient_points")
+            : pointResult.error || getPaymentErrorMessage("points_deduct_failed"),
+          reason,
+        },
         { status: 400 }
       );
     }
@@ -229,6 +276,7 @@ export async function POST(request: NextRequest) {
           {
             error:
               "예약 생성에 실패했습니다. 포인트는 환불되었습니다.",
+            reason: "slot_already_booked" as const,
             balance_after: refundResult.newBalance,
           },
           { status: 500 }
@@ -240,6 +288,7 @@ export async function POST(request: NextRequest) {
         {
           error:
             "예약 생성 및 포인트 환불에 실패했습니다. 고객센터로 문의해 주세요.",
+          reason: "points_refund_failed" as const,
           needsManualRefund: true,
         },
         { status: 500 }
@@ -344,10 +393,11 @@ export async function POST(request: NextRequest) {
     if (lockKey && userId) {
       await releasePaymentLock(userId, "reservation", lockKey);
     }
-    
-    console.error("예약 생성 오류:", error);
+
+    const reason: PaymentErrorReason = "server_error";
+    console.error("예약 생성 오류:", reason, error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "예약 생성에 실패했습니다" },
+      { error: getPaymentErrorMessage(reason), reason },
       { status: 500 }
     );
   }

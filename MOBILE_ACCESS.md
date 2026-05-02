@@ -61,13 +61,11 @@ ADMIN_PASSWORD="[.env.local에서 복사]"
 
 # Google OAuth
 GOOGLE_CLIENT_ID="[.env.local에서 복사]"
-GOOGLE_CLIENT_SECRET="[.env.local에서 복사]"
 NEXT_PUBLIC_GOOGLE_CONFIGURED="true"
 
 # Kakao OAuth
 AUTH_KAKAO_ID="[.env.local에서 복사]"
 AUTH_KAKAO_SECRET="[.env.local에서 복사]"
-BETTER_AUTH_SECRET="[.env.local에서 복사]"
 NEXT_PUBLIC_KAKAO_CONFIGURED="true"
 
 # KakaoPay

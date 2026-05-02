@@ -2,12 +2,14 @@
 
 <!--
   AI_TRANSFER_PROMPT.md
-  버전: 2.46
-  최종 수정: 2026-05-01
+  버전: 2.51
+  최종 수정: 2026-05-03
   작성자: A1 STUDIO 개발팀
 -->
 
 > 이 문서는 A1 STUDIO 웹사이트의 전체 구조, 기능, 코드베이스를 다른 AI 어시스턴트(GPT, Claude 등)에게 전달하기 위한 포괄적인 가이드입니다.
+>
+> **짧은 판별용 요약**(스택·도메인·경로만): 루트 **`AI_TRANSFER_BRIEF.md`** — 프롬프트 길이를 줄일 때 우선 제공하고, 깊은 작업은 본 문서를 연다.
 
 ## 📌 문서 갱신 규칙 (AI / 개발자)
 
@@ -154,7 +156,7 @@ $$;
 
 **2. 연습실 카카오페이 정상**
 
-- 카카오 결제 완료 → approve → 예약 행·`kakaopay_*` → SMS → `payment_locks`에 `practice-room` 잔여 없음.
+- 카카오 결제 완료 → approve → 예약 행·`kakaopay_*` → SMS → `payment_locks`(예약 결제 락 타입 **`reservation`**) 잔여 없음.
 
 **3. 예약 INSERT 실패 후 환불**
 
@@ -1552,13 +1554,11 @@ ADMIN_PASSWORD="..."
 
 # ── Google OAuth ──
 GOOGLE_CLIENT_ID="..."
-GOOGLE_CLIENT_SECRET="..."
 NEXT_PUBLIC_GOOGLE_CONFIGURED="true"
 
 # ── Kakao OAuth ──
 AUTH_KAKAO_ID="..."
 AUTH_KAKAO_SECRET="..."
-BETTER_AUTH_SECRET="..."
 NEXT_PUBLIC_KAKAO_CONFIGURED="true"
 
 # ── 결제 (Toss) ──
@@ -1882,7 +1882,8 @@ A1STUDIO/
 ├── tsconfig.json
 ├── README.md
 ├── AI_CONTEXT_PROMPT.md                    # AI 컨텍스트 (구버전)
-├── AI_TRANSFER_PROMPT.md                   # AI 전달 프롬프트 (최신)
+├── AI_TRANSFER_PROMPT.md                   # AI 전달 프롬프트 (최신·전체)
+├── AI_TRANSFER_BRIEF.md                    # AI용 짧은 판별·요약 (스택·도메인만)
 ├── HOMEPAGE_SPECIFICATION.md               # 홈페이지 상세 명세
 ├── KAKAO_CONSENT_SETUP.md                  # 카카오 동의 설정
 ├── VERCEL_DEPLOY.md                        # Vercel 배포 가이드
@@ -2816,8 +2817,8 @@ DISABLE TRIGGER validate_reservation_user;
 
 ---
 
-**작성일**: 2026-05-01  
-**버전**: 2.46 (최신)  
+**작성일**: 2026-05-03  
+**버전**: 2.51 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3382,6 +3383,46 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 - **`src/app/api/admin/board/route.ts`**: Supabase 세션 필요(비로그인 **401**) · 헤더 **`x-admin-password`** = 서버 **`ADMIN_PASSWORD`**(다른 관리자 게시판/후기 API와 동일) · **`GET`** 페이지네이션(`page`,`limit`, 응답 `pagination.total` 등) · **`DELETE`** JSON `{ postIds }` 후 `deleteMany`(댓글·좋아요는 Prisma 스키마 `onDelete` 전제로 연쇄 삭제).
 - **`src/app/admin/board/page.tsx`**: 관리 세션 기반 로드 · 체크박스 일괄 삭제 확인 후 API 호출.
 - **`src/app/admin/page.tsx`**: 탭 **「게시판 관리」** 추가, `/admin/board` 이동 링크.
+
+### 결제 락 `lock_type` 통일 + 결제 에러 `reason` (`payment-errors.ts`, 2026-05-01)
+
+- **`payment_locks.lock_type`**: 연습실·파티룸 카카오 ready/approve/cancel/fail 및 파티룸 포인트 생성의 `acquirePaymentLock` / `releasePaymentLock` / `deleteExpiredPaymentLocksForUser` / `getActivePaymentLocksForUser` 인자를 **`"reservation"`** 단일 값으로 통일(기존 `"practice-room"` / `"party-room"` 제거). **`reservation_type`·`room_id`·URL 경로·UI 라벨은 변경 없음**. 포인트 충전 락 `"charge"` 유지.
+- **`src/lib/payment-errors.ts`**: `PaymentErrorReason` · `getPaymentErrorMessage` · `classifyKakaoPayError` · (루트 catch용) **`reasonFromCaughtKakaoError`**.
+- **JSON 에러 응답**: `GET/POST`가 `NextResponse.json`으로 실패를 주는 예약·충전 ready/승인 일부·포인트 예약 생성 라우트에 **`reason`** 필드 추가, `error`는 매핑 메시지 또는 기존 문구 유지. **`/api/charge/approve`**, **`…/kakao/cancel`**, **`…/kakao/fail`** 은 리다이렉트 전용이라 본 패턴 미적용.
+
+### `POST /api/members/profile` — 전화번호 중복 검사 (`src/app/api/members/profile/route.ts`)
+
+- **`upsert` 전**: 요청 **`phone`** 이 있고 기존 사용자 `phone` 과 다를 때, 본인 `id` 제외하고 동일 번호 행이 있으면 **409** · `success: false` · `errorCode: "PHONE_ALREADY_EXISTS"` · `"이미 다른 계정에서 사용 중인 전화번호입니다."` (DB **`users.phone` @unique** 와 일치하는 애플리케이션 검증.)
+- **온보딩 클라이언트** (`src/app/onboarding/phone/page.tsx`): SMS 검증 후 프로필 `POST` 응답이 위 **409** 이고 `PHONE_ALREADY_EXISTS` 이면 `error` 배너로 `"이 전화번호는 이미 다른 계정에서 사용 중입니다."`, 그 외는 `error` 문자열 또는 기본 실패 메시지 · 성공 시 `router.push("/")`.
+
+### `AI_TRANSFER_BRIEF.md` (요약 레이어, 2026-05-01)
+
+- 긴 본 문서 대신 다른 AI에게 **프로젝트 범위·스택·도메인·경로표**만 빠르게 넘길 때 사용. 상세·역사·운영 노트는 **본 문서 유지**.
+- 소개 블록(상단 blockquote 옆)·`## 📂 파일 구조` 목록에 **상호 참조** 추가.
+
+---
+
+## 📝 최근 수정 사항 (2026-05-03)
+
+### 1. 전달 문서 동기화
+
+- **`AI_TRANSFER_PROMPT.md`**: 상단 HTML 메타·중간 고정 메타(`**작성일**` / `**버전**`)·본 절(2026-05-03) 반영.
+- **`AI_TRANSFER_BRIEF.md`**: 요약 레이어 버전·동기 날짜 갱신, 결제 `reason`·배포 문서 예시 정합 요약 추가.
+
+### 2. 결제 에러 `reason` + `payment-errors.ts`
+
+- **`src/lib/payment-errors.ts`**: `PaymentErrorReason`, `getPaymentErrorMessage`, `classifyKakaoPayError`, `reasonFromCaughtKakaoError` — 실패 JSON에 **`error`(한글)** 와 **`reason`(머신 코드)** 병행(클라이언트·로그 분류용).
+- **연습실·파티룸 카카오** `POST …/kakao/ready`, `GET …/kakao/approve`(일부): 인증·검증·슬롯 충돌·락·카카오 예외 등에 매핑; **`retryAfter`** 등 기존 필드 유지.
+- **`POST /api/charge/ready`**: 동일 패턴; `catch`에서 카카오 메시지 휴리스틱 시 `reasonFromCaughtKakaoError`.
+- **`POST /api/reservations/create`**, **`POST /api/party-room/reservations/create`**: 주요 JSON 오류에 `reason` 추가; 파티룸 포인트 예약의 `acquirePaymentLock` 두 번째 인자를 **`"reservation"`** 으로 통일(카카오·연습실 예약과 **`payment_locks.lock_type`** 정합). 도메인 **`reservation_type`**, URL, UI 라벨은 변경 없음.
+
+### 3. 온보딩·프로필
+
+- **`POST /api/members/profile`** 전화 중복 **409** (`PHONE_ALREADY_EXISTS`) · **`src/app/onboarding/phone/page.tsx`** 에러 표시 — 2026-05-01 절과 동일 취지, 워크트리에서 UI·흐름 정리.
+
+### 4. 배포·로컬 접근 문서
+
+- **`MOBILE_ACCESS.md`**, **`VERCEL_DEPLOY.md`**: 예시 환경변수 블록에서 **`GOOGLE_CLIENT_SECRET`**, **`BETTER_AUTH_SECRET`** 행 제거(실제 스택·Supabase OAuth 설정과 예시 정합).
 
 ---
 
