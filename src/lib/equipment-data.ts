@@ -218,6 +218,20 @@ export const EQUIPMENT_LIST: Equipment[] = [
   },
   // 편의시설
   {
+    id: "tv-43",
+    name: "43인치 TV",
+    category: "facility",
+    quantity: 1,
+    description: "43인치 대형 TV",
+    usage: [
+      "영상 시청",
+      "미러링 및 화면 공유",
+      "연습 영상 확인",
+    ],
+    images: ["/equipment/tv-43.jpg"],
+    status: "available",
+  },
+  {
     id: "air-conditioner",
     name: "냉난방기",
     category: "facility",

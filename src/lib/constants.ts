@@ -5,7 +5,7 @@ export const STUDIO_DESCRIPTION =
 export const STUDIO_ADDRESS = "서울시 송파구 문정동 70-13 B1";
 export const STUDIO_ADDRESS_DETAIL = "문정역 도보 8분 · 장지역 도보 10분";
 export const STUDIO_PHONE = "010-2994-0323";
-export const STUDIO_KAKAO_CHANNEL = "https://pf.kakao.com/_example";
+export const STUDIO_KAKAO_CHANNEL = "https://pf.kakao.com/_pwxldX";
 export const STUDIO_INSTAGRAM = "https://instagram.com/a1studio";
 
 export const HOLD_TIMEOUT_MINUTES = 10;

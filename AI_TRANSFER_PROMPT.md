@@ -2,7 +2,7 @@
 
 <!--
   AI_TRANSFER_PROMPT.md
-  버전: 2.51
+  버전: 2.52
   최종 수정: 2026-05-03
   작성자: A1 STUDIO 개발팀
 -->
@@ -1393,14 +1393,60 @@ const cardsY = useTransform(scrollYProgress, [0.24, 0.48], [120, 0]);
 
 ### 5. 구비 비품 (Equipment)
 
+**소스**: `src/lib/equipment-data.ts` — `EQUIPMENT_LIST` 배열이 단일 소스.
 **그리드**: 2열(모바일) → 4열(데스크톱)
+**카테고리**: `audio` / `music` / `fitness` / `photography` / `lighting` / `facility` / `upcoming`
 
-1. 전신 거울 - "댄스·연기·뮤지컬 연습 필수"
-2. 촬영용 조명 - "영상·사진 촬영 가능"
-3. 삼각대 - "스마트폰·카메라 거치"
-4. 전자피아노 - "보컬·뮤지컬 반주 연습"
-5. 요가매트 - "몸풀기·스트레칭"
-6. 폼롤러 - "근막이완·근육 회복"
+#### 🎵 오디오 장비 (audio)
+| id | 품목 | 수량 |
+|----|------|------|
+| `jbl-partybox-320` | JBL PartyBox 320 블루투스 스피커 | 1 |
+| `wireless-mic` | 무선 블루투스 마이크 | 2 |
+
+#### 🎹 음악 장비 (music)
+| id | 품목 | 수량 |
+|----|------|------|
+| `digital-piano` | 전자피아노 | 1 |
+| `music-stand` | 보면대 | 3 |
+
+#### 💪 운동 장비 (fitness)
+| id | 품목 | 수량 |
+|----|------|------|
+| `foam-roller` | 폼롤러 | 2 |
+| `yoga-mat` | 요가매트 | 2 |
+
+#### 📸 촬영 장비 (photography)
+| id | 품목 | 수량 |
+|----|------|------|
+| `tripod` | 삼각대 | 1 |
+| `art100-light` | ART100 촬영용 조명 | 2 |
+
+#### 💡 조명 시스템 (lighting)
+| id | 품목 | 수량 |
+|----|------|------|
+| `color-light` | 컬러조명 | 14 |
+| `theater-light` | 극장조명 (전구등) | 4 |
+| `special-light` | 특수조명 | 4 |
+| `music-reactive-light` | 음악반응 조명 | 4 |
+| `speaker-light` | 스피커 조명 | 1 |
+
+#### 🏠 편의시설 (facility)
+| id | 품목 | 수량 |
+|----|------|------|
+| `tv-43` | 43인치 TV | 1 |
+| `air-conditioner` | 냉난방기 | 1 |
+| `dehumidifier` | 제습기 | 1 |
+| `air-purifier` | 공기청정기 | 1 |
+| `wifi` | 고속 WIFI | 1 |
+| `charger` | 충전기 | 1 |
+| `cctv` | CCTV | 1 |
+| `water-dispenser` | 냉온정수기 | 1 |
+
+#### 🎮 예정 비품 (upcoming, status: "upcoming")
+| id | 품목 | 수량 |
+|----|------|------|
+| `refrigerator` | 냉장고 | 1 |
+| `board-game` | 보드게임 | 1 |
 
 ### 6. GallerySection (갤러리)
 
@@ -2818,7 +2864,7 @@ DISABLE TRIGGER validate_reservation_user;
 ---
 
 **작성일**: 2026-05-03  
-**버전**: 2.51 (최신)  
+**버전**: 2.52 (최신)  
 **프로젝트**: A1 STUDIO (https://a1-studio.vercel.app)
 
 ---
@@ -3403,6 +3449,16 @@ ALTER FUNCTION public.charge_points(uuid, integer, integer, text) OWNER TO postg
 ---
 
 ## 📝 최근 수정 사항 (2026-05-03)
+
+### 5. 구비 비품 목록 업데이트
+
+- **`src/lib/equipment-data.ts`**: `EQUIPMENT_LIST`에 편의시설(`facility`) 항목 **43인치 TV** (`id: "tv-43"`) 추가.
+- **`AI_TRANSFER_PROMPT.md` §5 구비 비품**: 기존 6개 항목 나열 → 카테고리별 전체 표로 교체 (총 20종 + 예정 2종).
+
+### 6. 카카오 채널 URL 설정
+
+- **`src/lib/constants.ts`**: `STUDIO_KAKAO_CHANNEL` 값을 `https://pf.kakao.com/_pwxldX` 로 변경 (기존 placeholder → 실제 채널).
+- contact 페이지 카카오 채널 버튼(`src/app/contact/page.tsx`)은 이 상수를 참조하므로 별도 수정 없이 반영.
 
 ### 1. 전달 문서 동기화
 

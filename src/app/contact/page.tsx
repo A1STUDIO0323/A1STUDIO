@@ -69,7 +69,8 @@ export default function ContactPage() {
           </a>
         </div>
 
-        {/* 문의 폼 */}
+        {/* 문의 폼 — 일시 비활성화 (필요 시 아래 블록 주석 해제) */}
+        {/*
         {submitted ? (
           <div className="flex flex-col items-center gap-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 py-16 text-center">
             <CheckCircle2 className="h-12 w-12 text-emerald-400" />
@@ -127,6 +128,14 @@ export default function ContactPage() {
             </button>
           </form>
         )}
+        */}
+
+        <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-8 text-center">
+          <MessageSquare className="mx-auto mb-3 h-8 w-8 text-[#B98768]" />
+          <p className="text-sm text-[#6f655d]">
+            문의는 카카오 채널 또는 전화로 부탁드립니다.
+          </p>
+        </div>
       </div>
     </div>
   );
