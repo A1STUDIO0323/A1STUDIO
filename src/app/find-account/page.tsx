@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 type AccountRow = {
   email: string;
@@ -264,12 +265,23 @@ export default function FindAccountPage() {
                 ))}
               </div>
 
-              <Link
-                href="/login"
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const supabase = createClient();
+                    await supabase.auth.signOut();
+                  } catch (e) {
+                    console.error('[find-account] signOut 실패:', e);
+                  } finally {
+                    // 세션이 완전히 정리되도록 풀 리로드
+                    window.location.href = '/login';
+                  }
+                }}
                 className="block w-full py-3 bg-[var(--color-accent)] text-white text-center rounded-xl hover:bg-[var(--color-accent-hover)] transition-colors"
               >
                 로그인하기
-              </Link>
+              </button>
             </div>
           )}
         </div>
