@@ -93,7 +93,7 @@ export default function NaverMap({
   return (
     <>
       <Script
-        src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}`}
+        src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}`}
         strategy="afterInteractive"
         onLoad={() => setScriptLoaded(true)}
         onReady={() => setScriptLoaded(true)}
