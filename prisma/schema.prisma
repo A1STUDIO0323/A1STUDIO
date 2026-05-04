@@ -221,6 +221,19 @@ model Notice {
   @@schema("public")
 }
 
+model LostItem {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  images      Json     @default("[]")
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("lost_items")
+  @@schema("public")
+}
+
 model Event {
   id          String    @id @default(cuid())
   title       String

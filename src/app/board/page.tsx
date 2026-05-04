@@ -115,12 +115,20 @@ function BoardContent() {
           <p className="mb-2 text-[var(--color-text-muted)]">
             A1 STUDIO 회원들과 자유롭게 소통하세요
           </p>
-          <Link
-            href="/board/guide"
-            className="text-sm text-[var(--color-accent)] hover:underline"
-          >
-            이용 안내 보기
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Link
+              href="/board/guide"
+              className="text-sm text-[var(--color-accent)] hover:underline"
+            >
+              이용 안내 보기
+            </Link>
+            <Link
+              href="/board/lost"
+              className="text-sm text-[var(--color-accent)] hover:underline"
+            >
+              분실물 게시판
+            </Link>
+          </div>
         </div>
 
         <div className="mb-6">

@@ -75,6 +75,7 @@ export const NAV_LINKS = [
     children: [
       { label: "공지·이벤트", href: "/notices" },
       { label: "자유게시판", href: "/board" },
+      { label: "분실물", href: "/board/lost" },
       { label: "후기", href: "/reviews" },
     ],
   },
