@@ -87,7 +87,11 @@ export function checkIsHoliday(date: Date): boolean {
     '2026-12-25', // 크리스마스
   ];
   
-  const dateStr = date.toISOString().split('T')[0];
+  // 로컬 타임존 기준 YYYY-MM-DD (toISOString은 UTC라 KST 자정이 전날로 밀리는 버그 방지)
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const dateStr = `${y}-${m}-${d}`;
   return holidays.includes(dateStr);
 }
 
