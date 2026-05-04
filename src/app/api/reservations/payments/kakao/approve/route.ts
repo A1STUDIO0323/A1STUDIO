@@ -144,8 +144,6 @@ export async function GET(request: NextRequest) {
         ? guestPhoneNorm
         : guestPhone?.trim() || "미등록";
 
-    const durationHours = duration;
-
     const { data: reservation, error: insertError } = await supabase
       .from("reservations")
       .insert({
@@ -157,17 +155,12 @@ export async function GET(request: NextRequest) {
         date,
         start_time: startTime,
         end_time: endTime,
-        duration_hours: durationHours,
         headcount: 1,
         status: "PAID",
         total_amount: totalAmount,
         points_used: 0,
         payment_method: "kakaopay",
         reservation_type: "room",
-        kakaopay_order_id: partner_order_id,
-        kakaopay_tid: tid,
-        kakaopay_payment_status: "approved",
-        kakaopay_approved_at: new Date().toISOString(),
       })
       .select()
       .single();

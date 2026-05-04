@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { MapPin, Train, Car, Phone } from "lucide-react";
-import { STUDIO_ADDRESS, STUDIO_ADDRESS_DETAIL, STUDIO_PHONE } from "@/lib/constants";
+import {
+  STUDIO_ADDRESS,
+  STUDIO_ADDRESS_DETAIL,
+  STUDIO_PHONE,
+  STUDIO_LAT,
+  STUDIO_LNG,
+  STUDIO_NAME,
+} from "@/lib/constants";
+import NaverMap from "@/components/NaverMap";
 
 export default function LocationSection() {
   return (
@@ -16,24 +24,20 @@ export default function LocationSection() {
         <div className="mt-12 grid gap-6 lg:grid-cols-2">
           {/* 지도 임베드 영역 */}
           <div className="relative overflow-hidden rounded-2xl bg-[#F7F3EB]" style={{ minHeight: 360 }}>
-            {/* 네이버 지도 임베드 (실제 사용 시 CLIENT_ID 설정 후 iframe으로 교체) */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#EFE7DA] to-[#3B342F]/60">
-              <MapPin className="h-12 w-12 text-[#B98768]" />
-              <p className="text-sm font-medium text-[#3B342F]">
-                네이버 지도 임베드 영역
-              </p>
-              <p className="text-xs text-[#9b9189]">
-                NEXT_PUBLIC_NAVER_MAP_CLIENT_ID 설정 후 활성화
-              </p>
-              <a
-                href={`https://map.naver.com/v5/search/${encodeURIComponent(STUDIO_ADDRESS)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 rounded-full bg-green-500 px-5 py-2 text-sm font-semibold text-[#3B342F] hover:bg-green-400 transition-colors"
-              >
-                네이버 지도로 보기
-              </a>
-            </div>
+            <NaverMap
+              lat={STUDIO_LAT}
+              lng={STUDIO_LNG}
+              label={STUDIO_NAME}
+              className="h-full w-full min-h-[360px]"
+            />
+            <a
+              href={`https://map.naver.com/v5/search/${encodeURIComponent(STUDIO_ADDRESS)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute bottom-3 right-3 rounded-full bg-green-500 px-4 py-2 text-xs font-semibold text-[#3B342F] shadow hover:bg-green-400 transition-colors"
+            >
+              네이버 지도로 보기
+            </a>
           </div>
 
           {/* 교통 정보 */}

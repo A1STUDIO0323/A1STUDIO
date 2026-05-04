@@ -1,6 +1,12 @@
 import { Metadata } from "next";
-import { MapPin, Train, Car, Clock, Key } from "lucide-react";
-import { STUDIO_ADDRESS } from "@/lib/constants";
+import { Train, Car, Clock, Key } from "lucide-react";
+import {
+  STUDIO_ADDRESS,
+  STUDIO_LAT,
+  STUDIO_LNG,
+  STUDIO_NAME,
+} from "@/lib/constants";
+import NaverMap from "@/components/NaverMap";
 
 export const metadata: Metadata = { title: "오시는길" };
 
@@ -14,19 +20,21 @@ export default function LocationPage() {
         </div>
 
         {/* 지도 */}
-        <div className="mb-10 flex h-64 items-center justify-center overflow-hidden rounded-2xl bg-[#F7F3EB] sm:h-80">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <MapPin className="h-10 w-10 text-[#B98768]" />
-            <p className="text-sm text-[#6f655d]">{STUDIO_ADDRESS}</p>
-            <a
-              href={`https://map.naver.com/v5/search/${encodeURIComponent(STUDIO_ADDRESS)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-full bg-green-500 px-5 py-2 text-sm font-semibold text-[#3B342F] hover:bg-green-400 transition-colors"
-            >
-              네이버 지도로 보기
-            </a>
-          </div>
+        <div className="relative mb-10 h-64 overflow-hidden rounded-2xl bg-[#F7F3EB] sm:h-80">
+          <NaverMap
+            lat={STUDIO_LAT}
+            lng={STUDIO_LNG}
+            label={STUDIO_NAME}
+            className="h-full w-full"
+          />
+          <a
+            href={`https://map.naver.com/v5/search/${encodeURIComponent(STUDIO_ADDRESS)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute bottom-3 right-3 rounded-full bg-green-500 px-4 py-2 text-xs font-semibold text-[#3B342F] shadow hover:bg-green-400 transition-colors"
+          >
+            네이버 지도로 보기
+          </a>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">

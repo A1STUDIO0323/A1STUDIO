@@ -62,23 +62,42 @@ export default function Header() {
         provider: session.user.provider ?? null,
       }),
     });
-
-    // 포인트 잔액 조회
-    const supabase = createClient();
-    supabase
-      .from("user_points")
-      .select("balance")
-      .eq("user_id", session.user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          console.warn('[Header] 포인트 조회 실패:', error);
-          setUserPoints(0);
-          return;
-        }
-        setUserPoints(data?.balance || 0);
-      });
   }, [session?.user?.email, session?.user?.id, session?.user?.image, session?.user?.name, session?.user?.provider]);
+
+  // 포인트 잔액 조회 + 이벤트/포커스 시 재조회
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setUserPoints(null);
+      return;
+    }
+    const supabase = createClient();
+    const refetch = () => {
+      supabase
+        .from("user_points")
+        .select("balance")
+        .eq("user_id", userId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            console.warn("[Header] 포인트 조회 실패:", error);
+            setUserPoints(0);
+            return;
+          }
+          setUserPoints(data?.balance || 0);
+        });
+    };
+    refetch();
+
+    const onRefresh = () => refetch();
+    const onFocus = () => refetch();
+    window.addEventListener("points:refresh", onRefresh);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("points:refresh", onRefresh);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [session?.user?.id]);
 
   return (
     <>

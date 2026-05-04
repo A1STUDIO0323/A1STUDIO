@@ -29,6 +29,10 @@ function PartyRoomCompleteContent() {
       return;
     }
 
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("points:refresh"));
+    }
+
     const supabase = createClient();
     
     supabase
