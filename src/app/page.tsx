@@ -1,9 +1,8 @@
 import { Metadata } from "next";
 import HeroScroll from "@/components/HeroScroll";
 import StudioIntro from "@/components/home/StudioIntro";
-import AboutSection from "@/components/home/AboutSection";
-import FadeInSection from "@/components/FadeInSection";
 import GallerySection from "@/components/home/GallerySection";
+import FadeInSection from "@/components/FadeInSection";
 import PricingSummary from "@/components/home/PricingSummary";
 import ReviewsPreview from "@/components/home/ReviewsPreview";
 import LocationSection from "@/components/home/LocationSection";
@@ -42,11 +41,6 @@ export default function HomePage() {
 
       {/* 스튜디오 소개 */}
       <StudioIntro />
-
-      {/* 회사 소개 */}
-      <FadeInSection>
-        <AboutSection />
-      </FadeInSection>
 
       {/* 활용 용도 */}
       <section className="border-y border-[#D8CCBC] bg-[#EFE7DA]/80 py-14">

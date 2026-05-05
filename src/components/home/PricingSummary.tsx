@@ -92,11 +92,18 @@ export default function PricingSummary() {
             Pricing
           </p>
           <h2 className="mt-1 text-3xl font-bold text-[#3B342F]">
-            합리적인 요금, 숨겨진 비용 없음
+            합리적인 요금, 행복한 시간들!
           </h2>
         </div>
 
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-12 text-center mb-6">
+          <h3 className="text-2xl font-bold text-[#3B342F]">연습실 요금</h3>
+          <p className="text-sm text-[#6f655d] mt-2">
+            시간 / 통대관 단위로 예약 · 최대 8인 이용 가능
+          </p>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
@@ -125,19 +132,6 @@ export default function PricingSummary() {
                     {plan.priceEvent1h.toLocaleString("ko-KR")}원
                   </span>
                   <span className="text-[#6f655d] text-sm">/시간</span>
-                </div>
-              </div>
-
-              {/* 2시간 패키지 가격 */}
-              <div className="mt-3 space-y-1">
-                <p className="text-xs text-[#9b9189]">2시간 패키지</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="line-through text-[#9b9189] text-sm">
-                    {plan.priceOriginal2h.toLocaleString("ko-KR")}원
-                  </span>
-                  <span className="text-[#B98768] font-bold text-xl">
-                    {plan.priceEvent2h.toLocaleString("ko-KR")}원
-                  </span>
                 </div>
               </div>
 

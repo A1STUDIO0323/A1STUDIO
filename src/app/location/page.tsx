@@ -1,10 +1,10 @@
 import { Metadata } from "next";
 import { Train, Car, Clock, Key } from "lucide-react";
 import {
-  STUDIO_ADDRESS,
   STUDIO_LAT,
   STUDIO_LNG,
-  STUDIO_NAME,
+  STUDIO_MAP_LABEL,
+  STUDIO_NAVER_PLACE_ID,
 } from "@/lib/constants";
 import NaverMap from "@/components/NaverMap";
 
@@ -24,11 +24,12 @@ export default function LocationPage() {
           <NaverMap
             lat={STUDIO_LAT}
             lng={STUDIO_LNG}
-            label={STUDIO_NAME}
+            label={STUDIO_MAP_LABEL}
+            zoom={15}
             className="h-full w-full"
           />
           <a
-            href={`https://map.naver.com/v5/search/${encodeURIComponent(STUDIO_ADDRESS)}`}
+            href={`https://map.naver.com/p/entry/place/${STUDIO_NAVER_PLACE_ID}`}
             target="_blank"
             rel="noopener noreferrer"
             className="absolute bottom-3 right-3 rounded-full bg-green-500 px-4 py-2 text-xs font-semibold text-[#3B342F] shadow hover:bg-green-400 transition-colors"

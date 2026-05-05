@@ -113,8 +113,8 @@ export default function Footer() {
             개인정보처리방침
           </Link>
           <span className="mx-2">|</span>
-          <Link href="/admin" className="hover:text-[#6f655d] transition-colors">
-            관리자
+          <Link href="/terms" className="hover:text-[#6f655d] transition-colors">
+            서비스 이용약관
           </Link>
         </div>
       </div>

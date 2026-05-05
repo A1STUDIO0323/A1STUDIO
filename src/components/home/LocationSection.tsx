@@ -93,7 +93,7 @@ export default function LocationSection() {
                 >
                   {STUDIO_PHONE}
                 </a>
-                <p className="text-xs text-[#9b9189]">운영시간 00:00 – 24:00</p>
+                <p className="text-xs text-[#9b9189]">운영시간 10:00 – 22:00</p>
               </div>
             </div>
 

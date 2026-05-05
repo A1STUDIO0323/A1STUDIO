@@ -1,22 +1,22 @@
 import type { CSSProperties, ReactNode } from "react";
 
 const careers = [
-  { year: "2011", title: "삼총사" },
-  { year: "2013", title: "The Promise" },
-  { year: "2016", title: "맘마미아" },
-  { year: "2018", title: "존 도우" },
-  { year: "2019", title: "안나 카레니나" },
-  { year: "2019", title: "엘리자벳" },
-  { year: "2020", title: "드라큘라" },
-  { year: "2021", title: "다윈영의 악의기원" },
-  { year: "2021", title: "맨 오브 라만차" },
-  { year: "2022", title: "웃는 남자" },
-  { year: "2023", title: "할란카운티" },
-  { year: "2023", title: "드라큘라" },
-  { year: "2024", title: "블러디러브" },
-  { year: "2024", title: "4월은 너의 거짓말" },
-  { year: "2024", title: "삼총사" },
   { year: "2025", title: "슈가" },
+  { year: "2024", title: "삼총사" },
+  { year: "2024", title: "4월은 너의 거짓말" },
+  { year: "2024", title: "블러디러브" },
+  { year: "2023", title: "드라큘라" },
+  { year: "2023", title: "할란카운티" },
+  { year: "2022", title: "웃는 남자" },
+  { year: "2021", title: "맨 오브 라만차" },
+  { year: "2021", title: "다윈영의 악의기원" },
+  { year: "2020", title: "드라큘라" },
+  { year: "2019", title: "엘리자벳" },
+  { year: "2019", title: "안나 카레니나" },
+  { year: "2018", title: "존 도우" },
+  { year: "2016", title: "맘마미아" },
+  { year: "2013", title: "The Promise" },
+  { year: "2011", title: "삼총사" },
 ];
 
 const philosophy = [
@@ -122,8 +122,8 @@ export default function AboutSection() {
 
             <SectionLabel>주요 출연작 · Selected Works</SectionLabel>
 
-            {/* 출연작 그리드: 모바일 2열 → sm 이상 3열 */}
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+            {/* 출연작 목록: 1열, 최신순 */}
+            <div className="grid grid-cols-1 gap-1.5">
               {careers.map((c, i) => (
                 <div
                   key={i}

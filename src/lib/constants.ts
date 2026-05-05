@@ -4,12 +4,16 @@ export const STUDIO_DESCRIPTION =
   "서울시 송파구 문정동 70-13 B1. 문정역 도보 8분, 장지역 도보 10분.";
 export const STUDIO_ADDRESS = "서울시 송파구 문정동 70-13 B1";
 export const STUDIO_ADDRESS_DETAIL = "문정역 도보 8분 · 장지역 도보 10분";
-// 지도 마커 좌표 (필요 시 정확한 위경도로 미세 조정)
-export const STUDIO_LAT = 37.4848;
-export const STUDIO_LNG = 127.1226;
+// 지도 마커 좌표 (네이버 플레이스 등록 위치 기준)
+export const STUDIO_LAT = 37.4828998;
+export const STUDIO_LNG = 127.1256066;
+// 지도에 표시될 업체명 (마커 라벨)
+export const STUDIO_MAP_LABEL = "에이원스튜디오";
+// 네이버 플레이스 ID (지도 보기 링크가 업체 페이지로 바로 열리도록)
+export const STUDIO_NAVER_PLACE_ID = "2012721420";
 export const STUDIO_PHONE = "010-2994-0323";
 export const STUDIO_KAKAO_CHANNEL = "https://pf.kakao.com/_pwxldX";
-export const STUDIO_INSTAGRAM = "https://instagram.com/a1studio";
+export const STUDIO_INSTAGRAM = "https://www.instagram.com/a1studio.munjeong";
 
 export const HOLD_TIMEOUT_MINUTES = 10;
 
@@ -35,11 +39,11 @@ export const NAV_LINKS = [
   { label: "홈", href: "/" },
   {
     label: "소개",
-    href: "/#about",
+    href: "/about/company",
     children: [
-      { label: "회사 소개", href: "/#studio-intro" },
-      { label: "대표 소개", href: "/#about" },
-      { label: "공간 소개", href: "/#gallery" },
+      { label: "회사 소개", href: "/about/company" },
+      { label: "대표 소개", href: "/about/ceo" },
+      { label: "공간 소개", href: "/about/space" },
       { label: "비품 및 시설", href: "/equipment" },
     ],
   },
