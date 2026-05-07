@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 const TIERS = [
@@ -299,6 +300,21 @@ export default function IntakePage() {
                 {t.price && <div className="text-zinc-500 text-xs mt-1">💰 {t.price}</div>}
               </div>
             ))}
+          </div>
+          <div className="mt-4 rounded-lg bg-violet-50 border border-violet-200 p-3 flex items-center justify-between gap-3">
+            <div className="text-xs text-violet-900 leading-relaxed">
+              <strong>가격 폭이 왜 이렇게 큰가요?</strong>
+              <br />
+              단계별 최소·최대 비용의 산정 기준을 자세히 보실 수 있습니다.
+            </div>
+            <Link
+              href="/intake/details"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 inline-flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition whitespace-nowrap"
+            >
+              상세 안내 보기 →
+            </Link>
           </div>
         </Card>
 
