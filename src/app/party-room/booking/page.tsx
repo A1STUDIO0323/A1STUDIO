@@ -18,9 +18,9 @@ import { ChevronLeft, ChevronRight, Clock, Calendar, Sparkles, AlertCircle, User
 type Step = 1 | 2 | 3 | 4;
 
 const PACKAGE_INFO = {
-  day: { name: '낮 패키지', time: '10:00 ~ 17:00', hours: 7 },
-  night: { name: '야간 패키지', time: '19:00 ~ 익일 07:00', hours: 12 },
-  allday: { name: '종일권', time: '10:00 ~ 익일 07:00', hours: 21 },
+  day: { name: '데이 패키지', time: '10:00 ~ 17:00', hours: 7 },
+  night: { name: '나잇 패키지', time: '19:00 ~ 익일 07:00', hours: 12 },
+  allday: { name: '올데이 패키지', time: '10:00 ~ 익일 07:00', hours: 21 },
 };
 
 function PartyRoomBookingContent() {
@@ -532,7 +532,7 @@ function PartyRoomBookingContent() {
                 </p>
                 <p className="text-xs text-[#9b9189] mt-2 flex items-center gap-1">
                   <Users className="w-3 h-3" />
-                  최대 10인 이용 가능 (추가 요금 없음)
+                  기본 포함 인원 10인 · 기준 인원 초과 시 사전 문의
                 </p>
               </div>
             )}

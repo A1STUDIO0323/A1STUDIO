@@ -7,7 +7,12 @@ import {
   getActivePaymentLocksForUser,
   releasePaymentLock,
 } from "@/lib/payment-lock";
-import { calcDuration, calcPoints, getPriceType } from "@/lib/pricing";
+import {
+  calcHourlyMixed,
+  calcStudioPackagePoints,
+  STUDIO_PACKAGES,
+  StudioPackage,
+} from "@/lib/pricing";
 import { cookies } from "next/headers";
 import { validateUserExists, USER_NOT_FOUND_ERROR } from "@/lib/user-validation";
 import { prisma } from "@/lib/db";
@@ -43,11 +48,23 @@ export async function POST(request: NextRequest) {
     userId = user.id;
 
     const body = await request.json();
-    const { date, startTime, endTime } = body as {
+    const { date, packageType } = body as {
       date?: string;
       startTime?: string;
       endTime?: string;
+      packageType?: StudioPackage;
     };
+    let { startTime, endTime } = body as {
+      startTime?: string;
+      endTime?: string;
+    };
+
+    // 연습실 패키지 예약: 시간 자동 설정 (서버 신뢰값)
+    if (packageType && ['day', 'night', 'allday'].includes(packageType)) {
+      const pkg = STUDIO_PACKAGES[packageType];
+      startTime = pkg.start;
+      endTime = pkg.end;
+    }
 
     if (!date || !startTime || !endTime) {
       const reason: PaymentErrorReason = "validation_failed";
@@ -117,11 +134,14 @@ export async function POST(request: NextRequest) {
     }
 
     const reservationDate = new Date(date);
-    const startHour = parseInt(startTime.split(":")[0], 10);
-    const priceType = getPriceType(reservationDate, startHour);
-    const duration = calcDuration(startTime, endTime);
-    const pricing = calcPoints(priceType, duration, reservationDate);
-    const totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+    let totalAmount: number;
+    if (packageType) {
+      const pricing = calcStudioPackagePoints(reservationDate, packageType);
+      totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+    } else {
+      const pricing = calcHourlyMixed(reservationDate, startTime, endTime);
+      totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+    }
 
     partner_order_id = `practice-${user.id}-${Date.now()}`;
     const lockOk = await acquirePaymentLock(
@@ -171,7 +191,9 @@ export async function POST(request: NextRequest) {
     });
     const normalizedPhone = normalizePhoneNumber(userProfile?.phone || user.phone);
 
-    const itemName = `A1 STUDIO 연습실 예약 (${date} ${startTime}~${endTime})`;
+    const itemName = packageType
+      ? `A1 STUDIO 연습실 ${STUDIO_PACKAGES[packageType].label} (${date})`
+      : `A1 STUDIO 연습실 예약 (${date} ${startTime}~${endTime})`;
 
     const kakaoResult = await readyPracticeRoomPayment({
       userId: user.id,
@@ -185,6 +207,7 @@ export async function POST(request: NextRequest) {
       startTime,
       endTime,
       totalAmount,
+      packageType: packageType || null,
       guestName:
         userProfile?.name?.trim() || user.email?.split("@")[0] || "회원",
       guestPhone: normalizedPhone || "",

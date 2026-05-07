@@ -1,11 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { isLockedRoute } from "@/lib/locked-routes";
 
 const HIDE_ON = ["/booking", "/admin"];
 
 export default function StickyBookingCTA() {
   const pathname = usePathname();
+  if (isLockedRoute(pathname)) return null;
   const hidden = HIDE_ON.some((p) => pathname.startsWith(p));
   if (hidden) return null;
 

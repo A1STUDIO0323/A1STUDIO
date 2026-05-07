@@ -186,3 +186,36 @@ export const classRequestStore = {
     setStore(REQUESTS_KEY, items.filter((r) => r.id !== id));
   },
 };
+
+// ─── 개인레슨 요청 ────────────────────────────────────────────────
+export type LocalLessonRequest = {
+  id: string;
+  userName: string;
+  userEmail: string;
+  genre: string;                // 분야 (보컬/댄스/연기/뮤지컬 등)
+  level: string;                // 수준 (입문/초급/중급/상급/자유 입력)
+  goal: string;                 // 레슨 목표 (오디션 준비, 취미 등)
+  preferredTime: string;        // 원하는 시간대
+  preferredDays: string[];      // 원하는 요일
+  preferredDates: string;       // 원하는 날짜
+  message: string;
+  createdAt: string;
+};
+
+const LESSON_REQUESTS_KEY = "a1studio_lesson_requests";
+
+export const lessonRequestStore = {
+  getAll(): LocalLessonRequest[] {
+    return getStore<LocalLessonRequest>(LESSON_REQUESTS_KEY);
+  },
+  create(data: Omit<LocalLessonRequest, "id" | "createdAt">): LocalLessonRequest {
+    const req: LocalLessonRequest = { ...data, id: genId(), createdAt: new Date().toISOString() };
+    const items = getStore<LocalLessonRequest>(LESSON_REQUESTS_KEY);
+    setStore(LESSON_REQUESTS_KEY, [req, ...items]);
+    return req;
+  },
+  delete(id: string) {
+    const items = getStore<LocalLessonRequest>(LESSON_REQUESTS_KEY);
+    setStore(LESSON_REQUESTS_KEY, items.filter((r) => r.id !== id));
+  },
+};

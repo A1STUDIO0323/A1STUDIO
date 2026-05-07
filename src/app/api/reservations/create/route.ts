@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { deductPointsDB, refundPointsDB } from "@/lib/supabase-points";
-import { 
-  getPriceType, 
-  calcPoints, 
-  calcDuration,
+import {
+  calcHourlyMixed,
   calcPartyRoomPoints,
+  calcStudioPackagePoints,
   PARTY_ROOM_MAX_HEADCOUNT,
+  PARTY_ROOM_PACKAGES,
+  STUDIO_PACKAGES,
   PartyRoomPackage,
-  type PriceType,
+  StudioPackage,
 } from "@/lib/pricing";
 import { isAdult } from "@/lib/age-check";
 import { acquirePaymentLock, releasePaymentLock } from "@/lib/payment-lock";
@@ -46,14 +47,24 @@ export async function POST(request: NextRequest) {
 
     // 요청 body 파싱
     const body = await request.json();
-    const { 
-      date, 
-      start_time, 
-      end_time,
-      reservation_type = 'room', // 기본값: 연습실
-      package_type, // 파티룸일 때만 사용
-      headcount, // 파티룸일 때 인원 수
+    const {
+      date,
+      reservation_type = 'room',
+      package_type, // 'day' | 'night' | 'allday' (연습실 패키지 또는 파티룸)
+      headcount,
     } = body;
+    let { start_time, end_time } = body;
+
+    // 연습실 패키지인 경우 시간 자동 설정 (서버 신뢰값)
+    if (
+      reservation_type === 'room' &&
+      package_type &&
+      ['day', 'night', 'allday'].includes(package_type)
+    ) {
+      const pkg = STUDIO_PACKAGES[package_type as StudioPackage];
+      start_time = pkg.start;
+      end_time = pkg.end;
+    }
 
     if (!date || !start_time || !end_time) {
       const reason: PaymentErrorReason = "validation_failed";
@@ -131,7 +142,7 @@ export async function POST(request: NextRequest) {
       if (startHour >= 17 && startHour < 19 && package_type !== 'day') {
         return NextResponse.json(
           {
-            error: '야간 패키지는 19:00부터 시작 가능합니다',
+            error: '나잇 패키지는 19:00부터 시작 가능합니다',
             reason: "validation_failed" as const,
           },
           { status: 400 }
@@ -170,15 +181,21 @@ export async function POST(request: NextRequest) {
       const pricing = calcPartyRoomPoints(reservationDate, package_type as PartyRoomPackage);
       pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
       priceType = pricing.priceType;
-      duration = 0; // 패키지는 시간이 고정되어 있음
-    } else {
-      // 연습실: 기존 시간당 가격 계산
+      duration = 0;
+    } else if (reservation_type === 'room' && package_type) {
+      // 연습실 패키지: 평일/주말 기반 가격 계산
       const reservationDate = new Date(date);
-      const startHour = parseInt(start_time.split(":")[0]);
-      priceType = getPriceType(reservationDate, startHour);
-      duration = calcDuration(start_time, end_time);
-      const pricing = calcPoints(priceType as PriceType, duration, reservationDate);
+      const pricing = calcStudioPackagePoints(reservationDate, package_type as StudioPackage);
       pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+      priceType = pricing.dayType;
+      duration = STUDIO_PACKAGES[package_type as StudioPackage].hours;
+    } else {
+      // 연습실 시간제 (피크/비피크 경계 포함 정확 계산)
+      const reservationDate = new Date(date);
+      const pricing = calcHourlyMixed(reservationDate, start_time, end_time);
+      pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+      priceType = 'hourly_mixed';
+      duration = pricing.duration;
     }
 
     // 사용자 프로필 — public.users (Prisma, 파티룸 API와 동일). Supabase profiles/users 직접 조회는 RLS로 phone 누락될 수 있음.
@@ -245,8 +262,8 @@ export async function POST(request: NextRequest) {
       reservation_type,
     };
 
-    // 파티룸일 경우 추가 필드
-    if (reservation_type === 'party-room') {
+    // 패키지 정보 저장 (파티룸 또는 연습실 패키지)
+    if (package_type) {
       reservationData.package_type = package_type;
     }
 

@@ -18,10 +18,10 @@ const SPACES = [
     name: "A1 연습실",
     slug: "a1-room",
     type: "연습실",
-    sizeM2: 50,
+    sizeM2: 66,
     capacity: 6,
     description:
-      "보컬·댄스·연기·뮤지컬 연습이 모두 가능한 15평 단독 공간. 전신거울·전자피아노·촬영용 조명·삼각대·보면대·무선마이크·요가매트·폼롤러 구비.",
+      "보컬·댄스·연기·뮤지컬 연습이 모두 가능한 약 20평 단독 공간. 전신거울·전자피아노·촬영용 조명·삼각대·보면대·무선마이크·요가매트·폼롤러 구비.",
     amenities: [
       "전신거울",
       "전자피아노",
@@ -43,10 +43,10 @@ const SPACES = [
     name: "A1 파티룸",
     slug: "party-room",
     type: "파티룸",
-    sizeM2: 50,
+    sizeM2: 66,
     capacity: 10,
     description:
-      "성인 전용 프라이빗 모임 공간. 음악반응 조명·배달음식 반입·주류 가능. 최대 10인까지 이용 가능한 15평 단독 공간. 낮/야간/종일권 패키지로 운영.",
+      "성인 전용 프라이빗 모임 공간. 음악반응 조명·배달음식 반입·주류 가능. 약 20평 단독 공간. 데이/나잇/올데이 패키지로 운영.",
     amenities: [
       "음악반응 조명",
       "전신거울",
@@ -58,7 +58,7 @@ const SPACES = [
       "공기청정기",
     ],
     priceFrom: 70000,
-    priceUnit: "낮 패키지",
+    priceUnit: "데이 패키지",
     bookingUrl: "/booking?type=party-room",
     detailUrl: "/party-room",
     imageSrc: "/연습실.jpg",

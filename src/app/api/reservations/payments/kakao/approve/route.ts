@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { approvePayment } from "@/lib/kakaopay";
 import { releasePaymentLock } from "@/lib/payment-lock";
-import { calcDuration, calcPoints, getPriceType } from "@/lib/pricing";
+import {
+  calcHourlyMixed,
+  calcStudioPackagePoints,
+  STUDIO_PACKAGES,
+  StudioPackage,
+} from "@/lib/pricing";
 import { cookies } from "next/headers";
 import {
   formatPhoneNumber,
@@ -22,6 +27,7 @@ type PracticeReservationCookie = {
   startTime: string;
   endTime: string;
   totalAmount: number;
+  packageType?: StudioPackage | null;
   guestName: string;
   guestPhone: string;
 };
@@ -93,7 +99,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/booking?failed=true", request.url));
     }
 
-    const { date, startTime, endTime, guestName, guestPhone } = reservationData;
+    const { date, guestName, guestPhone, packageType } = reservationData;
+    let { startTime, endTime } = reservationData;
+
+    // 연습실 패키지: 시간 강제 (서버 신뢰값)
+    if (packageType && ['day', 'night', 'allday'].includes(packageType)) {
+      const pkg = STUDIO_PACKAGES[packageType];
+      startTime = pkg.start;
+      endTime = pkg.end;
+    }
 
     if (!date || !startTime || !endTime) {
       return NextResponse.redirect(new URL("/booking?failed=true", request.url));
@@ -107,11 +121,14 @@ export async function GET(request: NextRequest) {
     });
 
     const reservationDate = new Date(date);
-    const startHour = parseInt(startTime.split(":")[0], 10);
-    const priceType = getPriceType(reservationDate, startHour);
-    const duration = calcDuration(startTime, endTime);
-    const pricing = calcPoints(priceType, duration, reservationDate);
-    const totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+    let totalAmount: number;
+    if (packageType) {
+      const pricing = calcStudioPackagePoints(reservationDate, packageType);
+      totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+    } else {
+      const pricing = calcHourlyMixed(reservationDate, startTime, endTime);
+      totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+    }
 
     if (Math.abs(totalAmount - reservationData.totalAmount) > 0) {
       console.warn("[연습실 카카오페이] 쿠키 금액과 서버 재계산 불일치 — 서버 금액 사용", {
@@ -144,24 +161,29 @@ export async function GET(request: NextRequest) {
         ? guestPhoneNorm
         : guestPhone?.trim() || "미등록";
 
+    const insertPayload: Record<string, unknown> = {
+      id: crypto.randomUUID(),
+      room_id: "a1-room",
+      user_id: user.id,
+      guest_name: guestName?.trim() || "회원",
+      guest_phone,
+      date,
+      start_time: startTime,
+      end_time: endTime,
+      headcount: 1,
+      status: "PAID",
+      total_amount: totalAmount,
+      points_used: 0,
+      payment_method: "kakaopay",
+      reservation_type: "room",
+    };
+    if (packageType) {
+      insertPayload.package_type = packageType;
+    }
+
     const { data: reservation, error: insertError } = await supabase
       .from("reservations")
-      .insert({
-        id: crypto.randomUUID(),
-        room_id: "a1-room",
-        user_id: user.id,
-        guest_name: guestName?.trim() || "회원",
-        guest_phone,
-        date,
-        start_time: startTime,
-        end_time: endTime,
-        headcount: 1,
-        status: "PAID",
-        total_amount: totalAmount,
-        points_used: 0,
-        payment_method: "kakaopay",
-        reservation_type: "room",
-      })
+      .insert(insertPayload)
       .select()
       .single();
 

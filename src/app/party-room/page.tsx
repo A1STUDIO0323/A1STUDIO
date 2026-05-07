@@ -7,7 +7,7 @@ import { Sparkles } from "lucide-react";
 const PACKAGES = [
   {
     id: "day",
-    name: "낮 패키지",
+    name: "데이 패키지",
     time: "10:00 ~ 17:00",
     hours: 7,
     priceOffPeak: { regular: 100000, event: 70000 },
@@ -15,20 +15,19 @@ const PACKAGES = [
   },
   {
     id: "night",
-    name: "야간 패키지",
+    name: "나잇 패키지",
     time: "19:00 ~ 익일 07:00",
     hours: 12,
     priceOffPeak: { regular: 140000, event: 100000 },
     pricePeak: { regular: 160000, event: 120000 },
   },
-  {
-    id: "allday",
-    name: "종일권",
-    time: "10:00 ~ 익일 07:00",
-    hours: 21,
-    priceOffPeak: { regular: 210000, event: 150000 },
-    pricePeak: { regular: 250000, event: 180000 },
-  },
+];
+
+const ALLDAY_TIERS = [
+  { today: "평일",         next: "평일",         label: "비피크 + 비피크", regSum: 240000, regFinal: 216000, evtSum: 170000, evtFinal: 153000 },
+  { today: "평일",         next: "주말·공휴일", label: "비피크 + 피크",   regSum: 260000, regFinal: 234000, evtSum: 190000, evtFinal: 171000 },
+  { today: "주말·공휴일", next: "평일",         label: "피크 + 비피크",   regSum: 270000, regFinal: 243000, evtSum: 190000, evtFinal: 171000 },
+  { today: "주말·공휴일", next: "주말·공휴일", label: "피크 + 피크",     regSum: 290000, regFinal: 261000, evtSum: 210000, evtFinal: 189000 },
 ];
 
 export default function PartyRoomPage() {
@@ -49,7 +48,7 @@ export default function PartyRoomPage() {
             음악이 조명이 됩니다
           </h1>
           <p className="text-lg md:text-xl mb-8 text-white/90">
-            성인 전용 프라이빗 모임 공간 · 최대 10인 · 15평 단독
+            성인 전용 프라이빗 모임 공간 · 약 20평 단독
           </p>
           <Link
             href="/booking?type=party-room"
@@ -73,7 +72,7 @@ export default function PartyRoomPage() {
             </div>
             <div className="rounded-2xl border border-[#D8CCBC] bg-white p-8 text-center">
               <div className="mb-4 text-4xl">🏠</div>
-              <h3 className="text-xl font-bold text-[#3B342F] mb-2">15평 단독 공간</h3>
+              <h3 className="text-xl font-bold text-[#3B342F] mb-2">약 20평 단독 공간</h3>
               <p className="text-[#6f655d]">
                 공간 전체를 우리<br />팀만 사용합니다.
               </p>
@@ -118,13 +117,13 @@ export default function PartyRoomPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {PACKAGES.map((pkg) => (
               <div key={pkg.id} className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
                 <h3 className="text-xl font-bold text-[#3B342F] mb-2">{pkg.name}</h3>
                 <p className="text-[#6f655d] mb-4">{pkg.time}</p>
-                
-                <div className="space-y-3">
+
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-[#9b9189] mb-1">비피크</p>
                     <p className="text-sm text-[#9b9189] line-through">
@@ -148,13 +147,67 @@ export default function PartyRoomPage() {
             ))}
           </div>
 
+          {/* 올데이 패키지 (조합형) */}
+          <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6 mb-6">
+            <div className="flex flex-wrap items-baseline gap-2 mb-2">
+              <h3 className="text-xl font-bold text-[#3B342F]">올데이 패키지</h3>
+              <span className="text-[#6f655d]">10:00 ~ 익일 07:00</span>
+              <span className="text-xs text-[#9b9189]">21시간</span>
+            </div>
+            <p className="text-sm text-[#6f655d] mb-4">
+              올데이 패키지는 데이 + 나잇 조합 상품으로, 각 패키지를 따로 예약하는 것보다 약 10~15% 저렴합니다.
+            </p>
+            <div className="overflow-hidden rounded-xl border border-[#D8CCBC]">
+              <table className="w-full text-sm">
+                <thead className="bg-[#EFE7DA] border-b border-[#D8CCBC]">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-[#3B342F]">당일</th>
+                    <th className="px-3 py-2 text-left font-semibold text-[#3B342F]">익일</th>
+                    <th className="px-3 py-2 text-right font-semibold text-[#3B342F]">가격 (10% 할인 적용)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#D8CCBC]/40">
+                  {ALLDAY_TIERS.map((row, i) => (
+                    <tr key={i}>
+                      <td className="px-3 py-2 text-[#3B342F] align-top">{row.today}</td>
+                      <td className="px-3 py-2 text-[#3B342F] align-top">{row.next}</td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-baseline justify-end gap-2">
+                            <span className="text-[10px] text-[#9b9189] uppercase tracking-wide">정상가</span>
+                            <span className="text-xs text-[#9b9189] line-through">
+                              {row.regSum.toLocaleString("ko-KR")}원
+                            </span>
+                            <span className="text-[#3B342F]">→</span>
+                            <span className="font-semibold text-[#3B342F]">
+                              {row.regFinal.toLocaleString("ko-KR")}원
+                            </span>
+                          </div>
+                          <div className="flex items-baseline justify-end gap-2">
+                            <span className="text-[10px] text-[#B98768] font-bold uppercase tracking-wide">특가</span>
+                            <span className="text-xs text-[#9b9189] line-through">
+                              {row.evtSum.toLocaleString("ko-KR")}원
+                            </span>
+                            <span className="text-[#B98768]">→</span>
+                            <span className="font-bold text-[#B98768]">
+                              {row.evtFinal.toLocaleString("ko-KR")}원
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div className="rounded-xl bg-[#EFE7DA] p-6 text-sm text-[#6f655d] space-y-2">
-            <p>* 낮 패키지(10~17시)와 야간 패키지(19시~익일 7시) 사이 17~19시는 예약이 불가합니다.</p>
-            <p>* 최대 10인 기준이며 추가 인원 요금은 없습니다.</p>
+            <p>* 데이 패키지(10~17시)와 나잇 패키지(19시~익일 7시) 사이 17~19시는 예약이 불가합니다.</p>
+            <p>* 기본 포함 인원 10인 · 11인부터 1인당 10,000원 (기준 인원 초과 시 사전 문의)</p>
             <p>* 이용 시간에는 준비 및 정리 시간이 포함됩니다.</p>
             <p>* 오픈 이벤트 가격은 비품 업그레이드 완료 전까지 적용됩니다.</p>
             <p>* 만 19세 이상 성인 전용입니다.</p>
-            <p>* 10인 기준 1인당: 낮 패키지 7,000원부터 / 야간 패키지 10,000원부터</p>
           </div>
         </section>
 
@@ -214,7 +267,7 @@ export default function PartyRoomPage() {
               <ul className="space-y-2 text-sm text-[#6f655d]">
                 <li>· 다회용 식기 및 세척이 필요한 용기 사용 불가 (세척 시설 없음)</li>
                 <li>· 조리 행위 불가 (전기조리도구·가스버너 등 반입 금지)</li>
-                <li>· 최대 10명 초과 이용 불가</li>
+                <li>· 기준 인원(10인) 초과 시 사전 문의 없이 이용 불가</li>
                 <li>· 미성년자 동반 이용 불가</li>
               </ul>
             </div>

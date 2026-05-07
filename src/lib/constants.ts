@@ -52,11 +52,20 @@ export const NAV_LINKS = [
     label: "원데이클래스",
     href: "/one-day-class",
     children: [
-      { label: "클래스 공고 등록", href: "/one-day-class/announcements" },
-      { label: "클래스 요청", href: "/one-day-class/requests" },
+      { label: "안내", href: "/one-day-class" },
+      { label: "목록", href: "/one-day-class/list" },
+      { label: "요청", href: "/one-day-class/requests" },
     ],
   },
-  { label: "요금안내", href: "/pricing" },
+  {
+    label: "개인레슨",
+    href: "/lessons",
+    children: [
+      { label: "안내", href: "/lessons" },
+      { label: "목록", href: "/lessons/list" },
+      { label: "요청", href: "/lessons/requests" },
+    ],
+  },
   // 예약 메뉴 임시 숨김 (코드 보관)
   // {
   //   label: "예약",
@@ -68,12 +77,12 @@ export const NAV_LINKS = [
   // },
   {
     label: "이용안내",
-    href: "/guide",
+    href: "/pricing",
     children: [
-      { label: "이용수칙", href: "/guide#rules" },
+      { label: "요금안내", href: "/pricing" },
+      { label: "이용수칙‧FAQ", href: "/guide" },
       // 결제/환불 메뉴 임시 숨김 (코드 보관)
       // { label: "환불규정", href: "/guide#refund" },
-      { label: "FAQ", href: "/guide#faq" },
     ],
   },
   {

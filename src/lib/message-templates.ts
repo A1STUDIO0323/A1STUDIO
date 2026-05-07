@@ -117,11 +117,11 @@ export function getPartyRoomConfirmMessage(info: ReservationInfo): string {
   
   let packageInfo = '';
   if (info.packageType === 'day') {
-    packageInfo = '낮 패키지 (10:00~17:00)';
+    packageInfo = '데이 패키지 (10:00~17:00)';
   } else if (info.packageType === 'night') {
-    packageInfo = '야간 패키지 (19:00~익일 10:00)';
+    packageInfo = '나잇 패키지 (19:00~익일 10:00)';
   } else if (info.packageType === 'allday') {
-    packageInfo = '종일권 (10:00~익일 10:00)';
+    packageInfo = '올데이 패키지 (10:00~익일 10:00)';
   }
   
   return `안녕하세요, A1 STUDIO입니다! ◡̎ 
@@ -141,7 +141,7 @@ export function getPartyRoomConfirmMessage(info: ReservationInfo): string {
 
 [ 📌시설 이용 안내  ] 
 - 성인 전용 공간입니다 (만 19세 이상)
-- 최대 10인까지 이용 가능해요
+- 기본 포함 인원 10인 (초과 시 사전 문의)
 - Wi-Fi, 블루투스 스피커, 특수조명 등 모든 시설을 자유롭게 이용하세요!
 
 [ 📌이용 안내 및 주의사항  ]

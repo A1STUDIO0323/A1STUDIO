@@ -55,7 +55,7 @@ type DashboardStats = {
   uniqueGuestCount: number;
 };
 
-const TABS = ["예약 관리", "시간 블록", "요금 관리", "후기 관리", "게시판 관리", "공지 관리"];
+const TABS = ["예약 관리", "시간 블록", "요금 관리", "후기 관리", "게시판 관리", "공지 관리", "CM 신청", "클래스/레슨", "CM 정산"];
 
 export default function AdminPage() {
   const { isAdmin, adminLogin, adminLogout } = useAdmin();
@@ -401,9 +401,57 @@ export default function AdminPage() {
         )}
 
         {/* 다른 탭들 (플레이스홀더) */}
-        {activeTab !== 0 && activeTab !== 3 && activeTab !== 4 && (
+        {activeTab !== 0 && activeTab !== 3 && activeTab !== 4 && activeTab !== 6 && activeTab !== 7 && activeTab !== 8 && (
           <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-[#D8CCBC] text-[#b0a89e]">
             {TABS[activeTab]} 기능 구현 예정
+          </div>
+        )}
+
+        {/* 클래스/레슨 관리 탭 */}
+        {activeTab === 7 && (
+          <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-center">
+            <h3 className="text-lg font-bold text-[#3B342F]">클래스/레슨 상품 관리</h3>
+            <p className="mt-2 text-sm text-[#6f655d]">
+              원데이클래스 / 개인레슨 상품을 등록하고 상태를 관리합니다.
+            </p>
+            <Link
+              href="/admin/class-offerings"
+              className="mt-4 inline-flex rounded-lg bg-[#B98768] px-5 py-2.5 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"
+            >
+              클래스/레슨 관리 페이지로 이동
+            </Link>
+          </div>
+        )}
+
+        {/* CM 정산 관리 탭 */}
+        {activeTab === 8 && (
+          <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-center">
+            <h3 className="text-lg font-bold text-[#3B342F]">CM 정산 관리</h3>
+            <p className="mt-2 text-sm text-[#6f655d]">
+              수업 완료 후 자동 생성된 정산을 검토·승인하고 이체 완료 처리합니다.
+            </p>
+            <Link
+              href="/admin/cm-settlements"
+              className="mt-4 inline-flex rounded-lg bg-[#B98768] px-5 py-2.5 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"
+            >
+              CM 정산 페이지로 이동
+            </Link>
+          </div>
+        )}
+
+        {/* CM 신청 관리 탭 */}
+        {activeTab === 6 && (
+          <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-center">
+            <h3 className="text-lg font-bold text-[#3B342F]">CM 신청 관리</h3>
+            <p className="mt-2 text-sm text-[#6f655d]">
+              CM 신청서를 검토하고 승인 / 반려 / 보류 처리할 수 있습니다.
+            </p>
+            <Link
+              href="/admin/cm-applications"
+              className="mt-4 inline-flex rounded-lg bg-[#B98768] px-5 py-2.5 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"
+            >
+              CM 신청 관리 페이지로 이동
+            </Link>
           </div>
         )}
 

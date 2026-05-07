@@ -10,9 +10,9 @@ import Link from "next/link";
 import { STUDIO_PHONE } from "@/lib/constants";
 
 const PACKAGE_INFO = {
-  day: { name: '낮 패키지', time: '10:00 ~ 17:00' },
-  night: { name: '야간 패키지', time: '19:00 ~ 익일 07:00' },
-  allday: { name: '종일권', time: '10:00 ~ 익일 07:00' },
+  day: { name: '데이 패키지', time: '10:00 ~ 17:00' },
+  night: { name: '나잇 패키지', time: '19:00 ~ 익일 07:00' },
+  allday: { name: '올데이 패키지', time: '10:00 ~ 익일 07:00' },
 };
 
 function PartyRoomCompleteContent() {

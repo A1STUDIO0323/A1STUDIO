@@ -332,9 +332,9 @@ export default function AdminReservationCalendarPage() {
                         </div>
                         {reservation.package_type && (
                           <p className="text-sm text-[#6f655d]">
-                            {reservation.package_type === "day" && "낮 패키지"}
-                            {reservation.package_type === "night" && "야간 패키지"}
-                            {reservation.package_type === "allday" && "종일 패키지"}
+                            {reservation.package_type === "day" && "데이 패키지"}
+                            {reservation.package_type === "night" && "나잇 패키지"}
+                            {reservation.package_type === "allday" && "올데이 패키지"}
                           </p>
                         )}
                       </div>

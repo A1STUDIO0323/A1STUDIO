@@ -51,9 +51,9 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
     id: id,
     name: "A1 Room",
     description:
-      "보컬·댄스·연기·뮤지컬 연습이 모두 가능한 15평 단독 공간입니다. 전신거울, 전자피아노, 촬영용 조명, 삼각대, 보면대, 무선마이크, 요가매트, 폼롤러가 구비되어 있습니다.",
+      "보컬·댄스·연기·뮤지컬 연습이 모두 가능한 약 20평 단독 공간입니다. 전신거울, 전자피아노, 촬영용 조명, 삼각대, 보면대, 무선마이크, 요가매트, 폼롤러가 구비되어 있습니다.",
     capacity: 6,
-    sizeM2: 50,
+    sizeM2: 66,
     amenities: [
       "전신거울",
       "전자피아노",
@@ -148,7 +148,7 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
             <div className="flex items-center gap-3">
               <span className="rounded-full bg-[#F7F3EB] px-3 py-1 text-xs text-[#6f655d]">
                 <Maximize2 className="mr-1 inline h-3 w-3" />
-                {room.sizeM2}㎡ (약 15평)
+                {room.sizeM2}㎡ (약 20평)
               </span>
               <span className="rounded-full bg-[#F7F3EB] px-3 py-1 text-xs text-[#6f655d]">
                 <Users className="mr-1 inline h-3 w-3" />

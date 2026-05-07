@@ -6,7 +6,7 @@ import Image from "next/image";
 import { ArrowRight, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 const GALLERY_IMAGES = [
-  { src: "/연습실.jpg", alt: "A1 Room - 메인 공간", caption: "A1 Room · 15평 단독 공간" },
+  { src: "/연습실.jpg", alt: "A1 Room - 메인 공간", caption: "A1 Room · 약 20평 단독 공간" },
   { src: "/1.jpg", alt: "A1 Room - 전체 뷰" },
   { src: "/2.jpg", alt: "A1 Room - 조명 화이트" },
   { src: "/3.jpg", alt: "A1 Room - 조명 블루" },
@@ -83,7 +83,7 @@ export default function GallerySection() {
             </div>
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0f0e0d]/80 to-transparent p-4">
               <p className="text-base font-bold text-white">A1 Room</p>
-              <p className="text-sm text-white/80">15평 단독 공간</p>
+              <p className="text-sm text-white/80">약 20평 단독 공간</p>
             </div>
           </button>
 

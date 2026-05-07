@@ -476,6 +476,79 @@ model users {
   accounts         Account[]
   sessions         Session[]
 
+  // CM 관련
+  cm_applications          cm_applications[] @relation("cm_applications_user")
+  cm_applications_reviewed cm_applications[] @relation("cm_applications_reviewer")
+  cm_profile               cm_profiles?
+
+  // 클래스/레슨 관련
+  class_offerings_as_cm      class_offerings[]   @relation("class_offerings_cm")
+  class_offerings_as_creator class_offerings[]   @relation("class_offerings_creator")
+  class_enrollments          class_enrollments[]
+  cm_settlements_as_cm       cm_settlements[]    @relation("cm_settlements_cm")
+  cm_settlements_as_approver cm_settlements[]    @relation("cm_settlements_approver")
+  cm_settlements_as_payer    cm_settlements[]    @relation("cm_settlements_payer")
+
+  @@schema("public")
+}
+
+// ============================================
+// CM (Class Master) 신청 / 공개 프로필
+// ============================================
+
+// CM 지원서 (관리자 검토용)
+model cm_applications {
+  id            String    @id @default(uuid()) @db.Uuid
+  user_id       String    @db.Uuid
+  name          String
+  phone         String
+  field         String
+  intro         String
+  career        String
+  portfolio_url String?
+  profile_image String?
+  can_oneday    Boolean   @default(false)
+  can_lesson    Boolean   @default(false)
+  subjects      String[]  @default([])
+  status        String    @default("PENDING") // PENDING / APPROVED / REJECTED / HOLD
+  admin_memo    String?
+  reviewed_at   DateTime?
+  reviewed_by   String?   @db.Uuid
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now()) @updatedAt
+
+  user     users  @relation("cm_applications_user", fields: [user_id], references: [id], onDelete: Cascade)
+  reviewer users? @relation("cm_applications_reviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at(sort: Desc)])
+  @@map("cm_applications")
+  @@schema("public")
+}
+
+// CM 공개 프로필 (승인 후 마이페이지에서 관리)
+model cm_profiles {
+  id             String   @id @default(uuid()) @db.Uuid
+  user_id        String   @unique @db.Uuid
+  display_name   String
+  bio            String?
+  career         String?
+  subjects       String[] @default([])
+  profile_image  String?
+  portfolio_url  String?
+  is_public      Boolean  @default(true)
+  is_active      Boolean  @default(true)
+  // 정산 정보 (비공개 — RLS 보호)
+  bank_name      String?
+  account_number String?
+  account_holder String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now()) @updatedAt
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("cm_profiles")
   @@schema("public")
 }
 
@@ -500,10 +573,10 @@ model BoardPost {
   comments BoardComment[]
   likes    BoardLike[]
 
-  @@map("board_posts")
   @@index([categoryText])
   @@index([authorId])
   @@index([createdAt])
+  @@map("board_posts")
   @@schema("public")
 }
 
@@ -522,9 +595,9 @@ model BoardComment {
   parent  BoardComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
   replies BoardComment[] @relation("CommentReplies")
 
-  @@map("board_comments")
   @@index([postId])
   @@index([authorId])
+  @@map("board_comments")
   @@schema("public")
 }
 
@@ -578,5 +651,95 @@ enum RefundStatus {
   APPROVED
   REJECTED
 
+  @@schema("public")
+}
+
+// ============================================
+// 클래스/레슨 + 정산 (Phase 5-A)
+// ============================================
+
+// 원데이클래스 / 개인레슨 상품
+model class_offerings {
+  id               String    @id @default(uuid()) @db.Uuid
+  type             String // 'oneday' | 'lesson'
+  cm_user_id       String?   @db.Uuid
+  title            String
+  description      String?
+  subject          String? // vocal / dance / act / musical / etc
+  duration_minutes Int       @default(60)
+  capacity         Int       @default(1)
+  price_points     Int
+  scheduled_at     DateTime?
+  status           String    @default("DRAFT") // DRAFT / OPEN / CLOSED / CANCELLED / COMPLETED
+  created_by       String?   @db.Uuid
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @default(now()) @updatedAt
+
+  cm          users?              @relation("class_offerings_cm", fields: [cm_user_id], references: [id], onDelete: SetNull)
+  creator     users?              @relation("class_offerings_creator", fields: [created_by], references: [id], onDelete: SetNull)
+  enrollments class_enrollments[]
+
+  @@index([type, status])
+  @@index([cm_user_id])
+  @@index([scheduled_at])
+  @@map("class_offerings")
+  @@schema("public")
+}
+
+// 수강 신청 (포인트 HOLD/USED/REFUNDED 흐름)
+model class_enrollments {
+  id               String    @id @default(uuid()) @db.Uuid
+  offering_id      String    @db.Uuid
+  user_id          String    @db.Uuid
+  status           String    @default("HELD") // PENDING / HELD / COMPLETED / CANCELLED / REFUNDED / NO_SHOW
+  points_held      Int       @default(0)
+  points_used      Int       @default(0)
+  points_refunded  Int       @default(0)
+  request_note     String?
+  enrolled_at      DateTime  @default(now())
+  completed_at     DateTime?
+  cancelled_at     DateTime?
+  cancelled_reason String?
+  updated_at       DateTime  @default(now()) @updatedAt
+
+  offering   class_offerings @relation(fields: [offering_id], references: [id], onDelete: Restrict)
+  user       users           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  settlement cm_settlements?
+
+  @@index([user_id])
+  @@index([offering_id])
+  @@index([status])
+  @@map("class_enrollments")
+  @@schema("public")
+}
+
+// CM 정산 (수업 완료 후 자동 생성, 관리자 승인 → 수동 이체)
+model cm_settlements {
+  id            String    @id @default(uuid()) @db.Uuid
+  enrollment_id String    @unique @db.Uuid
+  cm_user_id    String    @db.Uuid
+  type          String // 'oneday' | 'lesson'
+  base_amount   Int
+  ratio         Int // 50 또는 70
+  amount        Int // base × ratio / 100
+  status        String    @default("PENDING") // PENDING / APPROVED / PAID / FAILED
+  approved_at   DateTime?
+  approved_by   String?   @db.Uuid
+  paid_at       DateTime?
+  paid_by       String?   @db.Uuid
+  paid_method   String? // 'manual_transfer' / 'auto_api' (추후)
+  paid_memo     String?
+  failed_reason String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now()) @updatedAt
+
+  enrollment class_enrollments @relation(fields: [enrollment_id], references: [id], onDelete: Restrict)
+  cm         users             @relation("cm_settlements_cm", fields: [cm_user_id], references: [id], onDelete: Restrict)
+  approver   users?            @relation("cm_settlements_approver", fields: [approved_by], references: [id], onDelete: SetNull)
+  payer      users?            @relation("cm_settlements_payer", fields: [paid_by], references: [id], onDelete: SetNull)
+
+  @@index([cm_user_id])
+  @@index([status])
+  @@map("cm_settlements")
   @@schema("public")
 }

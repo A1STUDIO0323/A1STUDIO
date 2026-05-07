@@ -239,9 +239,9 @@ interface PartyRoomPaymentParams {
 export async function readyPartyRoomPayment(params: PartyRoomPaymentParams): Promise<ReadyPaymentResponse> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const packageNames = {
-    day: '낮 패키지',
-    night: '야간 패키지',
-    allday: '종일권'
+    day: '데이 패키지',
+    night: '나잇 패키지',
+    allday: '올데이 패키지'
   };
   
   const body = {

@@ -3,14 +3,15 @@
 import { useState, useEffect, Suspense, type MouseEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { 
-  calcPoints, 
-  getPriceType, 
-  calcDuration, 
+import {
+  calcHourlyMixed,
   getPriceTypeName,
   calcPartyRoomPoints,
+  calcStudioPackagePoints,
   PartyRoomPackage,
   PARTY_ROOM_PACKAGES,
+  StudioPackage,
+  STUDIO_PACKAGES,
 } from "@/lib/pricing";
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isBefore, startOfToday } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -45,6 +46,8 @@ function BookingContent() {
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
   const [selectedPackage, setSelectedPackage] = useState<PartyRoomPackage | null>(null);
+  // 연습실 모드: 'hourly' | 'day' | 'night' | 'allday'
+  const [roomMode, setRoomMode] = useState<'hourly' | StudioPackage>('hourly');
   
   // Step 3: 예약 정보
   const [totalPoints, setTotalPoints] = useState(0);
@@ -123,9 +126,11 @@ function BookingContent() {
   useEffect(() => {
     if (!selectedDate) return;
 
-    // 날짜가 변경되면 시간 선택 초기화
-    setStartTime("");
-    setEndTime("");
+    // 날짜 변경 시: 시간제 모드면 시간 초기화, 패키지 모드면 유지
+    if (roomMode === 'hourly') {
+      setStartTime("");
+      setEndTime("");
+    }
 
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     fetch(`/api/reservations/available?date=${dateStr}`)
@@ -134,11 +139,25 @@ function BookingContent() {
         setReservedSlots(data.reserved || []);
       })
       .catch((err) => console.error("예약 조회 오류:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
-  // 시간 선택 시 요금 계산 (연습실)
+  // 모드 변경 시 시간 선택 초기화
   useEffect(() => {
-    if (selectedType !== 'room' || !selectedDate || !startTime || !endTime) {
+    if (selectedType !== 'room') return;
+    if (roomMode === 'hourly') {
+      setStartTime("");
+      setEndTime("");
+    } else {
+      const pkg = STUDIO_PACKAGES[roomMode];
+      setStartTime(pkg.start);
+      setEndTime(pkg.end);
+    }
+  }, [selectedType, roomMode]);
+
+  // 요금 계산 (연습실 — 시간제 또는 패키지)
+  useEffect(() => {
+    if (selectedType !== 'room' || !selectedDate) {
       if (selectedType === 'room') {
         setTotalPoints(0);
         setPriceInfo(null);
@@ -146,20 +165,36 @@ function BookingContent() {
       return;
     }
 
-    const startHour = parseInt(startTime.split(":")[0]);
-    const priceType = getPriceType(selectedDate, startHour);
-    const duration = calcDuration(startTime, endTime);
-    const pricing = calcPoints(priceType, duration, selectedDate);
-    
-    const points = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
-    setTotalPoints(points);
-    setPriceInfo({
-      ...pricing,
-      priceType,
-      duration,
-      finalPrice: points,
-    });
-  }, [selectedType, selectedDate, startTime, endTime]);
+    if (roomMode === 'hourly') {
+      if (!startTime || !endTime) {
+        setTotalPoints(0);
+        setPriceInfo(null);
+        return;
+      }
+      const pricing = calcHourlyMixed(selectedDate, startTime, endTime);
+      const points = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+      setTotalPoints(points);
+      setPriceInfo({
+        kind: 'hourly',
+        ...pricing,
+        finalPrice: points,
+      });
+    } else {
+      // 연습실 패키지
+      const pkg = STUDIO_PACKAGES[roomMode];
+      const pricing = calcStudioPackagePoints(selectedDate, roomMode);
+      const points = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
+      setTotalPoints(points);
+      setPriceInfo({
+        kind: 'studio-package',
+        ...pricing,
+        packageName: pkg.label,
+        packageTime: `${pkg.start} ~ ${pkg.end}`,
+        hours: pkg.hours,
+        finalPrice: points,
+      });
+    }
+  }, [selectedType, selectedDate, startTime, endTime, roomMode]);
 
   // 패키지 선택 시 요금 계산 (파티룸)
   useEffect(() => {
@@ -176,8 +211,8 @@ function BookingContent() {
     setTotalPoints(points);
     setPriceInfo({
       ...pricing,
-      packageName: selectedPackage === 'day' ? '낮 패키지' : 
-                   selectedPackage === 'night' ? '야간 패키지' : '종일권',
+      packageName: selectedPackage === 'day' ? '데이 패키지' :
+                   selectedPackage === 'night' ? '나잇 패키지' : '올데이 패키지',
       packageTime: PARTY_ROOM_PACKAGES[selectedPackage].start + ' ~ ' + PARTY_ROOM_PACKAGES[selectedPackage].end,
       finalPrice: points,
     });
@@ -232,7 +267,7 @@ function BookingContent() {
       return;
     }
 
-    if (selectedType === "room" && (!startTime || !endTime)) {
+    if (selectedType === "room" && roomMode === 'hourly' && (!startTime || !endTime)) {
       alert("시간을 선택해주세요");
       return;
     }
@@ -261,8 +296,15 @@ function BookingContent() {
       };
 
       if (selectedType === "room") {
-        payload.start_time = startTime;
-        payload.end_time = endTime;
+        if (roomMode === 'hourly') {
+          payload.start_time = startTime;
+          payload.end_time = endTime;
+        } else {
+          const pkg = STUDIO_PACKAGES[roomMode];
+          payload.start_time = pkg.start;
+          payload.end_time = pkg.end;
+          payload.package_type = roomMode;
+        }
       } else {
         payload.package_type = selectedPackage;
         const pkg = PARTY_ROOM_PACKAGES[selectedPackage!];
@@ -294,21 +336,34 @@ function BookingContent() {
   };
 
   const handleKakaoPayReservation = async () => {
-    if (!selectedDate || !startTime || !endTime) {
-      alert("날짜와 시간을 선택해주세요");
+    if (!selectedDate) {
+      alert("날짜를 선택해주세요");
+      return;
+    }
+    if (roomMode === 'hourly' && (!startTime || !endTime)) {
+      alert("시간을 선택해주세요");
       return;
     }
 
     setSubmitting(true);
     try {
+      const kakaoBody: Record<string, unknown> = {
+        date: format(selectedDate, "yyyy-MM-dd"),
+      };
+      if (roomMode === 'hourly') {
+        kakaoBody.startTime = startTime;
+        kakaoBody.endTime = endTime;
+      } else {
+        const pkg = STUDIO_PACKAGES[roomMode];
+        kakaoBody.startTime = pkg.start;
+        kakaoBody.endTime = pkg.end;
+        kakaoBody.packageType = roomMode;
+      }
+
       const response = await fetch("/api/reservations/payments/kakao/ready", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: format(selectedDate, "yyyy-MM-dd"),
-          startTime,
-          endTime,
-        }),
+        body: JSON.stringify(kakaoBody),
       });
 
       const data = await response.json();
@@ -495,8 +550,34 @@ function BookingContent() {
             </div>
 
             {selectedType === 'room' ? (
-              // 연습실: 시간 선택
+              // 연습실: 시간제 / 패키지 선택
               <>
+                {/* 모드 선택 */}
+                <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {([
+                    { id: 'hourly',  label: '시간제',        sub: '1시간부터' },
+                    { id: 'day',     label: '데이 패키지',   sub: '10:00~17:00' },
+                    { id: 'night',   label: '나잇 패키지',   sub: '00:00~07:00' },
+                    { id: 'allday',  label: '올데이 패키지', sub: '10:00~22:00' },
+                  ] as const).map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setRoomMode(m.id as 'hourly' | StudioPackage)}
+                      className={`rounded-xl border-2 p-3 text-center transition-all ${
+                        roomMode === m.id
+                          ? 'border-[#B98768] bg-[#f5ede6]'
+                          : 'border-[#D8CCBC] bg-white hover:bg-[#F7F3EB]'
+                      }`}
+                    >
+                      <div className="font-semibold text-sm text-[#3B342F]">{m.label}</div>
+                      <div className="text-xs text-[#9b9189] mt-0.5">{m.sub}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {roomMode === 'hourly' && (
+                <>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-[#3B342F] mb-2">
@@ -541,11 +622,11 @@ function BookingContent() {
                   </div>
                 </div>
 
-                {priceInfo && (
+                {priceInfo && priceInfo.kind === 'hourly' && (
                   <div className="rounded-lg bg-[#f5ede6] border border-[#B98768]/20 p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-[#6f655d]">
-                        {getPriceTypeName(priceInfo.priceType)}
+                        {priceInfo.duration}시간 이용
                       </span>
                       {priceInfo.isEvent && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#B98768]/20 px-2 py-0.5 text-xs font-semibold text-[#B98768]">
@@ -554,20 +635,67 @@ function BookingContent() {
                         </span>
                       )}
                     </div>
-                    <p className="text-2xl font-bold text-[#B98768]">
-                      {priceInfo.duration}시간 × {priceInfo.pricePerHour.toLocaleString("ko-KR")}P = {totalPoints.toLocaleString("ko-KR")}P
+
+                    <div className="space-y-1 mb-2 text-sm text-[#6f655d]">
+                      {priceInfo.breakdown.map((seg: { priceType: string; hours: number; originalPrice: number; eventPrice: number }, i: number) => (
+                        <div key={i} className="flex justify-between">
+                          <span>{getPriceTypeName(seg.priceType as never)} {seg.hours}시간</span>
+                          <span className="font-medium">
+                            {(priceInfo.isEvent ? seg.eventPrice : seg.originalPrice).toLocaleString("ko-KR")}P
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="text-2xl font-bold text-[#B98768] mt-2">
+                      합계 {totalPoints.toLocaleString("ko-KR")}P
                     </p>
                     {priceInfo.isEvent && (
                       <p className="text-sm text-[#9b9189] mt-1">
-                        <span className="line-through text-[#9b9189] text-sm">
-                        {priceInfo.originalPrice.toLocaleString("ko-KR")}P
-                      </span>
-                      {" → "}
-                      <span className="font-semibold text-[#B98768]">
-                        {priceInfo.eventPrice.toLocaleString("ko-KR")}P
-                      </span>
+                        <span className="line-through text-[#9b9189]">
+                          {priceInfo.originalPrice.toLocaleString("ko-KR")}P
+                        </span>
+                        {" → "}
+                        <span className="font-semibold text-[#B98768]">
+                          {priceInfo.eventPrice.toLocaleString("ko-KR")}P
+                        </span>
                       </p>
                     )}
+                  </div>
+                )}
+                </>
+                )}
+
+                {roomMode !== 'hourly' && priceInfo && priceInfo.kind === 'studio-package' && (
+                  <div className="rounded-lg bg-[#f5ede6] border border-[#B98768]/20 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-[#6f655d]">
+                        {priceInfo.packageName} · {priceInfo.dayType === 'weekend' ? '주말·공휴일' : '평일'} · {priceInfo.packageTime}
+                      </span>
+                      {priceInfo.isEvent && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#B98768]/20 px-2 py-0.5 text-xs font-semibold text-[#B98768]">
+                          <Sparkles className="w-3 h-3" />
+                          오픈 이벤트
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-2xl font-bold text-[#B98768]">
+                      {totalPoints.toLocaleString("ko-KR")}원
+                    </p>
+                    {priceInfo.isEvent && (
+                      <p className="text-sm text-[#9b9189] mt-1">
+                        <span className="line-through text-[#9b9189]">
+                          {priceInfo.originalPrice.toLocaleString("ko-KR")}원
+                        </span>
+                        {" → "}
+                        <span className="font-semibold text-[#B98768]">
+                          {priceInfo.eventPrice.toLocaleString("ko-KR")}원
+                        </span>
+                      </p>
+                    )}
+                    <p className="text-xs text-[#9b9189] mt-2">
+                      기본 포함 인원 8인 · 기준 인원 초과 시 사전 문의
+                    </p>
                   </div>
                 )}
               </>
@@ -586,9 +714,9 @@ function BookingContent() {
                       }`}
                     >
                       <h3 className="text-lg font-bold text-[#3B342F] mb-2">
-                        {pkg === 'day' && '낮 패키지'}
-                        {pkg === 'night' && '야간 패키지'}
-                        {pkg === 'allday' && '종일권'}
+                        {pkg === 'day' && '데이 패키지'}
+                        {pkg === 'night' && '나잇 패키지'}
+                        {pkg === 'allday' && '올데이 패키지'}
                       </h3>
                       <p className="text-sm text-[#6f655d] mb-2">
                         {PARTY_ROOM_PACKAGES[pkg].start} ~ {PARTY_ROOM_PACKAGES[pkg].end}
@@ -629,7 +757,7 @@ function BookingContent() {
                     )}
                     <p className="text-xs text-[#9b9189] mt-2 flex items-center gap-1">
                       <Users className="w-3 h-3" />
-                      최대 10인 이용 가능 (추가 요금 없음)
+                      기본 포함 인원 10인 · 기준 인원 초과 시 사전 문의
                     </p>
                   </div>
                 )}
@@ -640,7 +768,8 @@ function BookingContent() {
 
         {/* Step 3: 확인 및 결제 */}
         {selectedDate && priceInfo && (
-          (selectedType === 'room' && startTime && endTime) ||
+          (selectedType === 'room' && roomMode === 'hourly' && startTime && endTime) ||
+          (selectedType === 'room' && roomMode !== 'hourly') ||
           (selectedType === 'party-room' && selectedPackage)
         ) && (
           <div className="rounded-2xl border border-[#D8CCBC] bg-white p-6">
@@ -664,9 +793,13 @@ function BookingContent() {
               <div className="flex justify-between py-2 border-b border-[#D8CCBC]">
                 <span className="text-[#6f655d]">이용 시간</span>
                 <span className="font-semibold text-[#3B342F]">
-                  {selectedType === 'room' ? (
+                  {selectedType === 'room' && roomMode === 'hourly' && (
                     `${startTime} ~ ${endTime}`
-                  ) : (
+                  )}
+                  {selectedType === 'room' && roomMode !== 'hourly' && (
+                    `${STUDIO_PACKAGES[roomMode].label} (${STUDIO_PACKAGES[roomMode].start} ~ ${STUDIO_PACKAGES[roomMode].end})`
+                  )}
+                  {selectedType === 'party-room' && (
                     `${priceInfo.packageName} (${priceInfo.packageTime})`
                   )}
                 </span>

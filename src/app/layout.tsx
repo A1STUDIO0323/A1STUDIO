@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import StickyBookingCTA from "@/components/layout/StickyBookingCTA";
+import ChromeGuard from "@/components/layout/ChromeGuard";
 import Providers from "@/components/layout/Providers";
 import { STUDIO_NAME, STUDIO_DESCRIPTION } from "@/lib/constants";
 import { Suspense } from "react";
@@ -56,7 +57,9 @@ export default function RootLayout({
           </Suspense>
           <Header />
           <main>{children}</main>
-          <Footer />
+          <ChromeGuard>
+            <Footer />
+          </ChromeGuard>
           <StickyBookingCTA />
         </Providers>
       </body>

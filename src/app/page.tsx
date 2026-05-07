@@ -50,7 +50,7 @@ export default function HomePage() {
               One Space · Four Uses
             </p>
             <h2 className="mb-2 text-center text-2xl font-bold text-[#3B342F]">
-              15평 단독 공간, 4가지 활용
+              약 20평 단독 공간, 4가지 활용
             </h2>
             <p className="mb-10 text-center text-sm text-[#9b9189]">
               하나의 연습실을 보컬·댄스·연기·뮤지컬 용도로 자유롭게 활용하세요.

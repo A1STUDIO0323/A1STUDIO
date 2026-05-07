@@ -65,7 +65,7 @@ export default function Hero() {
           {/* 소셜 프루프 */}
           <div className="mt-14 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-[#9b9189]">
             {[
-              { value: "15평", label: "단독 공간" },
+              { value: "약 20평", label: "단독 공간" },
               { value: "4가지", label: "활용 용도" },
               { value: "8분", label: "문정역 도보" },
               { value: "10분", label: "장지역 도보" },

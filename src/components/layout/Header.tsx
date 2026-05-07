@@ -11,6 +11,7 @@ import { NAV_LINKS, STUDIO_NAME } from "@/lib/constants";
 import { useAdmin } from "@/lib/admin-context";
 import { registerMemberProfile, useMemberRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/client";
+import { isLockedRoute } from "@/lib/locked-routes";
 
 type NavLinkItem = (typeof NAV_LINKS)[number] & { isNew?: boolean };
 
@@ -99,6 +100,9 @@ export default function Header() {
     };
   }, [session?.user?.id]);
 
+  // 잠금 경로(예: 회원가입 에러)에서는 헤더 자체를 숨겨 다른 곳으로 이동을 막음
+  if (isLockedRoute(pathname)) return null;
+
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-[#D8CCBC] bg-[#F7F3EB]/95 backdrop-blur supports-[backdrop-filter]:bg-[#F7F3EB]/80">
@@ -154,7 +158,7 @@ export default function Header() {
                         <Link
                           key={child.href}
                           href={getFullyGuardedHref(child.href)}
-                          className="block px-4 py-2 text-sm text-[#3B342F] hover:bg-[#3B342F]/5 hover:text-[#B98768]"
+                          className="block whitespace-nowrap px-4 py-2 text-sm text-[#3B342F] hover:bg-[#3B342F]/5 hover:text-[#B98768]"
                         >
                           {child.label}
                         </Link>

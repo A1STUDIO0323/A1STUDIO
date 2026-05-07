@@ -277,7 +277,7 @@ export async function refundPointsDBServiceRole(params: {
   userId: string;
   points: number;
   description: string;
-  reservationId: string;
+  reservationId: string | null;
 }): Promise<PointResult> {
   const supabase = createServiceRoleSupabase();
   if (!supabase) {

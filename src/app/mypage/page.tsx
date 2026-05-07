@@ -12,22 +12,26 @@ import {
   calculatePartyRoomRefund,
   canCancelReservation as getCancelPolicy,
 } from "@/lib/refund-policy";
-import { 
-  Wallet, 
-  Calendar, 
-  User, 
-  LogOut, 
-  CreditCard, 
-  TrendingUp, 
+import {
+  Wallet,
+  Calendar,
+  User,
+  LogOut,
+  CreditCard,
+  TrendingUp,
   TrendingDown,
   RefreshCw,
   AlertCircle,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Award,
+  GraduationCap,
 } from "lucide-react";
+import CmHubSection from "@/components/mypage/CmHubSection";
+import MyEnrollmentsSection from "@/components/mypage/MyEnrollmentsSection";
 
-type Tab = "points" | "reservations" | "account";
+type Tab = "points" | "reservations" | "account" | "cm" | "classes";
 
 interface PointTransaction {
   id: string;
@@ -62,7 +66,7 @@ function TabSynchronizer({ setActiveTab }: { setActiveTab: (tab: Tab) => void })
   
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab === "account" || tab === "points" || tab === "reservations") {
+    if (tab === "account" || tab === "points" || tab === "reservations" || tab === "cm" || tab === "classes") {
       setActiveTab(tab as Tab);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -513,6 +517,17 @@ function MyPageContent() {
               예약 내역
             </button>
             <button
+              onClick={() => setActiveTab("classes")}
+              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+                activeTab === "classes"
+                  ? "border-b-2 border-[#B98768] text-[#B98768]"
+                  : "text-[#6f655d] hover:text-[#3B342F]"
+              }`}
+            >
+              <GraduationCap className="w-5 h-5" />
+              수강 내역
+            </button>
+            <button
               onClick={() => setActiveTab("account")}
               className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
                 activeTab === "account"
@@ -523,8 +538,25 @@ function MyPageContent() {
               <User className="w-5 h-5" />
               계정 정보
             </button>
+            <button
+              onClick={() => setActiveTab("cm")}
+              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+                activeTab === "cm"
+                  ? "border-b-2 border-[#B98768] text-[#B98768]"
+                  : "text-[#6f655d] hover:text-[#3B342F]"
+              }`}
+            >
+              <Award className="w-5 h-5" />
+              CM
+            </button>
           </div>
         </div>
+
+        {/* CM 탭 — 신청 안내/검토 중/승인 후 프로필을 모두 통합 표시 */}
+        {activeTab === "cm" && <CmHubSection />}
+
+        {/* 수강 내역 탭 */}
+        {activeTab === "classes" && <MyEnrollmentsSection />}
 
         {/* 탭 1: 포인트 현황 */}
         {activeTab === "points" && (
@@ -651,9 +683,9 @@ function MyPageContent() {
                           {/* 패키지 타입 배지 */}
                           {reservation.package_type && (
                             <span className="rounded-full bg-[#f5ede6] border border-[#B98768]/30 px-3 py-1 text-xs font-semibold text-[#B98768]">
-                              {reservation.package_type === 'day' && '낮 패키지'}
-                              {reservation.package_type === 'night' && '야간 패키지'}
-                              {reservation.package_type === 'allday' && '종일권'}
+                              {reservation.package_type === 'day' && '데이 패키지'}
+                              {reservation.package_type === 'night' && '나잇 패키지'}
+                              {reservation.package_type === 'allday' && '올데이 패키지'}
                             </span>
                           )}
                           {/* 결제수단 배지 (파티룸만) */}
