@@ -5,6 +5,7 @@ import sgMail from "@sendgrid/mail";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { sendMessage } from "@/lib/sms";
 
 const LOG_PREFIX = "[intake:submit]";
 
@@ -343,11 +344,41 @@ export async function POST(req: NextRequest) {
       });
       logger.info(`${LOG_PREFIX} mail_sent id=${saved.id}`);
     } catch (err) {
-      logger.error(`${LOG_PREFIX} mail_failed id=${saved.id}`, err);
+      const e = err as { code?: number; response?: { body?: unknown } };
+      const detail = e?.response?.body ? JSON.stringify(e.response.body) : String(err);
+      logger.error(`${LOG_PREFIX} mail_failed id=${saved.id} code=${e?.code ?? "-"} detail=${detail}`);
       // 메일 실패해도 사용자에게는 성공 응답 (DB에 저장됐으므로)
     }
   } else {
     logger.warn(`${LOG_PREFIX} mail_skipped reason=missing_env id=${saved.id}`);
+  }
+
+  // 휴대폰 알림 (알림톡 우선, 실패 시 SMS) — 메일 실패해도 별개로 시도
+  const notifyPhone = process.env.INTAKE_NOTIFY_PHONE?.replace(/[^0-9]/g, "");
+  if (notifyPhone) {
+    const tier = tierLabel(data.target_tier);
+    const budget = data.budget_range || "예산 미정";
+    const business = data.business_name ? ` · ${data.business_name}` : "";
+    const text =
+      `[A1STUDIO] 신규 제작 의뢰\n` +
+      `${data.contact_name}${business}\n` +
+      `${data.contact_phone}\n` +
+      `${tier} / ${budget}\n` +
+      `→ /admin/intakes 에서 확인`;
+
+    logger.info(`${LOG_PREFIX} notify_start id=${saved.id} to=${notifyPhone.slice(0, 3)}****${notifyPhone.slice(-4)}`);
+    try {
+      const result = await sendMessage({ to: notifyPhone, text });
+      if (result.success) {
+        logger.info(`${LOG_PREFIX} notify_sent id=${saved.id} messageId=${result.messageId ?? "-"}`);
+      } else {
+        logger.error(`${LOG_PREFIX} notify_failed id=${saved.id} err=${result.error ?? "unknown"}`);
+      }
+    } catch (err) {
+      logger.error(`${LOG_PREFIX} notify_error id=${saved.id}`, err);
+    }
+  } else {
+    logger.warn(`${LOG_PREFIX} notify_skipped reason=missing_INTAKE_NOTIFY_PHONE id=${saved.id}`);
   }
 
   logger.info(`${LOG_PREFIX} success id=${saved.id} email=${data.contact_email}`);

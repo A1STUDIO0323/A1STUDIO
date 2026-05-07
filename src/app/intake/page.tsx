@@ -59,6 +59,7 @@ type FormState = {
   booking_max_days: string;
   refund_policy: string;
   notification_prefs: string[];
+  notification_prefs_etc: string;
   pg_ready: string[];
   payment_methods: string[];
   refund_terms: string;
@@ -122,6 +123,7 @@ const initialState: FormState = {
   booking_max_days: "",
   refund_policy: "",
   notification_prefs: [],
+  notification_prefs_etc: "",
   pg_ready: [],
   payment_methods: [],
   refund_terms: "",
@@ -142,6 +144,7 @@ export default function IntakePage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<{ id: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const tierLevel = useMemo(() => {
     const n = parseInt(form.target_tier, 10);
@@ -154,6 +157,13 @@ export default function IntakePage() {
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    // 입력하면 해당 필드 에러 즉시 제거
+    setFieldErrors((prev) => {
+      if (!prev[key as string]) return prev;
+      const next = { ...prev };
+      delete next[key as string];
+      return next;
+    });
   }
 
   function toggleArr(key: keyof FormState, value: string) {
@@ -168,17 +178,38 @@ export default function IntakePage() {
     e.preventDefault();
     setError(null);
 
-    if (!form.contact_name.trim() || !form.contact_phone.trim() || !form.contact_email.trim()) {
-      setError("담당자 성함·연락처·이메일은 필수입니다.");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
+    const errs: Record<string, string> = {};
+
+    if (!form.contact_name.trim()) errs.contact_name = "담당자 성함을 입력해주세요.";
+    if (!form.contact_phone.trim()) {
+      errs.contact_phone = "연락처를 입력해주세요.";
+    } else if (!/^[0-9\-+\s()]{8,20}$/.test(form.contact_phone.trim())) {
+      errs.contact_phone = "올바른 연락처 형식이 아닙니다. (예: 010-1234-5678)";
     }
-    if (!form.agreed) {
-      setError("정보 사용 동의에 체크해주세요.");
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    if (!form.contact_email.trim()) {
+      errs.contact_email = "이메일을 입력해주세요.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contact_email.trim())) {
+      errs.contact_email = "올바른 이메일 형식이 아닙니다. (예: example@domain.com)";
+    }
+    if (!form.agreed) errs.agreed = "정보 사용 동의에 체크해주세요.";
+
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      setError(`작성하지 않은 필수 항목이 ${Object.keys(errs).length}개 있습니다.`);
+      // 첫 에러 필드로 스크롤
+      const firstKey = Object.keys(errs)[0];
+      setTimeout(() => {
+        const el = document.querySelector(`[data-field="${firstKey}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      }, 50);
       return;
     }
 
+    setFieldErrors({});
     setSubmitting(true);
     try {
       const customMenu = form.menu_items_etc
@@ -188,9 +219,15 @@ export default function IntakePage() {
         .map((s) => `기타: ${s}`);
       const mergedMenuItems = [...form.menu_items, ...customMenu];
 
+      const customNotify = form.notification_prefs_etc.trim();
+      const mergedNotificationPrefs = customNotify
+        ? [...form.notification_prefs, `기타: ${customNotify}`]
+        : form.notification_prefs;
+
       const payload = {
         ...form,
         menu_items: mergedMenuItems,
+        notification_prefs: mergedNotificationPrefs,
         reference_sites: form.reference_sites.filter((s) => s.url.trim()),
         products: form.products.filter((p) => p.name.trim() || p.price.trim()),
         faqs: form.faqs.filter((f) => f.q.trim() || f.a.trim()),
@@ -272,16 +309,16 @@ export default function IntakePage() {
         {/* 1. 담당자 */}
         <Card title="① 작성자 / 담당자" required>
           <Grid>
-            <Field label="담당자 성함" required>
+            <Field label="담당자 성함" required error={fieldErrors.contact_name} fieldKey="contact_name">
               <Input value={form.contact_name} onChange={(v) => update("contact_name", v)} />
             </Field>
             <Field label="직책">
               <Input value={form.contact_role} onChange={(v) => update("contact_role", v)} placeholder="대표 / 매니저 등" />
             </Field>
-            <Field label="연락처 (휴대폰)" required>
+            <Field label="연락처 (휴대폰)" required error={fieldErrors.contact_phone} fieldKey="contact_phone">
               <Input value={form.contact_phone} onChange={(v) => update("contact_phone", v)} placeholder="010-0000-0000" />
             </Field>
-            <Field label="이메일" required>
+            <Field label="이메일" required error={fieldErrors.contact_email} fieldKey="contact_email">
               <Input value={form.contact_email} onChange={(v) => update("contact_email", v)} placeholder="example@domain.com" type="email" />
             </Field>
           </Grid>
@@ -716,10 +753,18 @@ export default function IntakePage() {
                 onToggle={(v) => toggleArr("notification_prefs", v)}
                 options={[
                   "예약 시 고객에게 이메일",
+                  "예약 시 고객에게 SMS (별도 비용)",
                   "예약 시 고객에게 카카오 알림톡 (별도 비용)",
                   "예약 시 운영자에게 알림",
                   "예약 1시간 전 자동 리마인드",
                 ]}
+              />
+            </Field>
+            <Field label="기타 알림 요청 (직접 입력)">
+              <Input
+                value={form.notification_prefs_etc}
+                onChange={(v) => update("notification_prefs_etc", v)}
+                placeholder="예: 노쇼 1회 시 자동 블랙리스트 알림"
               />
             </Field>
           </Card>
@@ -842,17 +887,26 @@ export default function IntakePage() {
 
         {/* 동의 */}
         <Card title="동의 사항">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.agreed}
-              onChange={(e) => update("agreed", e.target.checked)}
-              className="mt-1 w-4 h-4"
-            />
-            <span className="text-sm text-zinc-700 leading-relaxed">
-              작성한 정보는 홈페이지 제작 목적 외 사용되지 않음에 동의합니다. 정식 계약은 별도 계약서를 통해 진행됨을 이해합니다.
-            </span>
-          </label>
+          <div data-field="agreed" className={fieldErrors.agreed ? "ring-2 ring-red-300 rounded-lg p-2 -m-2" : ""}>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.agreed}
+                onChange={(e) => update("agreed", e.target.checked)}
+                className="mt-1 w-4 h-4"
+              />
+              <span className="text-sm text-zinc-700 leading-relaxed">
+                <span className="text-red-500 mr-0.5">*</span>
+                작성한 정보는 홈페이지 제작 목적 외 사용되지 않음에 동의합니다. 정식 계약은 별도 계약서를 통해 진행됨을 이해합니다.
+              </span>
+            </label>
+            {fieldErrors.agreed && (
+              <p className="mt-2 text-xs text-red-600 flex items-center gap-1 pl-7">
+                <span>⚠</span>
+                {fieldErrors.agreed}
+              </p>
+            )}
+          </div>
         </Card>
 
         {/* Submit */}
@@ -885,14 +939,32 @@ function Card({ title, required, children }: { title: string; required?: boolean
   );
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  error,
+  fieldKey,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  fieldKey?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div>
+    <div data-field={fieldKey}>
       <label className="block text-sm font-medium text-zinc-700 mb-1.5">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
-      {children}
+      <div className={error ? "ring-2 ring-red-300 rounded-lg" : ""}>{children}</div>
+      {error && (
+        <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+          <span>⚠</span>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
