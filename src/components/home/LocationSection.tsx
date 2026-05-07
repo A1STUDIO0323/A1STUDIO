@@ -74,7 +74,7 @@ export default function LocationSection() {
               <div>
                 <h3 className="font-semibold text-[#3B342F]">주차</h3>
                 <p className="mt-1 text-sm text-[#6f655d]">
-                  건물 주차 가능 (예약 시 차량번호 입력)
+                  건물 주차 가능
                   <br />
                   인근 공영주차장 이용 가능
                 </p>

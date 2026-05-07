@@ -55,7 +55,7 @@ type DashboardStats = {
   uniqueGuestCount: number;
 };
 
-const TABS = ["예약 관리", "시간 블록", "요금 관리", "후기 관리", "게시판 관리", "공지 관리", "CM 신청", "클래스/레슨", "CM 정산"];
+const TABS = ["예약 관리", "시간 블록", "요금 관리", "후기 관리", "게시판 관리", "공지 관리", "CM 신청", "클래스/레슨", "CM 정산", "제작 의뢰서"];
 
 export default function AdminPage() {
   const { isAdmin, adminLogin, adminLogout } = useAdmin();
@@ -401,7 +401,7 @@ export default function AdminPage() {
         )}
 
         {/* 다른 탭들 (플레이스홀더) */}
-        {activeTab !== 0 && activeTab !== 3 && activeTab !== 4 && activeTab !== 6 && activeTab !== 7 && activeTab !== 8 && (
+        {activeTab !== 0 && activeTab !== 3 && activeTab !== 4 && activeTab !== 6 && activeTab !== 7 && activeTab !== 8 && activeTab !== 9 && (
           <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-[#D8CCBC] text-[#b0a89e]">
             {TABS[activeTab]} 기능 구현 예정
           </div>
@@ -467,6 +467,22 @@ export default function AdminPage() {
               className="mt-4 inline-flex rounded-lg bg-[#B98768] px-5 py-2.5 text-sm font-bold text-[#F7F3EB] transition-all hover:bg-[#a9785c]"
             >
               게시판 관리 페이지로 이동
+            </Link>
+          </div>
+        )}
+
+        {/* 제작 의뢰서 관리 탭 */}
+        {activeTab === 9 && (
+          <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-center">
+            <h3 className="text-lg font-bold text-[#3B342F]">홈페이지 제작 의뢰서</h3>
+            <p className="mt-2 text-sm text-[#6f655d]">
+              /intake 폼으로 접수된 제작 의뢰서를 조회하고 상태·메모를 관리합니다.
+            </p>
+            <Link
+              href="/admin/intakes"
+              className="mt-4 inline-flex rounded-lg bg-[#B98768] px-5 py-2.5 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"
+            >
+              제작 의뢰서 관리 페이지로 이동
             </Link>
           </div>
         )}

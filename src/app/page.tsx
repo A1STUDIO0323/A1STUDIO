@@ -8,7 +8,7 @@ import ReviewsPreview from "@/components/home/ReviewsPreview";
 import LocationSection from "@/components/home/LocationSection";
 import { STUDIO_NAME, STUDIO_DESCRIPTION } from "@/lib/constants";
 import Link from "next/link";
-import { Mic2, Music2, Clapperboard, Star, ScanFace, Camera, Piano, Dumbbell, BookOpen, Mic } from "lucide-react";
+import { Mic2, Music2, Clapperboard, Star, Camera, Piano, BookOpen, Mic, Volume2, Lightbulb, Sparkles, Monitor } from "lucide-react";
 
 export const metadata: Metadata = {
   title: STUDIO_NAME,
@@ -22,15 +22,16 @@ const ROOM_USES = [
   { icon: Star,         label: "MUSICAL", ko: "뮤지컬", desc: "전자피아노 · 전신거울로 뮤지컬 연습" },
 ];
 
+// 비품 미리보기 (자세한 내용은 /equipment 참고)
 const AMENITIES = [
-  { icon: ScanFace, label: "전신 거울",   desc: "댄스·연기·뮤지컬 연습 필수" },
-  { icon: Camera,   label: "촬영용 조명", desc: "영상·사진 촬영 가능" },
-  { icon: Camera,   label: "삼각대",      desc: "스마트폰·카메라 거치" },
-  { icon: Piano,    label: "전자피아노",  desc: "보컬·뮤지컬 반주 연습" },
-  { icon: BookOpen, label: "보면대",      desc: "악보·대본 거치" },
-  { icon: Mic,      label: "무선마이크",  desc: "보컬 연습·녹음" },
-  { icon: Dumbbell, label: "요가매트",    desc: "몸풀기·스트레칭" },
-  { icon: Dumbbell, label: "폼롤러",      desc: "근막이완·근육 회복" },
+  { icon: Volume2,   label: "JBL 블루투스 스피커", desc: "프리미엄 사운드 (PartyBox 320)" },
+  { icon: Mic,       label: "무선 마이크 ×2",      desc: "보컬·뮤지컬 연습" },
+  { icon: Piano,     label: "전자피아노",          desc: "보컬·뮤지컬 반주 연습" },
+  { icon: BookOpen,  label: "보면대 ×3",           desc: "악보·대본 거치" },
+  { icon: Lightbulb, label: "ART100 촬영 조명",    desc: "영상·사진 촬영" },
+  { icon: Camera,    label: "삼각대",              desc: "스마트폰·카메라 거치" },
+  { icon: Sparkles,  label: "음악반응 조명",       desc: "음악에 따라 자동 연동" },
+  { icon: Monitor,   label: "43인치 TV",           desc: "영상·자료 시청" },
 ];
 
 export default function HomePage() {

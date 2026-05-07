@@ -743,3 +743,77 @@ model cm_settlements {
   @@map("cm_settlements")
   @@schema("public")
 }
+
+model intake_submissions {
+  id                  String   @id @default(cuid())
+  status              String   @default("NEW")
+  contact_name        String
+  contact_phone       String
+  contact_email       String
+  contact_role        String?
+  preferred_channel   String?
+  business_name       String?
+  business_number     String?
+  representative      String?
+  business_address    String?
+  business_phone      String?
+  business_email      String?
+  ecommerce_license   String?
+  industry            String?
+  goals               Json?
+  goal_summary        String?
+  target_tier         String?
+  brand_logo_status   String?
+  brand_color_main    String?
+  brand_color_sub     String?
+  brand_color_avoid   String?
+  tone_and_manner     Json?
+  reference_sites     Json?
+  menu_items          Json?
+  intro_text          String?
+  products            Json?
+  photo_status        String?
+  faqs                Json?
+  business_hours      String?
+  closed_days         String?
+  location            String?
+  parking             String?
+  social_links        Json?
+  domain_status       String?
+  domain_candidates   Json?
+  member_required     String?
+  signup_methods      Json?
+  signup_fields       Json?
+  member_tiers        String?
+  booking_unit        String?
+  booking_duration    String?
+  booking_capacity    String?
+  booking_targets     String?
+  booking_window      String?
+  booking_max_days    String?
+  refund_policy       String?
+  notification_prefs  Json?
+  pg_ready            Json?
+  payment_methods     Json?
+  refund_terms        String?
+  guest_checkout      String?
+  admin_operators     String?
+  admin_features      Json?
+  desired_open_date   String?
+  deadline            String?
+  budget_range        String?
+  payment_split       String?
+  infra_payer         String?
+  extra_requests      String?
+  agreed              Boolean  @default(false)
+  admin_memo          String?
+  source_ip           String?
+  user_agent          String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  @@index([status])
+  @@index([created_at])
+  @@map("intake_submissions")
+  @@schema("public")
+}
