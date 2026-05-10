@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminOrLegacy } from "@/lib/admin-auth";
 
 /**
  * 관리자용 예약 총괄 조회 API
  * GET /api/admin/reservations/calendar?start=2026-04-01&end=2026-04-30
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireAdminOrLegacy(request);
+  if ("error" in auth) return auth.error;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const startDate = searchParams.get("start");

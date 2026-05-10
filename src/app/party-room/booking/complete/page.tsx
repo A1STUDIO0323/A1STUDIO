@@ -132,7 +132,7 @@ function PartyRoomCompleteContent() {
           </h3>
           <div className="space-y-2 text-sm text-[#6f655d]">
             <p>· 도어락 코드는 예약 확정 문자·이메일로 발송됩니다</p>
-            <p>· 주소: 서울시 송파구 문정동 70-13 B1</p>
+            <p>· 주소: 서울특별시 송파구 새말로 103, 지하1층 (문정동, 기백빌딩)</p>
             <p className="flex items-center gap-2">
               <Phone className="w-4 h-4" />
               문의: {STUDIO_PHONE} (24시간)

@@ -351,11 +351,12 @@ export default function AdminIntakesPage() {
             }}
             onKeyDown={async (e) => {
               if (e.key === "Enter") {
-                if (await adminLogin(password)) {
+                const result = await adminLogin(password);
+                if (result.ok) {
                   setPassword("");
                   setLoginError("");
                 } else {
-                  setLoginError("비밀번호가 올바르지 않습니다.");
+                  setLoginError(result.error);
                 }
               }
             }}
@@ -365,11 +366,12 @@ export default function AdminIntakesPage() {
           {loginError && <p className="mt-2 text-xs text-red-400">{loginError}</p>}
           <button
             onClick={async () => {
-              if (await adminLogin(password)) {
+              const result = await adminLogin(password);
+              if (result.ok) {
                 setPassword("");
                 setLoginError("");
               } else {
-                setLoginError("비밀번호가 올바르지 않습니다.");
+                setLoginError(result.error);
               }
             }}
             className="mt-3 w-full rounded-xl bg-[#B98768] py-3 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"

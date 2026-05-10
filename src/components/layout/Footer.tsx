@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Music2, Phone, MapPin, Instagram } from "lucide-react";
 import {
   STUDIO_NAME,
+  STUDIO_LEGAL_NAME,
+  STUDIO_CEO,
+  STUDIO_BIZ_NO,
   STUDIO_ADDRESS,
   STUDIO_ADDRESS_DETAIL,
   STUDIO_PHONE,
@@ -25,7 +28,24 @@ export default function Footer() {
               <br />
               전신거울, 전자피아노, 촬영조명 완비.
             </p>
-            <div className="mt-4 flex items-start gap-2 text-sm">
+
+            {/* 사업자 정보 */}
+            <dl className="mt-4 space-y-1 text-xs text-[#6f655d]">
+              <div className="flex gap-2">
+                <dt className="shrink-0 w-20 text-[#9b9189]">상호</dt>
+                <dd>{STUDIO_LEGAL_NAME}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="shrink-0 w-20 text-[#9b9189]">대표자명</dt>
+                <dd>{STUDIO_CEO}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="shrink-0 w-20 text-[#9b9189]">사업자등록번호</dt>
+                <dd>{STUDIO_BIZ_NO}</dd>
+              </div>
+            </dl>
+
+            <div className="mt-3 flex items-start gap-2 text-sm">
               <MapPin className="h-4 w-4 shrink-0 mt-0.5 text-[#B98768]" />
               <div>
                 <span>{STUDIO_ADDRESS}</span>

@@ -196,9 +196,9 @@ export default function TermsPage() {
 
           <div className="space-y-2 text-sm text-[#3B342F]">
             <p>
-              <strong>A1 STUDIO</strong>
+              <strong>에이원스튜디오(A1STUDIO)</strong>
             </p>
-            <p>서울시 송파구 문정동 70-13 B1</p>
+            <p>서울특별시 송파구 새말로 103, 지하1층 (문정동, 기백빌딩)</p>
             <p>대표: 신지섭</p>
             <p>사업자등록번호: 332-32-01611</p>
             <p>전화: 010-2994-0323</p>
@@ -210,7 +210,7 @@ export default function TermsPage() {
       <div className="bg-[#EFE7DA] border-t border-[#D8CCBC] py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center text-sm text-[#6f655d] space-y-1">
-            <p>A1 STUDIO | 서울시 송파구 문정동 70-13 B1</p>
+            <p>에이원스튜디오(A1STUDIO) | 서울특별시 송파구 새말로 103, 지하1층 (문정동, 기백빌딩)</p>
             <p>대표: 신지섭 | 사업자등록번호: 332-32-01611</p>
             <p>010-2994-0323 | a1studio0323@gmail.com</p>
           </div>

@@ -200,11 +200,13 @@ export default function Header() {
                   onChange={(e) => { setAdminPw(e.target.value); setAdminError(""); }}
                   onKeyDown={async (e) => {
                     if (e.key === "Enter") {
-                      if (await adminLogin(adminPw)) {
+                      const result = await adminLogin(adminPw);
+                      if (result.ok) {
                         setShowAdminLogin(false);
                         setAdminPw("");
+                        setAdminError("");
                       } else {
-                        setAdminError("비밀번호가 틀렸습니다.");
+                        setAdminError(result.error);
                       }
                     }
                   }}
@@ -215,11 +217,13 @@ export default function Header() {
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={async () => {
-                      if (await adminLogin(adminPw)) {
+                      const result = await adminLogin(adminPw);
+                      if (result.ok) {
                         setShowAdminLogin(false);
                         setAdminPw("");
+                        setAdminError("");
                       } else {
-                        setAdminError("비밀번호가 틀렸습니다.");
+                        setAdminError(result.error);
                       }
                     }}
                     className="flex-1 rounded-lg bg-[#B98768] py-2 text-xs font-bold text-[#F7F3EB] hover:bg-[#a9785c]"

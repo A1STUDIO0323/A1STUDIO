@@ -1,8 +1,11 @@
 export const STUDIO_NAME = "A1 STUDIO";
+export const STUDIO_LEGAL_NAME = "에이원스튜디오(A1STUDIO)";
+export const STUDIO_CEO = "신지섭";
+export const STUDIO_BIZ_NO = "332-32-01611";
 export const STUDIO_TAGLINE = "보컬·댄스·연기·뮤지컬 연습실";
 export const STUDIO_DESCRIPTION =
-  "서울시 송파구 문정동 70-13 B1. 문정역 도보 8분, 장지역 도보 10분.";
-export const STUDIO_ADDRESS = "서울시 송파구 문정동 70-13 B1";
+  "서울특별시 송파구 새말로 103, 지하1층 (문정동, 기백빌딩). 문정역 도보 8분, 장지역 도보 10분.";
+export const STUDIO_ADDRESS = "서울특별시 송파구 새말로 103, 지하1층 (문정동, 기백빌딩)";
 export const STUDIO_ADDRESS_DETAIL = "문정역 도보 8분 · 장지역 도보 10분";
 // 지도 마커 좌표 (네이버 플레이스 등록 위치 기준)
 export const STUDIO_LAT = 37.4828998;

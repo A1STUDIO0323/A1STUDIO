@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { prisma } from "@/lib/db";
 
 /**
  * A1 STUDIO 라우트 가드 미들웨어
@@ -11,7 +12,13 @@ import { createServerClient } from "@supabase/ssr";
  * 2. 로그인했지만 프로필 미완성(이름/출생연도 없음) → /onboarding/profile
  * 3. 로그인했지만 전화번호 미인증 → /onboarding/phone
  * 4. 이미 로그인한 사용자가 /login, /signup 접근 → /
+ * 5. /admin 경로 — ADMIN role 아니면 / 로 리다이렉트 (Phase B-3)
  */
+
+// 관리자 전용 경로
+const ADMIN_PATHS = ["/admin"];
+
+const ADMIN_LOG_PREFIX = "[middleware:admin]";
 
 // 로그인 없이도 접근 가능한 공개 경로
 const PUBLIC_PATHS = [
@@ -105,6 +112,41 @@ export async function middleware(request: NextRequest) {
   // ── 로그인 사용자가 auth 전용 경로 접근 ─────────────────
   if (AUTH_ONLY_PATHS.includes(pathname)) {
     return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // ── /admin 경로 가드 (Phase B-3) ─────────────────────────
+  // ADMIN role 아니면 차단. 일반 회원/CM 모두 막힘.
+  // 기존 sessionStorage 비번 인증은 페이지 내부에서 별도 작동 (Phase B-5에서 제거 예정)
+  const isAdminPath = ADMIN_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
+  if (isAdminPath) {
+    console.log(`${ADMIN_LOG_PREFIX} start userId=${user.id} email=${user.email ?? "-"} path=${pathname}`);
+    try {
+      const profile = await prisma.users.findUnique({
+        where: { id: user.id },
+        select: { role: true },
+      });
+      const role = profile?.role ?? "MEMBER";
+
+      if (role !== "ADMIN") {
+        console.warn(
+          `${ADMIN_LOG_PREFIX} blocked userId=${user.id} email=${user.email ?? "-"} role=${role} path=${pathname}`
+        );
+        const homeUrl = new URL("/", request.url);
+        return NextResponse.redirect(homeUrl);
+      }
+      console.log(`${ADMIN_LOG_PREFIX} success userId=${user.id} role=${role} path=${pathname}`);
+      // ADMIN 통과 — 아래 일반 프로필 체크는 그대로 진행 (전화 인증 등)
+    } catch (err) {
+      console.error(`${ADMIN_LOG_PREFIX} role_check_failed userId=${user.id} path=${pathname}`, err);
+      // 안전 우선: 조회 실패 시 차단 (production)
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.redirect(new URL("/", request.url));
+      }
+      // dev: 통과시켜 디버깅 가능하게
+      console.warn(`${ADMIN_LOG_PREFIX} role_check_failed_dev_pass`);
+    }
   }
 
   // ── 프로필 완성 여부 확인 (보호된 경로 접근 시) ─────────

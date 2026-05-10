@@ -1,6 +1,6 @@
 # A1 STUDIO — AI 인계 문서
 
-마지막 갱신: 2026-05-06
+마지막 갱신: 2026-05-09
 원천: 현재 코드베이스 기준 스냅샷 + AI 작업 메모리. 의심되면 항상 코드를 우선합니다.
 
 ---
@@ -9,9 +9,11 @@
 
 서울 송파구 문정동에 위치한 보컬·댄스·연기·뮤지컬 연습실 **A1 STUDIO**의 공식 웹사이트 + 예약 시스템.
 
-- **메인 도메인 기능**: 시간대별 연습실 예약, 카카오페이 결제, 포인트 충전·사용, 원데이클래스 모집, 자유게시판, 분실물·공지·후기 관리
+- **메인 도메인 기능**: 시간대별 연습실 예약, 카카오페이 결제, 포인트 충전·사용, 원데이클래스 모집·신청·정산, 자유게시판, 분실물·공지·후기 관리
 - **별도 흐름**: 파티룸 예약(독립 결제 CID/테이블)
+- **부가 흐름**: 웹사이트 제작 의뢰(인테이크) — `/intake` 단계별 폼, 관리자 백오피스에서 처리
 - **유저 흐름**: Supabase 인증(이메일/카카오/구글) → 휴대폰 인증 온보딩 → 예약/충전/사용
+- **권한 흐름**: MEMBER(기본) / CM(코디네이터·원데이클래스 강사) / ADMIN(운영자) — `users.role` 컬럼 기반
 
 ---
 
@@ -23,7 +25,7 @@
 - **인증**: Supabase Auth (`@supabase/ssr`, v2.100.1) — 이메일/비밀번호, 카카오 OAuth, 구글 OAuth, 휴대폰 OTP
 - **결제**: 카카오페이 API (Ready → Approve → Refund)
 - **SMS/카카오톡**: CoolSMS 또는 SolAPI (env로 선택)
-- **이메일**: SendGrid (문의 폼 등)
+- **이메일**: SendGrid (문의 폼·인테이크 알림 등)
 - **지도**: 네이버 지도 (클라이언트 SDK)
 - **유틸**: bcryptjs, date-fns, zod, lucide-react, motion
 
@@ -32,11 +34,14 @@
 ## 3. 라우트
 
 ### Public 페이지 (`src/app/`)
-홈, 소개(/about/company, /ceo, /space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + /announcements + /requests, /party-room + /party-room/booking + /party-room/booking/complete, /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms
+홈, 소개(/about/company, /ceo, /space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + /announcements + /requests, /party-room + /party-room/booking + /party-room/booking/complete, /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms, **/intake + /intake/details** (웹사이트 제작 의뢰 인테이크 폼)
 
-### Admin 페이지
-/admin, /admin/board, /admin/class-requests, /admin/members, /admin/reservations/calendar, /admin/reviews
-- sessionStorage 기반 비밀번호 보호 (`ADMIN_PASSWORD` 환경변수)
+### Admin 페이지 (`/admin/*`)
+/admin, /admin/board, /admin/class-offerings, /admin/class-requests, /admin/cm-applications, /admin/cm-settlements, /admin/intakes, /admin/members, /admin/reservations/calendar, /admin/reviews
+
+- **이중 가드 (Phase B-3 마이그레이션 중)**:
+  1. `middleware.ts` — `/admin` 진입 시 Supabase 세션 + `users.role === "ADMIN"` 검증, 아니면 `/`로 리다이렉트
+  2. 페이지 내부 sessionStorage 비밀번호 인증(레거시) — Phase B-5에서 제거 예정
 
 ### API 라우트 (`src/app/api/`)
 - **인증**: /auth/email-signup, /auth/callback, /auth/password-reset/{request,confirm}, /auth/sms/{send-code,verify-code}
@@ -45,7 +50,8 @@
 - **파티룸**: /party-room/reservations/{available,create,cancel}, /party-room/payments/kakao/{ready,approve,cancel,fail}
 - **게시판**: /board (CRUD), /board/[id], /board/[id]/{comments,like}, /board/categories
 - **회원**: /members/{profile,sync,withdraw}, /member-roles/role, /account/delete
-- **관리자**: /admin/{auth,board,dashboard,members,reservations/calendar,reservations/cancel,reviews}
+- **인테이크**: /intake/submit (zod 검증 + Prisma 저장 + SendGrid 메일 + SolAPI/CoolSMS 알림)
+- **관리자**: /admin/{auth,board,dashboard,members,members/actions,reservations/calendar,reservations/cancel,reviews,intakes,intakes/[id],cm-applications,cm-applications/[id],cm-list,cm-settlements,cm-settlements/[id],class-offerings,class-offerings/[id],class-offerings/[id]/enrollments,class-enrollments/[id]}
 - **기타**: /lost-items, /notices, /events, /one-day-class, /find-account, /contact, /test/send-sms, /debug/*
 
 ---
@@ -87,7 +93,7 @@
 
 | 모델 | 용도 |
 |---|---|
-| users | Supabase 인증 + 프로필(이름·전화·생년·약관 동의) |
+| users | Supabase 인증 + 프로필(이름·전화·생년·약관 동의) + **role** 컬럼("MEMBER"\|"CM"\|"ADMIN", 기본 MEMBER, `@@index([role])`) |
 | Account/Session/VerificationToken | OAuth 세션 |
 | Room | 연습실 (이름/수용/시설) |
 | PricingRule | 요일·시간대·패키지별 가격 규칙 |
@@ -98,15 +104,23 @@
 | ChargePackage | 포인트 충전 패키지 (보너스율 포함) |
 | user_points / point_transactions | 포인트 잔액 + 원장 |
 | BlockedSlot / ExternalReservation | 슬롯 차단·외부 예약 동기화 |
-| PaymentLock | 결제 트랜잭션 동시성 보호 |
-| MemberRole | 멤버 역할 테이블 (CM = 코디네이터; MEMBER가 기본·미저장) |
+| PaymentLock / public_PaymentLock | 결제 트랜잭션 동시성 보호 |
+| MemberRole | (레거시) 이메일 기반 역할 테이블 — 신규 코드는 `users.role` 사용 |
 | banned_members | 차단 이메일 |
-| OneDayClass / OneDayClassApplication | 원데이클래스 모집·신청 |
+| OneDayClass / OneDayClassApplication | 원데이클래스 모집·신청 (구 흐름) |
+| **class_offerings / class_enrollments** | 신규 원데이클래스 공고·수강 신청 (CM이 등록·진행) |
+| **cm_applications** | CM 지원서 (관리자 승인/반려) |
+| **cm_profiles** | 승인된 CM의 프로필 정보 |
+| **cm_settlements** | CM 정산 (REQUESTED→APPROVED→PAID, approver/payer FK → users) |
+| **intake_submissions** | 웹사이트 제작 의뢰 폼 응답 (단계별 상세, target_tier 1~5/unsure) |
 | Notice / LostItem / Event | 공지·분실물·이벤트 |
 | BoardPost / BoardComment / BoardLike | 자유게시판 (카테고리 자유텍스트, 답글·좋아요) |
 | message_logs | SMS·알림톡 로그 |
 | party_reservations | 파티룸 예약 (별도 스키마) |
 | password_reset_tokens | 비밀번호 재설정 토큰 |
+| reviews | 후기 |
+| reservation_holds | HOLD 상태 보조 테이블 |
+| email_auth_users | Supabase auth.users 미러 (참조용) |
 
 ---
 
@@ -115,7 +129,7 @@
 1. **HeroScroll** — 풀스크린 히어로 애니메이션
 2. **StudioIntro** — 스튜디오명·태그라인·간단 소개
 3. **One Space · Four Uses** — VOCAL/DANCE/ACT/MUSICAL 활용 카드
-4. **Equipment** — 비품 8종 (전신거울, 촬영조명, 삼각대, 전자피아노, 보면대, 무선마이크, 요가매트, 폼롤러)
+4. **Equipment** — 비품 (전신거울, 촬영조명, 삼각대, 전자피아노, 보면대, 무선마이크, 요가매트, 폼롤러, TV)
 5. **GallerySection** — 연습실 사진 갤러리
 6. **PricingSummary** — 요금 요약 ("합리적인 요금, 행복한 시간들!")
 7. **ReviewsPreview** — 최근 후기
@@ -127,16 +141,21 @@
 ## 8. 주요 기능 메모
 
 - **인증**: Supabase Auth — 카카오/구글 OAuth + 이메일/비밀번호. 가입 후 휴대폰 OTP 온보딩(`NEXT_PUBLIC_PHONE_OTP_ENABLED`).
+- **권한 모델**: `users.role` 단일 컬럼 (MEMBER/CM/ADMIN). 신규 가입자는 항상 MEMBER. 자동 승격 없음 — 관리자 UI(`/admin/members`, `/admin/cm-applications`)에서 수동 변경.
+- **관리자 인증 (Phase B 마이그레이션 중)**:
+  - 신규: Supabase 세션 + `users.role === "ADMIN"` (`src/lib/admin-auth.ts`의 `requireAdmin()`, `requireRole()`, `requireAdminOrLegacy()`)
+  - 레거시: `x-admin-password` 헤더 또는 `/api/admin/auth`의 비밀번호 — 점진적으로 제거 중
+  - `/api/admin/auth` POST 시 **세션 → role → 비밀번호** 3중 검증, 실패 시 status별로 다른 한국어 에러 메시지를 클라이언트에 전달 (`AdminLoginResult` 타입)
+  - `middleware.ts`는 `/admin/*` 진입 자체를 ADMIN role로 차단 (DB 조회 실패 시 production은 차단, dev는 통과)
 - **결제**: 카카오페이 — 본 예약과 파티룸이 별도 CID(`KAKAOPAY_CID`, `KAKAOPAY_PARTY_CID`).
 - **포인트**: 패키지 충전 → 결제 승인 시 `user_points` 적립; 예약 시 `use_points` RPC로 차감.
 - **공휴일/피크 가격**: `checkIsHoliday()`에 2026년 공휴일 하드코딩. 평일/주말·피크/오프피크 분리. 로컬 타임존 기준.
 - **이벤트 가격**: 시작일 2026-04-08, 종료일 없음(상시 적용).
-- **파티룸**: day/night/allday 패키지, 본 예약과 완전 분리된 흐름·테이블·CID.
+- **파티룸**: day/night/allday 패키지, 본 예약과 완전 분리된 흐름·테이블·CID. **단, 같은 물리 공간이라 예약 슬롯은 공유 (10-4 참고)**.
+- **원데이클래스 (신규 흐름 `class_offerings`)**: CM이 공고 등록 → 회원이 신청(`class_enrollments`) → 관리자/CM이 확정·취소 → 종료 후 `cm_settlements`로 정산 요청 → 관리자 승인 → 송금 처리(PAID).
+- **인테이크 (`/intake`)**: 웹사이트 제작 의뢰 단계별 폼. 1~5단계 티어(소개·회원·예약·결제·플랫폼) + "잘 모르겠음". 제출 시 zod 검증 → Prisma 저장 → SendGrid 메일 → SMS/알림톡(`sendMessage`) 트리거. 관리자는 `/admin/intakes`에서 조회·상태 관리.
 - **자유게시판**: 카테고리는 작성자가 자유 텍스트 입력. 관리자가 핀/숨김/공지 표시.
 - **분실물 게시판**: `/board/lost` — 관리자 전용 작성, 모두 열람.
-- **원데이클래스**: 모집/확정/취소/완료 라이프사이클, 최소·최대 인원.
-- **회원 역할**: 신규 가입자는 항상 MEMBER (테이블에 row 없음). 관리자 UI에서만 수동으로 CM 승격.
-- **관리자**: 페이지 진입 시 비밀번호 입력 → sessionStorage 저장 (브라우저 닫으면 초기화).
 - **지도**: 네이버 플레이스(2012721420) 기반 좌표·라벨, "지도로 보기"는 플레이스 페이지로 직접 이동.
 
 ---
@@ -150,7 +169,7 @@
 - **SMS**: `SMS_PROVIDER`, `COOLSMS_API_KEY`/`SECRET`/`FROM_NUMBER`, `SOLAPI_API_KEY`/`SECRET`/`FROM_NUMBER`, `SOLAPI_KAKAO_ENABLED`, `SOLAPI_KAKAO_PF_ID`, `NEXT_PUBLIC_PHONE_OTP_ENABLED`
 - **이메일**: `SENDGRID_API_KEY`, `CONTACT_FROM_EMAIL`, `CONTACT_TO_EMAIL`
 - **지도**: `NEXT_PUBLIC_NAVER_MAP_CLIENT_ID`
-- **관리자**: `ADMIN_PASSWORD`, `ADMIN_PASSWORD_HASH`
+- **관리자**: `ADMIN_PASSWORD`, `ADMIN_PASSWORD_HASH` (Phase B-5에서 제거 예정)
 - **사이트**: `NEXT_PUBLIC_SITE_URL`, `NODE_ENV`
 - **Cron**: `CRON_SECRET`
 
@@ -183,15 +202,16 @@
   - 외부 서비스 설정(카카오페이 콘솔, OAuth 등) → 어느 페이지에서 어떤 값을 입력할지 단계별 안내
   - "DB에 컬럼 추가가 필요하다" 식으로 언급만 하고 끝내지 말 것
 
-### 10-3. 회원 역할: CM 자동 부여 없음
+### 10-3. 회원 역할: CM/ADMIN 자동 부여 없음
 
-신규 사용자는 항상 `MEMBER` (테이블에 row 없음 → 기본값). 관리자 UI(`/admin/members`, `/one-day-class/announcements`)에서만 수동으로 CM 승격.
+신규 사용자는 항상 `users.role = "MEMBER"` (기본값). 관리자 UI(`/admin/members`, `/admin/cm-applications`)에서만 수동으로 CM/ADMIN 승격. ADMIN 부트스트랩은 Supabase SQL로 직접 INSERT·UPDATE.
 
-- **이유**: CM이 드물고, 관리자 판단 하에 수동 할당.
+- **이유**: 권한 부여는 운영자 판단 하에서만.
 - **코드 위치**:
-  - `src/lib/member-role.ts` — `getMemberRoleByEmail`, `setMemberRoleByEmail`
-  - `src/app/api/member-roles/route.ts` — GET/POST
-  - Prisma: `getRoleByEmail`, `upsertRoleByEmail`
+  - `src/lib/admin-auth.ts` — `requireAdmin`, `requireRole`, `requireAdminOrLegacy`, `getCurrentUserWithRole`
+  - `prisma/schema.prisma` — `users.role` 컬럼
+  - `middleware.ts` — `/admin/*` 가드
+  - 레거시: `src/lib/member-role.ts`, `src/app/api/member-roles/route.ts` (제거 예정)
 
 ### 10-4. 연습실/파티룸은 한 공간 (예약 슬롯 공유)
 
@@ -203,16 +223,44 @@
   - 중복 예약 체크도 `room_id` / `reservation_type` 분기 없이 같은 날짜·시간 충돌만 확인
   - 관리자 캘린더, 가용 시간 조회에서도 두 상품을 함께 표시
 
-### 10-5. 기타
+### 10-5. 상세 에러/로그 메시지 필수
+
+모든 구현에 추적·조치 가능한 로그 포함. 결제·예약·인증은 **start / success / failed 3단계** 로그 (`[prefix:scope] start ...`, `[prefix:scope] success ...`, `[prefix:scope] failed reason=... ...`).
+
+### 10-6. DB 접근 패턴
+
+- 인증(세션·user.id 추출)은 **Supabase**, 비즈로직 CRUD(role·예약·결제·게시판 등)는 **Prisma**
+- 한 파일·한 함수 안에서 두 클라이언트를 섞지 않음
+- 예외: `src/lib/admin-auth.ts`처럼 "Supabase로 user.id 받고 → Prisma로 role 조회" 같은 명확한 분리는 OK
+
+### 10-7. 할인 중복 규칙
+
+- 오픈이벤트 + 장기대관 → **중복 가능**
+- 패키지 + 장기대관 → **중복 불가**
+
+### 10-8. 기타
 
 - **언어**: 코드 주석·커밋 메시지·UI 텍스트는 한국어.
 - **메모리 원본**: 위 지침은 `~/.claude/projects/C--Users-zxcv9-A1STUDIO/memory/` 에 저장됨. 새 지침이 추가되면 이 문서도 갱신.
 
 ---
 
-## 11. 신뢰성 주의
+## 11. 진행 중인 마이그레이션
 
-이 문서는 **2026-05-05 시점의 스냅샷**입니다. 코드는 계속 변경되니, 어긋나는 부분이 있으면 **항상 코드를 정답으로 삼고** 이 문서를 갱신해주세요. 특히 다음은 빠르게 바뀝니다:
+### Phase B: 관리자 인증 모던화 (sessionStorage 비번 → Supabase 세션 + role)
+
+- **B-1~B-2 완료**: `users.role` 컬럼 추가, `src/lib/admin-auth.ts` 헬퍼 도입
+- **B-3 진행 중**: `middleware.ts` `/admin` 가드, `/api/admin/auth` 3중 검증, AdminLoginResult 타입화
+- **B-4 예정**: 모든 `/api/admin/*` 라우트를 `requireAdmin()` 또는 `requireAdminOrLegacy()`로 통일
+- **B-5 예정**: sessionStorage 비밀번호 인증 UI 제거, `ADMIN_PASSWORD`/`ADMIN_PASSWORD_HASH` env 폐기
+- **B-6 예정**: `MemberRole` 테이블·`src/lib/member-role.ts` 제거
+
+---
+
+## 12. 신뢰성 주의
+
+이 문서는 **2026-05-09 시점의 스냅샷**입니다. 코드는 계속 변경되니, 어긋나는 부분이 있으면 **항상 코드를 정답으로 삼고** 이 문서를 갱신해주세요. 특히 다음은 빠르게 바뀝니다:
 - 가격/이벤트 기간/공휴일 목록
 - 네비게이션 메뉴
 - 출연작·후기 등 컨텐츠
+- 관리자 인증 마이그레이션 단계 (Phase B)

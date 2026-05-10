@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Megaphone, MessageSquarePlus, ChevronRight, Users, UserCheck, ShieldCheck, Award } from "lucide-react";
+import { Megaphone, MessageSquarePlus, ChevronRight, Users, ShieldCheck, Award } from "lucide-react";
 import CmCardSection from "@/components/one-day-class/CmCardSection";
 import OpenOfferingsSection from "@/components/one-day-class/OpenOfferingsSection";
 
@@ -10,51 +10,35 @@ export default function OneDayClassPage() {
         {/* Header */}
         <div className="mb-12 text-center">
           <p className="text-sm font-semibold uppercase tracking-widest text-[#B98768]">
-            One-Day Class · Private Lesson
+            One-Day Class
           </p>
           <h1 className="mt-2 text-4xl font-extrabold text-[#3B342F]">
-            원데이클래스 · 개인레슨
+            원데이클래스
           </h1>
           <p className="mt-4 text-base text-[#6f655d] max-w-2xl mx-auto">
-            보컬·댄스·연기·뮤지컬 등 다양한 분야의 클래스와 레슨을
+            보컬·댄스·연기·뮤지컬 등 다양한 분야의 모집형 클래스를
             A1 STUDIO와 클래스마스터(CM)가 함께 운영합니다.
           </p>
         </div>
 
-        {/* 두 상품 카드 */}
-        <div className="grid gap-5 sm:grid-cols-2 mb-12">
-          <div className="rounded-2xl border border-[#D8CCBC] bg-white p-7">
-            <div className="rounded-xl bg-[#B98768]/15 p-3 w-fit mb-4">
-              <Users className="h-6 w-6 text-[#B98768]" />
-            </div>
-            <h2 className="text-lg font-bold text-[#3B342F] mb-2">원데이클래스</h2>
-            <p className="text-sm text-[#6f655d] leading-relaxed mb-4">
-              여러 수강생과 클래스마스터가 함께하는 모집형 클래스입니다.
-              보컬·댄스·연기·뮤지컬 등 다양한 분야의 클래스를 소수 인원으로 진행합니다.
-            </p>
-            <ul className="text-sm text-[#6f655d] space-y-1 mb-2">
-              <li>· 신청 경로: A1 STUDIO 홈페이지</li>
-              <li>· 운영: A1 STUDIO + 클래스마스터(CM) 협업</li>
-              <li>· 형태: 모집형 · 소수 인원</li>
-            </ul>
+        {/* 원데이클래스 소개 카드 */}
+        <div className="mb-12 rounded-2xl border border-[#D8CCBC] bg-white p-7">
+          <div className="rounded-xl bg-[#B98768]/15 p-3 w-fit mb-4">
+            <Users className="h-6 w-6 text-[#B98768]" />
           </div>
-
-          <div className="rounded-2xl border border-[#D8CCBC] bg-white p-7">
-            <div className="rounded-xl bg-emerald-50 p-3 w-fit mb-4">
-              <UserCheck className="h-6 w-6 text-emerald-500" />
-            </div>
-            <h2 className="text-lg font-bold text-[#3B342F] mb-2">개인레슨</h2>
-            <p className="text-sm text-[#6f655d] leading-relaxed mb-4">
-              신청자의 목적과 수준에 맞춰 클래스마스터와 1:1 또는 소수 인원으로
-              진행되는 맞춤형 레슨입니다. 신청 후 희망 분야·일정·목표를 확인한 뒤
-              적합한 클래스마스터와 연결됩니다.
-            </p>
-            <ul className="text-sm text-[#6f655d] space-y-1 mb-2">
-              <li>· 신청 경로: A1 STUDIO 홈페이지</li>
-              <li>· 매칭: 목적·수준·일정 기반 CM 매칭</li>
-              <li>· 형태: 1:1 또는 소수 인원 맞춤형</li>
-            </ul>
-          </div>
+          <h2 className="text-lg font-bold text-[#3B342F] mb-2">원데이클래스란?</h2>
+          <p className="text-sm text-[#6f655d] leading-relaxed mb-4">
+            여러 수강생과 클래스마스터가 함께하는 모집형 클래스입니다.
+            보컬·댄스·연기·뮤지컬 등 다양한 분야의 클래스를 소수 인원으로 진행합니다.
+          </p>
+          <ul className="text-sm text-[#6f655d] space-y-1">
+            <li>· 신청 경로: A1 STUDIO 홈페이지</li>
+            <li>· 운영: A1 STUDIO + 클래스마스터(CM) 협업</li>
+            <li>· 형태: 모집형 · 소수 인원</li>
+          </ul>
+          <p className="mt-4 text-xs text-[#9b9189]">
+            * 1:1 또는 맞춤형 개인레슨을 원하시면 <Link href="/lessons" className="font-semibold text-emerald-600 hover:underline">개인레슨</Link> 페이지를 이용해주세요.
+          </p>
         </div>
 
         {/* 신청/등록 진입 */}
@@ -90,9 +74,9 @@ export default function OneDayClassPage() {
             </div>
             <div>
               <p className="text-xs font-bold tracking-widest text-emerald-400 uppercase mb-1">Member Only</p>
-              <h2 className="text-lg font-bold text-[#3B342F]">클래스/레슨 요청</h2>
+              <h2 className="text-lg font-bold text-[#3B342F]">클래스 요청</h2>
               <p className="mt-1.5 text-sm text-[#6f655d] leading-relaxed">
-                일반회원이 원하는 장르·시간·요일을 선택해 클래스 또는 개인레슨 개설을 요청할 수 있습니다.
+                일반회원이 원하는 장르·시간·요일을 선택해 원데이클래스 개설을 요청할 수 있습니다.
               </p>
             </div>
           </Link>
@@ -126,14 +110,13 @@ export default function OneDayClassPage() {
               <ul className="text-sm text-[#6f655d] space-y-1 list-disc list-inside">
                 <li>수업 기획 · 진행</li>
                 <li>수강생 지도 · 피드백</li>
-                <li>개인별 커리큘럼 관리 (개인레슨)</li>
                 <li>수업 품질 개선 협조</li>
               </ul>
             </div>
           </div>
 
           <p className="text-xs text-[#9b9189] mt-4">
-            * 클래스/레슨 관련 불만은 A1 STUDIO가 1차 접수 후, 필요 시 CM에게 개선 요청을 전달합니다.
+            * 클래스 관련 불만은 A1 STUDIO가 1차 접수 후, 필요 시 CM에게 개선 요청을 전달합니다.
           </p>
         </div>
 
@@ -176,7 +159,7 @@ export default function OneDayClassPage() {
 
         {/* 누적 진행 안내 — 데이터 없을 때 */}
         <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-7 text-center">
-          <h3 className="text-lg font-bold text-[#3B342F] mb-2">첫 클래스·레슨을 모집 중입니다</h3>
+          <h3 className="text-lg font-bold text-[#3B342F] mb-2">첫 원데이클래스를 모집 중입니다</h3>
           <p className="text-sm text-[#6f655d]">
             누적 진행 횟수 · 수강생 수 · 후기 정보는 실제 수업이 완료된 후부터 표시됩니다.
           </p>

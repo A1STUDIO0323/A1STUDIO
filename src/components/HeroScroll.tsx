@@ -161,7 +161,7 @@ export default function HeroScroll() {
           <span className="block h-px w-14 bg-white/10 mb-8" />
 
           <p className="text-xs sm:text-sm text-white/45 leading-relaxed">
-            서울시 송파구 문정동 70-13 B1
+            서울특별시 송파구 새말로 103, 지하1층 (문정동, 기백빌딩)
           </p>
           <p className="text-xs sm:text-sm text-white/35 mt-1">
             문정역 도보 8분&nbsp;·&nbsp;장지역 도보 10분

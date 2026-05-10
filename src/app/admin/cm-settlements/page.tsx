@@ -152,8 +152,13 @@ export default function AdminSettlementsPage() {
             onChange={(e) => { setPassword(e.target.value); setLoginError(""); }}
             onKeyDown={async (e) => {
               if (e.key === "Enter") {
-                if (await adminLogin(password)) setPassword("");
-                else setLoginError("비밀번호가 올바르지 않습니다.");
+                const result = await adminLogin(password);
+                if (result.ok) {
+                  setPassword("");
+                  setLoginError("");
+                } else {
+                  setLoginError(result.error);
+                }
               }
             }}
             placeholder="관리자 비밀번호"
@@ -162,8 +167,13 @@ export default function AdminSettlementsPage() {
           {loginError && <p className="mt-2 text-xs text-red-500">{loginError}</p>}
           <button
             onClick={async () => {
-              if (await adminLogin(password)) setPassword("");
-              else setLoginError("비밀번호가 올바르지 않습니다.");
+              const result = await adminLogin(password);
+              if (result.ok) {
+                setPassword("");
+                setLoginError("");
+              } else {
+                setLoginError(result.error);
+              }
             }}
             className="mt-3 w-full rounded-xl bg-[#B98768] py-3 text-sm font-bold text-white hover:bg-[#a9785c]"
           >

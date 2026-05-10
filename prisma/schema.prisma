@@ -473,6 +473,7 @@ model users {
   phone_verified   Boolean   @default(false)
   marketing_agreed Boolean   @default(false)
   nickname         String?
+  role             String    @default("MEMBER") // "MEMBER" | "CM" | "ADMIN" — 메모리 규칙: 자동 부여 없음, 관리자 UI에서만 수동 승격
   accounts         Account[]
   sessions         Session[]
 
@@ -489,6 +490,7 @@ model users {
   cm_settlements_as_approver cm_settlements[]    @relation("cm_settlements_approver")
   cm_settlements_as_payer    cm_settlements[]    @relation("cm_settlements_payer")
 
+  @@index([role])
   @@schema("public")
 }
 
