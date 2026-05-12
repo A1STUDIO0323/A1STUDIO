@@ -5,22 +5,30 @@ import { createServerClient } from "@supabase/ssr";
 import { prisma } from "@/lib/db";
 
 /**
- * A1 STUDIO 라우트 가드 미들웨어
+ * A1 STUDIO 라우트 가드 미들웨어 (Phase B-5b 옵션 B 강화)
  *
  * 적용 규칙:
- * 1. 로그인하지 않은 사용자가 보호된 페이지 접근 → /login
- * 2. 로그인했지만 프로필 미완성(이름/출생연도 없음) → /onboarding/profile
- * 3. 로그인했지만 전화번호 미인증 → /onboarding/phone
- * 4. 이미 로그인한 사용자가 /login, /signup 접근 → /
- * 5. /admin 경로 — ADMIN role 아니면 / 로 리다이렉트 (Phase B-3)
+ * 1. 비로그인 사용자
+ *    - PUBLIC_PATHS → 통과
+ *    - 그 외 → /login?next=...
+ *
+ * 2. 로그인 사용자 — 온보딩 완전 강제
+ *    a. /api, /_next, /auth/callback, 정적파일 → 항상 통과
+ *    b. /onboarding/* → 통과 (인증 진행 페이지 자체는 접근 허용)
+ *    c. 프로필 미완성 (이름/출생연도) → /onboarding/profile (모든 경로에서)
+ *    d. 전화번호 미인증 → /onboarding/phone (모든 경로에서)
+ *    e. AUTH_ONLY (/login, /signup) → /
+ *    f. /admin → users.role === 'ADMIN' 만 통과, 아니면 /
+ *    g. 그 외 → 통과
+ *
+ * 카카오 사용자 예외: /auth/callback에서 자동 완성되므로 (c, d) 스킵.
  */
 
-// 관리자 전용 경로
 const ADMIN_PATHS = ["/admin"];
+const ONBOARDING_PATHS = ["/onboarding/profile", "/onboarding/phone"];
+const AUTH_ONLY_PATHS = ["/login", "/signup"];
 
-const ADMIN_LOG_PREFIX = "[middleware:admin]";
-
-// 로그인 없이도 접근 가능한 공개 경로
+// 비로그인 사용자에게 허용되는 공개 경로
 const PUBLIC_PATHS = [
   "/",
   "/login",
@@ -40,23 +48,18 @@ const PUBLIC_PATHS = [
   "/api",
 ];
 
-// 온보딩 전용 경로 (로그인 후 isOnboardingPath로 식별, 완료 전 본인 확인·정보 입력)
-const ONBOARDING_PATHS = ["/onboarding/profile", "/onboarding/phone"];
+const LOG_PREFIX = "[middleware]";
+const ADMIN_LOG_PREFIX = "[middleware:admin]";
+const ONB_LOG_PREFIX = "[middleware:onboarding]";
 
-// 로그인 후 접근 불필요한 경로 (리다이렉트 대상)
-const AUTH_ONLY_PATHS = ["/login", "/signup"];
+function matchesPath(pathname: string, paths: string[]): boolean {
+  return paths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 온보딩 경로: 인증만 있으면 본인 확인용 페이지 접근(프로필 완성·전화 이전 단계)
-  const isOnboardingPath = ONBOARDING_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
-
-  console.log("[middleware] 실행됨:", request.nextUrl.pathname);
-
-  // /api, /_next, /auth/callback 등 항상 통과
+  // ── 1. 정적/시스템 경로 통과 ───────────────────────────────
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
@@ -67,7 +70,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Supabase 클라이언트 (미들웨어용)
+  const isOnboardingPath = matchesPath(pathname, ONBOARDING_PATHS);
+  const isPublicPath = matchesPath(pathname, PUBLIC_PATHS);
+  const isAdminPath = matchesPath(pathname, ADMIN_PATHS);
+  const isAuthOnlyPath = AUTH_ONLY_PATHS.includes(pathname);
+
+  // Supabase 클라이언트 (미들웨어용 — 세션 쿠키 갱신 포함)
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -95,68 +103,37 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ── 비로그인 사용자 처리 ─────────────────────────────────
+  // ── 2. 비로그인 사용자 ─────────────────────────────────────
   if (!user) {
-    // 공개 경로 또는 온보딩 경로는 통과
-    const isPublic = PUBLIC_PATHS.some(
-      (p) => pathname === p || pathname.startsWith(p + "/")
-    );
-    if (isPublic) return response;
-
-    // 보호된 경로 → 로그인 페이지
+    // 온보딩 경로는 로그인 필요 → /login
+    if (isOnboardingPath) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    // 공개 경로 통과
+    if (isPublicPath) return response;
+    // 비공개 경로 → 로그인
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // ── 로그인 사용자가 auth 전용 경로 접근 ─────────────────
-  if (AUTH_ONLY_PATHS.includes(pathname)) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // ── 3. 로그인 사용자 ───────────────────────────────────────
+
+  // 3-1. 온보딩 경로 자체는 통과 (정보 입력 단계)
+  if (isOnboardingPath) {
+    return response;
   }
 
-  // ── /admin 경로 가드 (Phase B-3) ─────────────────────────
-  // ADMIN role 아니면 차단. 일반 회원/CM 모두 막힘.
-  // 기존 sessionStorage 비번 인증은 페이지 내부에서 별도 작동 (Phase B-5에서 제거 예정)
-  const isAdminPath = ADMIN_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
-  if (isAdminPath) {
-    console.log(`${ADMIN_LOG_PREFIX} start userId=${user.id} email=${user.email ?? "-"} path=${pathname}`);
-    try {
-      const profile = await prisma.users.findUnique({
-        where: { id: user.id },
-        select: { role: true },
-      });
-      const role = profile?.role ?? "MEMBER";
+  // 3-2. 프로필 완성 여부 강제 검증 — 모든 경로에 적용 (옵션 B)
+  let profile: {
+    name?: string | null;
+    birthYear?: number | null;
+    phoneVerified?: boolean;
+    provider?: string | null;
+  } | null = null;
 
-      if (role !== "ADMIN") {
-        console.warn(
-          `${ADMIN_LOG_PREFIX} blocked userId=${user.id} email=${user.email ?? "-"} role=${role} path=${pathname}`
-        );
-        const homeUrl = new URL("/", request.url);
-        return NextResponse.redirect(homeUrl);
-      }
-      console.log(`${ADMIN_LOG_PREFIX} success userId=${user.id} role=${role} path=${pathname}`);
-      // ADMIN 통과 — 아래 일반 프로필 체크는 그대로 진행 (전화 인증 등)
-    } catch (err) {
-      console.error(`${ADMIN_LOG_PREFIX} role_check_failed userId=${user.id} path=${pathname}`, err);
-      // 안전 우선: 조회 실패 시 차단 (production)
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.redirect(new URL("/", request.url));
-      }
-      // dev: 통과시켜 디버깅 가능하게
-      console.warn(`${ADMIN_LOG_PREFIX} role_check_failed_dev_pass`);
-    }
-  }
-
-  // ── 프로필 완성 여부 확인 (보호된 경로 접근 시) ─────────
-  // 공개 경로는 프로필 체크 스킵
-  const isPublicPath = PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
-  if (isPublicPath) return response;
-
-  // 보호된 경로: 프로필 데이터 확인
   try {
     const profileRes = await fetch(
       new URL("/api/members/profile", request.url).toString(),
@@ -167,65 +144,86 @@ export async function middleware(request: NextRequest) {
       }
     );
 
-    console.log("[middleware] profile fetch status:", profileRes.status);
-    const rawText = await profileRes.text();
-    console.log("[middleware] profile raw response:", rawText);
-
     if (profileRes.ok) {
-      const { profile } = JSON.parse(rawText);
-
-      console.log("[middleware] profile response:", JSON.stringify(profile));
-      console.log("[middleware] provider:", profile?.provider);
-      console.log(
-        "[middleware] name:",
-        profile?.name,
-        "birthYear:",
-        profile?.birthYear,
-        "phoneVerified:",
-        profile?.phoneVerified
+      const data = await profileRes.json();
+      profile = data?.profile ?? null;
+    } else {
+      console.warn(
+        `${LOG_PREFIX} profile fetch failed status=${profileRes.status} userId=${user.id}`
       );
-
-      // 온보딩 페이지 자체는 접근 허용 (여기서 정보 입력하도록)
-      if (isOnboardingPath) {
-        return response;
-      }
-
-      // 온보딩 페이지가 아닌 경우에만 프로필 완성 체크
-      // 카카오 사용자는 온보딩 체크 스킵 (이미 정보 수집됨)
-      if (profile?.provider === "kakao") {
-        // 카카오는 /auth/callback에서 모든 정보를 자동으로 설정하므로 통과
-        return response;
-      }
-
-      // 구글 또는 기타 provider: 온보딩 강제
-      // 이름 또는 출생연도 없음 → /onboarding/profile
-      if (!profile || !profile.name || !profile.birthYear) {
-        console.log("[middleware] Redirecting to /onboarding/profile");
-        return NextResponse.redirect(new URL("/onboarding/profile", request.url));
-      }
-
-      // 전화번호 미인증 → /onboarding/phone
-      if (!profile.phoneVerified) {
-        console.log("[middleware] Redirecting to /onboarding/phone");
-        return NextResponse.redirect(new URL("/onboarding/phone", request.url));
-      }
     }
   } catch (err) {
-    console.error("[middleware] session refresh failed:", err);
-    console.error("[middleware] profile check error:", err);
-
+    console.error(`${LOG_PREFIX} profile check error userId=${user.id}`, err);
+    // production: 안전상 /login 강제 (계속 진행 시 락 가능성)
     if (process.env.NODE_ENV === "production") {
       console.error(
-        "[middleware] Production: redirecting to login due to profile error"
+        `${LOG_PREFIX} production: redirecting to /login due to profile error`
       );
       return NextResponse.redirect(new URL("/login", request.url));
     }
-
-    console.warn(
-      "[middleware] Development: allowing access despite profile error"
-    );
+    // dev: 통과 (디버깅 편의)
+    console.warn(`${LOG_PREFIX} dev: allowing access despite profile error`);
   }
 
+  // 3-3. 카카오 사용자는 자동 완성 — 온보딩 강제 스킵
+  const skipOnboarding = profile?.provider === "kakao";
+
+  if (!skipOnboarding) {
+    // 프로필 미완성 (이름/출생연도) → /onboarding/profile
+    if (!profile || !profile.name || !profile.birthYear) {
+      console.log(
+        `${ONB_LOG_PREFIX} forcing /onboarding/profile userId=${user.id} from=${pathname}`
+      );
+      return NextResponse.redirect(new URL("/onboarding/profile", request.url));
+    }
+    // 전화번호 미인증 → /onboarding/phone
+    if (!profile.phoneVerified) {
+      console.log(
+        `${ONB_LOG_PREFIX} forcing /onboarding/phone userId=${user.id} from=${pathname}`
+      );
+      return NextResponse.redirect(new URL("/onboarding/phone", request.url));
+    }
+  }
+
+  // 3-4. AUTH_ONLY 경로(이미 로그인됨) → /
+  if (isAuthOnlyPath) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // 3-5. /admin 가드 (Phase B-3): role !== ADMIN → /
+  if (isAdminPath) {
+    console.log(
+      `${ADMIN_LOG_PREFIX} start userId=${user.id} email=${user.email ?? "-"} path=${pathname}`
+    );
+    try {
+      const userRow = await prisma.users.findUnique({
+        where: { id: user.id },
+        select: { role: true },
+      });
+      const role = userRow?.role ?? "MEMBER";
+
+      if (role !== "ADMIN") {
+        console.warn(
+          `${ADMIN_LOG_PREFIX} blocked userId=${user.id} email=${user.email ?? "-"} role=${role} path=${pathname}`
+        );
+        return NextResponse.redirect(new URL("/", request.url));
+      }
+      console.log(
+        `${ADMIN_LOG_PREFIX} success userId=${user.id} role=${role} path=${pathname}`
+      );
+    } catch (err) {
+      console.error(
+        `${ADMIN_LOG_PREFIX} role_check_failed userId=${user.id} path=${pathname}`,
+        err
+      );
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.redirect(new URL("/", request.url));
+      }
+      console.warn(`${ADMIN_LOG_PREFIX} dev: role_check_failed → pass`);
+    }
+  }
+
+  // 3-6. 그 외 → 통과
   return response;
 }
 
