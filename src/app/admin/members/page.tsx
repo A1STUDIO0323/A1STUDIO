@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Lock, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { AdminGate } from "@/components/admin/AdminGate";
 import { cn } from "@/lib/utils";
 import {
   clearMemberBannedLocal,
@@ -13,20 +14,93 @@ import {
   setMemberBannedLocal,
   setMemberRoleByEmail,
   useMemberDirectory,
+  type MemberRole,
 } from "@/lib/member-role";
-import { useAdmin } from "@/lib/admin-context";
+import { ADMIN_PASSWORD_SESSION_KEY, useAdmin } from "@/lib/admin-context";
+
+const LOG_PREFIX = "[admin:members:client]";
 
 export default function AdminMembersPage() {
-  const { isAdmin, adminLogin, adminLogout } = useAdmin();
+  const { isAdmin, adminLogout } = useAdmin();
   const { members } = useMemberDirectory();
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const [memberMessage, setMemberMessage] = useState("");
   const [adminActionPassword, setAdminActionPassword] = useState("");
+  const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
   const refreshMembers = () => {
     window.dispatchEvent(new Event("a1studio:member-role-updated"));
   };
+
+  /**
+   * 회원 역할 변경 핸들러 (Phase B-5a 신규)
+   * - userId가 있으면 PATCH /api/admin/members/[id]/role 사용 (ADMIN까지 지원)
+   * - userId 없으면 레거시 setMemberRoleByEmail (CM/MEMBER만, 탈퇴 회원 등)
+   */
+  async function changeMemberRole(
+    member: { id?: string; email: string; role: MemberRole },
+    nextRole: MemberRole
+  ) {
+    if (member.role === nextRole) return;
+    if (!member.id) {
+      // 레거시 fallback (탈퇴 회원이거나 user 레코드 없는 경우 — ADMIN은 불가)
+      if (nextRole === "ADMIN") {
+        setMemberMessage("이 회원은 가입 기록이 없어 ADMIN 승격이 불가합니다.");
+        return;
+      }
+      console.warn(`${LOG_PREFIX} legacy_path email=${member.email} to=${nextRole}`);
+      const ok = await setMemberRoleByEmail(member.email, nextRole as "CM" | "MEMBER");
+      setMemberMessage(
+        ok
+          ? `${member.email} 계정의 역할을 ${nextRole}로 변경했습니다.`
+          : "회원등급 변경에 실패했습니다."
+      );
+      refreshMembers();
+      return;
+    }
+
+    setSavingRoleId(member.id);
+    console.log(`${LOG_PREFIX} start id=${member.id} email=${member.email} from=${member.role} to=${nextRole}`);
+    try {
+      const legacyPw =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY) ?? ""
+          : "";
+      const res = await fetch(`/api/admin/members/${member.id}/role`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": legacyPw,
+        },
+        body: JSON.stringify({ role: nextRole }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        console.error(`${LOG_PREFIX} failed id=${member.id} status=${res.status} error=${data.error}`);
+        setMemberMessage(data.error || `역할 변경에 실패했습니다 (${res.status})`);
+        return;
+      }
+      console.log(`${LOG_PREFIX} success id=${member.id} to=${nextRole}`);
+      setMemberMessage(`${member.email} 계정의 역할을 ${nextRole}로 변경했습니다.`);
+      refreshMembers();
+    } catch (err) {
+      console.error(`${LOG_PREFIX} network_error id=${member.id}`, err);
+      setMemberMessage("네트워크 오류로 역할 변경에 실패했습니다.");
+    } finally {
+      setSavingRoleId(null);
+    }
+  }
+
+  function roleBadgeStyle(role: MemberRole): string {
+    if (role === "ADMIN") return "border-purple-400 bg-purple-50 text-purple-700";
+    if (role === "CM") return "border-[#B98768]/40 bg-[#B98768]/10 text-[#B98768]";
+    return "border-[#D8CCBC] bg-[#F7F3EB] text-[#6f655d]";
+  }
+
+  function roleBadgeLabel(role: MemberRole): string {
+    if (role === "ADMIN") return "ADMIN";
+    if (role === "CM") return "CM";
+    return "일반회원";
+  }
 
   const filteredMembers = members.filter((member) => {
     if (!memberSearch.trim()) return true;
@@ -38,52 +112,7 @@ export default function AdminMembersPage() {
     );
   });
 
-  if (!isAdmin) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F7F3EB] px-4">
-        <div className="w-full max-w-sm rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-8 text-center">
-          <Lock className="mx-auto mb-4 h-10 w-10 text-[#B98768]" />
-          <h1 className="text-xl font-bold text-[#3B342F]">관리자 로그인</h1>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setLoginError("");
-            }}
-            onKeyDown={async (e) => {
-              if (e.key === "Enter") {
-                const result = await adminLogin(password);
-                if (result.ok) {
-                  setPassword("");
-                  setLoginError("");
-                } else {
-                  setLoginError(result.error);
-                }
-              }
-            }}
-            placeholder="관리자 비밀번호 입력"
-            className="mt-5 w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-[#3B342F] placeholder:text-[#b0a89e] focus:border-[#B98768] focus:outline-none"
-          />
-          {loginError && <p className="mt-2 text-xs text-red-400">{loginError}</p>}
-          <button
-            onClick={async () => {
-              const result = await adminLogin(password);
-              if (result.ok) {
-                setPassword("");
-                setLoginError("");
-              } else {
-                setLoginError(result.error);
-              }
-            }}
-            className="mt-3 w-full rounded-xl bg-[#B98768] py-3 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"
-          >
-            로그인
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!isAdmin) return <AdminGate />;
 
   return (
     <div className="min-h-screen bg-[#F7F3EB]">
@@ -158,12 +187,10 @@ export default function AdminMembersPage() {
                     <span
                       className={cn(
                         "rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
-                        member.role === "CM"
-                          ? "border-[#B98768]/40 bg-[#B98768]/10 text-[#B98768]"
-                          : "border-[#D8CCBC] bg-[#F7F3EB] text-[#6f655d]"
+                        roleBadgeStyle(member.role)
                       )}
                     >
-                      {member.role === "CM" ? "CM" : "일반회원"}
+                      {roleBadgeLabel(member.role)}
                     </span>
                     {member.isBanned ? (
                       <span className="rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-500">
@@ -171,22 +198,50 @@ export default function AdminMembersPage() {
                       </span>
                     ) : null}
                     <button
-                      onClick={async () => {
-                        const ok = await setMemberRoleByEmail(member.email, "CM");
-                        setMemberMessage(ok ? `${member.email} 계정을 CM으로 승격했습니다.` : "회원등급 변경에 실패했습니다.");
-                      }}
-                      className="rounded-lg bg-[#B98768] px-2.5 py-1.5 text-[11px] font-bold text-[#F7F3EB] hover:bg-[#a9785c]"
+                      type="button"
+                      disabled={savingRoleId === member.id || member.role === "MEMBER"}
+                      onClick={() => changeMemberRole(member, "MEMBER")}
+                      className={cn(
+                        "rounded-lg border border-[#D8CCBC] px-2.5 py-1.5 text-[11px] font-semibold transition",
+                        member.role === "MEMBER"
+                          ? "bg-[#F7F3EB] text-[#9b9189] cursor-default"
+                          : "text-[#6f655d] hover:text-[#B98768]",
+                        savingRoleId === member.id && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      일반
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingRoleId === member.id || member.role === "CM"}
+                      onClick={() => changeMemberRole(member, "CM")}
+                      className={cn(
+                        "rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition",
+                        member.role === "CM"
+                          ? "bg-[#B98768]/30 text-[#B98768] cursor-default"
+                          : "bg-[#B98768] text-[#F7F3EB] hover:bg-[#a9785c]",
+                        savingRoleId === member.id && "opacity-50 cursor-not-allowed"
+                      )}
                     >
                       CM
                     </button>
                     <button
-                      onClick={async () => {
-                        const ok = await setMemberRoleByEmail(member.email, "MEMBER");
-                        setMemberMessage(ok ? `${member.email} 계정을 일반회원으로 변경했습니다.` : "회원등급 변경에 실패했습니다.");
+                      type="button"
+                      disabled={savingRoleId === member.id || member.role === "ADMIN" || !member.id}
+                      onClick={() => {
+                        if (!confirm(`${member.email} 계정에 ADMIN 권한을 부여하시겠습니까?\n\nADMIN은 모든 관리 기능(예약/결제/회원/정산)에 접근 가능합니다.`)) return;
+                        void changeMemberRole(member, "ADMIN");
                       }}
-                      className="rounded-lg border border-[#D8CCBC] px-2.5 py-1.5 text-[11px] font-semibold text-[#6f655d] hover:text-[#B98768]"
+                      className={cn(
+                        "rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition",
+                        member.role === "ADMIN"
+                          ? "bg-purple-100 text-purple-700 cursor-default"
+                          : "bg-purple-600 text-white hover:bg-purple-700",
+                        (savingRoleId === member.id || !member.id) && "opacity-50 cursor-not-allowed"
+                      )}
+                      title={!member.id ? "탈퇴/미가입 회원은 ADMIN 승격 불가" : undefined}
                     >
-                      일반
+                      ADMIN
                     </button>
                     <button
                       onClick={async () => {

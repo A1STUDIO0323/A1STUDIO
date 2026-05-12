@@ -2,11 +2,11 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { banMemberByEmail, unbanMemberByEmail, withdrawMemberByEmail } from "@/lib/member-role-db";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin1234";
+import { requireAdminOrLegacy } from "@/lib/admin-auth";
 
 const actionSchema = z.object({
-  adminPassword: z.string(),
+  // adminPassword는 레거시 호환 — 새 클라이언트는 x-admin-password 헤더 또는 ADMIN 세션 사용
+  adminPassword: z.string().optional(),
   email: z.string().email(),
   action: z.enum(["WITHDRAW", "BAN", "UNBAN"]),
   reason: z.string().optional(),
@@ -16,9 +16,18 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const data = actionSchema.parse(body);
-    if (data.adminPassword !== ADMIN_PASSWORD) {
-      return NextResponse.json({ success: false, error: "권한 없음" }, { status: 403 });
-    }
+
+    // 신규(세션+role) 또는 레거시(헤더) 인증 시도
+    // body의 adminPassword는 옛 클라이언트 호환용 — 헤더로 fallback 시켜 검증
+    const reqWithLegacyHeader = data.adminPassword
+      ? new Request(req.url, {
+          method: req.method,
+          headers: { ...Object.fromEntries(req.headers), "x-admin-password": data.adminPassword },
+          body: null,
+        })
+      : req;
+    const auth = await requireAdminOrLegacy(reqWithLegacyHeader);
+    if ("error" in auth) return auth.error;
 
     const email = data.email.trim().toLowerCase();
     if (data.action === "WITHDRAW") {

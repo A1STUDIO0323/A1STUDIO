@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Lock, RefreshCw, Trash2 } from "lucide-react";
+import { RefreshCw, Trash2 } from "lucide-react";
 import { useAdmin } from "@/lib/admin-context";
+import { AdminGate } from "@/components/admin/AdminGate";
 import { classRequestStore, type LocalClassRequest } from "@/lib/local-store";
 
 export default function AdminClassRequestsPage() {
-  const { isAdmin, adminLogin, adminLogout } = useAdmin();
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
+  const { isAdmin, adminLogout } = useAdmin();
   const [requests, setRequests] = useState<LocalClassRequest[]>([]);
 
   const load = () => {
@@ -21,52 +20,7 @@ export default function AdminClassRequestsPage() {
     load();
   }, [isAdmin]);
 
-  if (!isAdmin) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F7F3EB] px-4">
-        <div className="w-full max-w-sm rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-8 text-center">
-          <Lock className="mx-auto mb-4 h-10 w-10 text-[#B98768]" />
-          <h1 className="text-xl font-bold text-[#3B342F]">관리자 로그인</h1>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setLoginError("");
-            }}
-            onKeyDown={async (e) => {
-              if (e.key === "Enter") {
-                const result = await adminLogin(password);
-                if (result.ok) {
-                  setPassword("");
-                  setLoginError("");
-                } else {
-                  setLoginError(result.error);
-                }
-              }
-            }}
-            placeholder="관리자 비밀번호 입력"
-            className="mt-5 w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-[#3B342F] placeholder:text-[#b0a89e] focus:border-[#B98768] focus:outline-none"
-          />
-          {loginError && <p className="mt-2 text-xs text-red-400">{loginError}</p>}
-          <button
-            onClick={async () => {
-              const result = await adminLogin(password);
-              if (result.ok) {
-                setPassword("");
-                setLoginError("");
-              } else {
-                setLoginError(result.error);
-              }
-            }}
-            className="mt-3 w-full rounded-xl bg-[#B98768] py-3 text-sm font-bold text-[#F7F3EB] transition-all hover:bg-[#a9785c]"
-          >
-            로그인
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!isAdmin) return <AdminGate />;
 
   return (
     <div className="min-h-screen bg-[#F7F3EB]">

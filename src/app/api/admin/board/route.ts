@@ -1,31 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdminOrLegacy } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/admin/board — 전체 게시글 (관리자)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "로그인이 필요합니다" },
-        { status: 401 }
-      );
-    }
-
-    const headerPassword = request.headers.get("x-admin-password");
-    if (!headerPassword || headerPassword !== process.env.ADMIN_PASSWORD) {
-      return NextResponse.json(
-        { success: false, error: "관리자 권한이 필요합니다" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminOrLegacy(request);
+    if ("error" in auth) return auth.error;
 
     const searchParams = request.nextUrl.searchParams;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
@@ -93,25 +76,8 @@ export async function GET(request: NextRequest) {
 // DELETE /api/admin/board — 게시글 일괄 삭제
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "로그인이 필요합니다" },
-        { status: 401 }
-      );
-    }
-
-    const headerPassword = request.headers.get("x-admin-password");
-    if (!headerPassword || headerPassword !== process.env.ADMIN_PASSWORD) {
-      return NextResponse.json(
-        { success: false, error: "관리자 권한이 필요합니다" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminOrLegacy(request);
+    if ("error" in auth) return auth.error;
 
     const body = (await request.json()) as { postIds?: unknown };
     const postIds = body.postIds;

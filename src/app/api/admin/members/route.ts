@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
     const users = await prisma.users.findMany({
       where: { email: { not: null } },
-      select: { email: true, name: true, updated_at: true },
+      select: { id: true, email: true, name: true, role: true, updated_at: true },
       orderBy: { updated_at: "desc" },
       take: 500,
     });
@@ -40,10 +40,11 @@ export async function GET(req: NextRequest) {
       phoneMap.set(email, res.guestPhone ?? "");
     }
 
+    // legacy member_roles는 fallback용 (users.role 미반영된 경우 대비)
     const roleRows = await getAllRoleRows();
-    const roleMap = new Map<string, "CM" | "MEMBER">();
+    const legacyRoleMap = new Map<string, "CM" | "MEMBER">();
     for (const row of roleRows) {
-      roleMap.set(row.email.toLowerCase(), row.role === "CM" ? "CM" : "MEMBER");
+      legacyRoleMap.set(row.email.toLowerCase(), row.role === "CM" ? "CM" : "MEMBER");
     }
 
     const bannedRows = await getAllBannedRows();
@@ -52,13 +53,24 @@ export async function GET(req: NextRequest) {
       bannedMap.set(row.email.toLowerCase(), row.reason ?? null);
     }
 
+    function normalizeRole(r: string | null | undefined): "MEMBER" | "CM" | "ADMIN" {
+      if (r === "ADMIN") return "ADMIN";
+      if (r === "CM") return "CM";
+      return "MEMBER";
+    }
+
     const userMembers = users.map((user) => {
         const email = (user.email ?? "").trim().toLowerCase();
+        // users.role(권한의 진실)을 우선, 미설정 시 legacy member_roles에서 백필
+        const role = user.role && user.role !== "MEMBER"
+          ? normalizeRole(user.role)
+          : legacyRoleMap.get(email) ?? "MEMBER";
         return {
+          id: user.id,
           email,
           name: user.name?.trim() || "회원",
           phone: phoneMap.get(email) ?? "",
-          role: roleMap.get(email) ?? "MEMBER",
+          role,
           isBanned: bannedMap.has(email),
           banReason: bannedMap.get(email) ?? null,
           lastSeenAt: user.updated_at.toISOString(),
@@ -72,10 +84,11 @@ export async function GET(req: NextRequest) {
     for (const [email, reason] of bannedMap.entries()) {
       if (mergedMap.has(email)) continue;
       mergedMap.set(email, {
+        id: "",  // 탈퇴 후 users 레코드 없는 케이스 — role 변경 UI 비활성화 신호
         email,
         name: "탈퇴회원",
         phone: "",
-        role: roleMap.get(email) ?? "MEMBER",
+        role: legacyRoleMap.get(email) ?? "MEMBER",
         isBanned: true,
         banReason: reason ?? null,
         lastSeenAt: new Date().toISOString(),

@@ -7,12 +7,12 @@ import { motion } from "motion/react";
 import {
   Eye,
   EyeOff,
-  Lock,
   MessageSquare,
   Pin,
   ThumbsUp,
   Trash2,
 } from "lucide-react";
+import { AdminGate } from "@/components/admin/AdminGate";
 import { ADMIN_PASSWORD_SESSION_KEY, useAdmin } from "@/lib/admin-context";
 
 function adminBoardHeaders(): HeadersInit {
@@ -142,23 +142,7 @@ export default function AdminBoardPage() {
     }
   };
 
-  if (!isAdmin) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[var(--color-bg)] px-4 pt-24">
-        <Lock className="h-12 w-12 text-[var(--color-accent)]" aria-hidden />
-        <p className="text-center text-[var(--color-text-muted)]">
-          관리자 로그인이 필요합니다.
-        </p>
-        <button
-          type="button"
-          onClick={() => router.push("/admin")}
-          className="rounded-xl bg-[var(--color-accent)] px-8 py-3 font-semibold text-white hover:bg-[var(--color-accent-hover)]"
-        >
-          관리자 로그인으로 이동
-        </button>
-      </div>
-    );
-  }
+  if (!isAdmin) return <AdminGate />;
 
   const allOnPageSelected =
     posts.length > 0 && selectedIds.size === posts.length;

@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-
-function isAdmin(req: NextRequest): boolean {
-  const pw = req.headers.get("x-admin-password");
-  return !!pw && pw === process.env.ADMIN_PASSWORD;
-}
+import { requireAdminOrLegacy } from "@/lib/admin-auth";
 
 const VALID_SUBJECTS = ["vocal", "dance", "act", "musical", "etc"] as const;
 const VALID_STATUSES = ["DRAFT", "OPEN", "CLOSED", "CANCELLED", "COMPLETED"] as const;
@@ -20,9 +16,8 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
-  if (!isAdmin(req)) {
-    return NextResponse.json({ error: "관리자 권한이 필요합니다" }, { status: 401 });
-  }
+  const auth = await requireAdminOrLegacy(req);
+  if ("error" in auth) return auth.error;
 
   const { id } = await ctx.params;
   const body = await req.json();
@@ -89,9 +84,8 @@ export async function DELETE(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
-  if (!isAdmin(req)) {
-    return NextResponse.json({ error: "관리자 권한이 필요합니다" }, { status: 401 });
-  }
+  const auth = await requireAdminOrLegacy(req);
+  if ("error" in auth) return auth.error;
 
   const { id } = await ctx.params;
   const enrollmentCount = await prisma.class_enrollments.count({ where: { offering_id: id } });

@@ -11,18 +11,11 @@ import {
   calculatePracticeRoomRefund,
   canCancelReservation,
 } from "@/lib/refund-policy";
-
-function requireAdmin(request: NextRequest): NextResponse | null {
-  const pw = request.headers.get("x-admin-password");
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) {
-    return NextResponse.json({ error: "권한 없음" }, { status: 403 });
-  }
-  return null;
-}
+import { requireAdminOrLegacy } from "@/lib/admin-auth";
 
 export async function POST(request: NextRequest) {
-  const forbidden = requireAdmin(request);
-  if (forbidden) return forbidden;
+  const auth = await requireAdminOrLegacy(request);
+  if ("error" in auth) return auth.error;
 
   try {
     const body = await request.json();

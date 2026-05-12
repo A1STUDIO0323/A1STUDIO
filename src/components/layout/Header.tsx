@@ -20,12 +20,9 @@ export default function Header() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { data: session, status } = useSession();
-  const { isAdmin, adminLogin, adminLogout } = useAdmin();
+  const { isAdmin, adminLogout } = useAdmin();
   const { role } = useMemberRole(session?.user?.email);
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
-  const [adminPw, setAdminPw] = useState("");
-  const [adminError, setAdminError] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState<string | null>(null);
   const [userPoints, setUserPoints] = useState<number | null>(null);
@@ -190,55 +187,8 @@ export default function Header() {
 
           {/* 오른쪽 액션 영역 */}
           <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-            {/* 관리자 로그인 팝오버 */}
-            {showAdminLogin && (
-              <div className="absolute right-4 top-16 z-50 w-72 rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-4 shadow-2xl">
-                <p className="mb-3 text-sm font-bold text-[#3B342F]">관리자 로그인</p>
-                <input
-                  type="password"
-                  value={adminPw}
-                  onChange={(e) => { setAdminPw(e.target.value); setAdminError(""); }}
-                  onKeyDown={async (e) => {
-                    if (e.key === "Enter") {
-                      const result = await adminLogin(adminPw);
-                      if (result.ok) {
-                        setShowAdminLogin(false);
-                        setAdminPw("");
-                        setAdminError("");
-                      } else {
-                        setAdminError(result.error);
-                      }
-                    }
-                  }}
-                  placeholder="관리자 비밀번호"
-                  className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2 text-sm text-[#3B342F] placeholder-[#9b9189] focus:border-[#B98768] focus:outline-none"
-                />
-                {adminError && <p className="mt-1.5 text-xs text-red-400">{adminError}</p>}
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={async () => {
-                      const result = await adminLogin(adminPw);
-                      if (result.ok) {
-                        setShowAdminLogin(false);
-                        setAdminPw("");
-                        setAdminError("");
-                      } else {
-                        setAdminError(result.error);
-                      }
-                    }}
-                    className="flex-1 rounded-lg bg-[#B98768] py-2 text-xs font-bold text-[#F7F3EB] hover:bg-[#a9785c]"
-                  >
-                    로그인
-                  </button>
-                  <button
-                    onClick={() => { setShowAdminLogin(false); setAdminPw(""); setAdminError(""); }}
-                    className="flex-1 rounded-lg border border-[#D8CCBC] py-2 text-xs text-[#6f655d] hover:text-[#B98768]"
-                  >
-                    취소
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* 관리자 로그인 모달은 Phase B-5b에서 제거됨.
+                ADMIN은 일반 카카오/이메일 로그인 + users.role='ADMIN' 자동 인식. */}
 
             {/* 로그인/유저 영역 */}
             {status === "loading" ? (
@@ -291,8 +241,8 @@ export default function Header() {
               </button>
             )}
 
-            {/* 관리자 모드 버튼 */}
-            {isAdmin ? (
+            {/* 관리자 모드 버튼 — ADMIN 자동 감지 (session + users.role) */}
+            {isAdmin && (
               <div className="relative hidden lg:block">
                 <button
                   onClick={() => setShowAdminMenu((prev) => !prev)}
@@ -333,19 +283,11 @@ export default function Header() {
                       }}
                       className="block w-full px-3 py-2 text-left text-xs font-medium text-[#6f655d] hover:bg-[#3B342F]/5 hover:text-[#B98768]"
                     >
-                      관리자 해제
+                      관리자 메뉴 닫기
                     </button>
                   </div>
                 )}
               </div>
-            ) : (
-              <button
-                onClick={() => setShowAdminLogin(!showAdminLogin)}
-                className="hidden lg:flex items-center gap-1 text-xs text-[#b0a89e] transition-colors hover:text-[#6f655d]"
-                title="관리자 로그인"
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
-              </button>
             )}
 
             {/* 모바일 햄버거 버튼 (lg 미만) */}

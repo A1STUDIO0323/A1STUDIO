@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarCheck, Users, DollarSign, AlertCircle, Filter, CheckCircle2, XCircle, Lock, Search, ArrowUp, ArrowDown } from "lucide-react";
+import { CalendarCheck, Users, DollarSign, AlertCircle, Filter, CheckCircle2, XCircle, Search, ArrowUp, ArrowDown } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 import { ADMIN_PASSWORD_SESSION_KEY, useAdmin } from "@/lib/admin-context";
+import { AdminGate } from "@/components/admin/AdminGate";
 
 function adminFetchHeaders(): HeadersInit {
   const pw =
@@ -58,9 +59,7 @@ type DashboardStats = {
 const TABS = ["예약 관리", "시간 블록", "요금 관리", "후기 관리", "게시판 관리", "공지 관리", "CM 신청", "클래스/레슨", "CM 정산", "제작 의뢰서"];
 
 export default function AdminPage() {
-  const { isAdmin, adminLogin, adminLogout } = useAdmin();
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
+  const { isAdmin, adminLogout } = useAdmin();
   const [activeTab, setActiveTab] = useState(0);
   const [filterStatus, setFilterStatus] = useState<Status | "ALL">("ALL");
   const [dashboardLoading, setDashboardLoading] = useState(false);
@@ -126,52 +125,7 @@ export default function AdminPage() {
     }
   };
 
-  if (!isAdmin) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F7F3EB] px-4">
-        <div className="w-full max-w-sm rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-8 text-center">
-          <Lock className="mx-auto mb-4 h-10 w-10 text-[#B98768]" />
-          <h1 className="text-xl font-bold text-[#3B342F]">관리자 로그인</h1>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setLoginError("");
-            }}
-            onKeyDown={async (e) => {
-              if (e.key === "Enter") {
-                const result = await adminLogin(password);
-                if (result.ok) {
-                  setPassword("");
-                  setLoginError("");
-                } else {
-                  setLoginError(result.error);
-                }
-              }
-            }}
-            placeholder="관리자 비밀번호 입력"
-            className="mt-5 w-full rounded-xl border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-[#3B342F] placeholder:text-[#b0a89e] focus:border-[#B98768] focus:outline-none"
-          />
-          {loginError && <p className="mt-2 text-xs text-red-400">{loginError}</p>}
-          <button
-            onClick={async () => {
-              const result = await adminLogin(password);
-              if (result.ok) {
-                setPassword("");
-                setLoginError("");
-              } else {
-                setLoginError(result.error);
-              }
-            }}
-            className="mt-3 w-full rounded-xl bg-[#B98768] py-3 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"
-          >
-            로그인
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!isAdmin) return <AdminGate />;
 
   const normalizeStatus = (s: string): Status => {
     const u = s.toUpperCase();

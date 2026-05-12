@@ -4,13 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { requireAdminOrLegacy } from "@/lib/admin-auth";
 
 const LOG_PREFIX = "[admin:intakes:update]";
-
-function isAdmin(req: NextRequest): boolean {
-  const pw = req.headers.get("x-admin-password");
-  return !!pw && pw === process.env.ADMIN_PASSWORD;
-}
 
 const UpdateSchema = z.object({
   status: z.enum(["NEW", "CONSULTING", "QUOTED", "CONTRACTED", "IN_PROGRESS", "DONE", "REJECTED"]).optional(),
@@ -21,10 +17,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!isAdmin(req)) {
-    logger.warn(`${LOG_PREFIX} unauthorized`);
-    return NextResponse.json({ error: "관리자 권한이 필요합니다" }, { status: 401 });
-  }
+  const auth = await requireAdminOrLegacy(req);
+  if ("error" in auth) return auth.error;
 
   const { id } = await params;
   if (!id) {

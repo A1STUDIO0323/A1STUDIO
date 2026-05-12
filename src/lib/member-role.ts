@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-export type MemberRole = "CM" | "MEMBER";
+export type MemberRole = "MEMBER" | "CM" | "ADMIN";
 export type MemberDirectoryItem = {
+  id?: string;  // Supabase Auth user.id (UUID). 탈퇴 회원은 빈 문자열
   email: string;
   name: string;
   phone: string;
