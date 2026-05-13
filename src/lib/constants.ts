@@ -66,6 +66,7 @@ export const NAV_LINKS = [
     children: [
       { label: "안내", href: "/one-day-class" },
       { label: "목록", href: "/one-day-class/list" },
+      { label: "공고 등록", href: "/one-day-class/announcements" },
       { label: "요청", href: "/one-day-class/requests" },
     ],
   },
@@ -75,6 +76,7 @@ export const NAV_LINKS = [
     children: [
       { label: "안내", href: "/lessons" },
       { label: "목록", href: "/lessons/list" },
+      { label: "공고 등록", href: "/lessons/announcements" },
       { label: "요청", href: "/lessons/requests" },
     ],
   },

@@ -38,7 +38,7 @@
 ## 3. 라우트
 
 ### Public 페이지 (`src/app/`)
-홈, 소개(/about/company, /ceo, /space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + /announcements + /requests, /party-room + /party-room/booking + /party-room/booking/complete, **/reservations/status** (통합 예약현황 캘린더 — 연습실·파티룸·장기대관 시간 블록), **/long-term/apply** (고객용 장기대관 신청 폼, status='REQUESTED'로 저장), /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms, **/intake + /intake/details** (웹사이트 제작 의뢰 인테이크 폼)
+홈, 소개(/about/company, /ceo, /space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + **/one-day-class/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='oneday', 실제 DB) + /one-day-class/list + /one-day-class/requests (MEMBER 전용) + /one-day-class/apply-cm, **/lessons** + **/lessons/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='lesson', 실제 DB) + /lessons/list + /lessons/requests (MEMBER 전용), /party-room + /party-room/booking + /party-room/booking/complete, **/reservations/status** (통합 예약현황 캘린더 — 연습실·파티룸·장기대관 시간 블록), **/long-term/apply** (고객용 장기대관 신청 폼, status='REQUESTED'로 저장), /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms, **/intake + /intake/details** (웹사이트 제작 의뢰 인테이크 폼)
 
 ### Admin 페이지 (`/admin/*`)
 /admin, /admin/board, /admin/class-offerings, /admin/class-requests, /admin/cm-applications, /admin/cm-settlements, /admin/intakes, /admin/members, /admin/reservations/calendar, /admin/reviews
@@ -53,6 +53,7 @@
 - **결제**: /payments/kakao/{ready,approve}, /charge/{ready,approve}
 - **파티룸**: /party-room/reservations/{available,create,cancel}, /party-room/payments/kakao/{ready,approve,cancel,fail}
 - **장기대관**: **/long-term/apply** (POST, 고객용 공개 신청 — 어드민 인증 없음, `long_term_bookings`에 `status='REQUESTED'` 저장 + 관리자에게 SMS+이메일 알림)
+- **클래스/레슨 공고**: **/class-offerings** (GET 공개 — OPEN 상태 목록, POST CM/ADMIN 전용 — `class_offerings`에 즉시 OPEN 저장), **/class-offerings/[id]** (DELETE — CM은 본인 공고+신청자 0건일 때만, ADMIN은 제한 없음). 어드민 라우트(`/api/admin/class-offerings`)는 별도 유지
 - **게시판**: /board (CRUD), /board/[id], /board/[id]/{comments,like}, /board/categories
 - **회원**: /members/{profile,sync,withdraw}, /member-roles/role, /account/delete
 - **인테이크**: /intake/submit (zod 검증 + Prisma 저장 + SendGrid 메일 + SolAPI/CoolSMS 알림)
@@ -66,7 +67,8 @@
 - **홈** → `/`
 - **소개** ▼ 회사 소개 / 대표 소개 / 공간 소개 / 비품 및 시설
 - **예약하기** ▼ 예약현황(`/reservations/status`) / 연습실(`/booking`) / 파티룸(`/party-room`) / 장기대관(`/long-term/apply`)
-- **원데이클래스** ▼ 클래스 공고 등록 / 클래스 요청
+- **원데이클래스** ▼ 안내(`/one-day-class`) / 목록(`/one-day-class/list`) / 공고 등록(`/one-day-class/announcements`, CM·ADMIN 전용) / 요청(`/one-day-class/requests`, MEMBER 전용)
+- **개인레슨** ▼ 안내(`/lessons`) / 목록(`/lessons/list`) / 공고 등록(`/lessons/announcements`, CM·ADMIN 전용) / 요청(`/lessons/requests`, MEMBER 전용)
 - **요금안내** → `/pricing`
 - **이용안내** ▼ 이용수칙 / FAQ
 - **게시판** ▼ 공지·이벤트 / 자유게시판 / 분실물 / 후기
@@ -255,6 +257,15 @@
 - 코드: `lib/long-term-template.ts`, `api/admin/long-term-bookings/[id]`
 - 솔라피 예약 SMS는 발송 카운트 추적 (운영자가 한도 파악)
 
+### 10-9-2. 클래스/레슨 공고 등록 권한 정책
+
+- **공고 등록**(`/one-day-class/announcements`, `/lessons/announcements`) — **CM 또는 ADMIN만** 가능
+  - 두 페이지 모두 `src/components/class-offerings/AnnouncementsClient.tsx`를 type prop으로 공유
+  - 실제 DB(`class_offerings`)에 저장. **localStorage 기반(`oneDayClassStore`)은 폐기**됨 (2026-05-13)
+  - API: `POST /api/class-offerings` → Supabase 세션 + `users.role` 검증, CM이면 `cm_user_id` 자동 세팅, `status='OPEN'` 즉시 노출
+  - 본인 공고 삭제: `DELETE /api/class-offerings/[id]` (신청자 0건일 때만, ADMIN은 제한 없음)
+- **요청**(`/one-day-class/requests`, `/lessons/requests`) — **MEMBER만** 가능 (CM/ADMIN은 제출 차단)
+
 ### 10-9-1. 장기대관 고객 신청 흐름 (`/long-term/apply`)
 
 - 고객 공개 폼 → `POST /api/long-term/apply` → `long_term_bookings.status='REQUESTED'`로 저장
@@ -303,7 +314,7 @@
 
 ## 12. 신뢰성 주의
 
-이 문서는 **2026-05-13 시점의 스냅샷**입니다. (마지막 갱신: 예약현황 페이지·장기대관 고객 신청 흐름 추가) 코드는 계속 변경되니, 어긋나는 부분이 있으면 **항상 코드를 정답으로 삼고** 이 문서를 갱신해주세요. 특히 다음은 빠르게 바뀝니다:
+이 문서는 **2026-05-13 시점의 스냅샷**입니다. (마지막 갱신: 클래스/레슨 공고 등록 실제 DB 통합 + CM 권한 분리) 코드는 계속 변경되니, 어긋나는 부분이 있으면 **항상 코드를 정답으로 삼고** 이 문서를 갱신해주세요. 특히 다음은 빠르게 바뀝니다:
 - 가격/이벤트 기간/공휴일 목록
 - 네비게이션 메뉴
 - 출연작·후기 등 컨텐츠

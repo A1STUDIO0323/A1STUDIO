@@ -198,6 +198,12 @@ console.error(`[Payment][FAIL] reason=${r} code=${c} at=${ts} stack=${e.stack}`)
 - 읽기 전용 API 1개로 월 단위 조회: `GET /api/reservations/status?month=YYYY-MM`
 - 카카오페이 심사 중 빌드라면 **SELECT만** 수행, 결제/예약 컬럼·라우트 변경 금지 (절대지침 10-10)
 
+### 9-5. 클래스/레슨 공고 등록 권한 분리 원칙
+- **공고 등록** = CM/ADMIN 전용, **수강 요청/신청** = MEMBER 전용 (CM/ADMIN의 신청 제출은 클라이언트+서버 모두에서 차단)
+- 공고는 **실제 DB(`class_offerings`)에 저장** — localStorage 기반 모의 등록은 만들지 않는다 (다른 회원에게 노출되지 않아 운영 불가)
+- 동일 폼 UI를 type prop으로 공유 (예: `AnnouncementsClient.tsx` 패턴) — 원데이클래스/레슨 코드 중복 방지
+- 어드민 라우트와 공개 라우트는 **반드시 분리** (`/api/admin/class-offerings` ≠ `/api/class-offerings`)
+
 ---
 
 ## 10. 빌드 완료 체크리스트 (모든 티어 공통)

@@ -232,6 +232,7 @@ model PostReport { ... }
 - [ ] ✅ **장기대관 안내문 자동 발송** (`lib/long-term-template.ts` 검증, 절대지침 9-2)
 - [ ] ✅ **장기대관 고객 신청 폼** (`/long-term/apply` + `POST /api/long-term/apply` 검증 — 어드민 분리, `status='REQUESTED'`, 관리자 SMS+이메일 알림)
 - [ ] ✅ **통합 예약현황 캘린더** (`/reservations/status` + `GET /api/reservations/status?month=YYYY-MM` 검증 — 연습실/파티룸/장기대관 시간 블록 통합)
+- [ ] ✅ **클래스/레슨 공고 등록(CM 셀프 등록)** (`/one-day-class/announcements`, `/lessons/announcements` + `POST /api/class-offerings` 검증 — 공유 컴포넌트 `AnnouncementsClient`, type 분기, CM·ADMIN 게이트, 본인 공고 삭제까지)
 
 ### DB 모델 (Prisma)
 ```prisma
