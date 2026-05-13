@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { parseUsageMonth } from "@/lib/long-term-template";
 
 // 예약현황(읽기 전용) — 카카오페이 심사 중: 결제/예약 컬럼·라우트 변경 없음, SELECT only
 // GET /api/reservations/status?month=YYYY-MM
@@ -112,11 +113,15 @@ export async function GET(req: NextRequest) {
       status: r.status ?? "PAID",
     }));
 
-    // 3) 장기대관: usage_month(YYYY-MM) + usage_dates(Int[]) + start_hour/end_hour
-    const ltRows = await prisma.long_term_bookings.findMany({
+    // 3) 장기대관: usage_month는 "5월" / "6월" 한국어 표기로 저장됨 (연도 정보 없음)
+    //    → created_at 기준으로 연도를 추정해서 요청된 월(YYYY-MM)에 매칭
+    //    조회 범위: 최근 24개월 내 생성된 건 + DRAFT/CANCELLED 제외
+    const TWO_YEARS_AGO = new Date();
+    TWO_YEARS_AGO.setFullYear(TWO_YEARS_AGO.getFullYear() - 2);
+    const ltRowsAll = await prisma.long_term_bookings.findMany({
       where: {
-        usage_month: month,
         status: { notIn: ["DRAFT", "CANCELLED"] },
+        created_at: { gte: TWO_YEARS_AGO },
       },
       select: {
         usage_month: true,
@@ -125,18 +130,61 @@ export async function GET(req: NextRequest) {
         end_hour: true,
         space_type: true,
         status: true,
+        created_at: true,
       },
     });
-    const longTerm: LongTermBlock[] = ltRows.flatMap((r) =>
-      (r.usage_dates ?? []).map((day) => ({
-        source: "longTerm" as const,
-        date: `${r.usage_month}-${pad(day)}`,
-        startTime: `${pad(r.start_hour)}:00`,
-        endTime: `${pad(r.end_hour)}:00`,
-        spaceType: r.space_type,
-        status: r.status,
-      }))
-    );
+
+    const requestedYear = year;
+    const requestedMonthNum = monthIdx + 1;
+
+    const longTerm: LongTermBlock[] = [];
+    for (const r of ltRowsAll) {
+      let monthNum: number;
+      try {
+        monthNum = parseUsageMonth(r.usage_month);
+      } catch {
+        // 새 포맷("YYYY-MM") 호환 — 향후 데이터 대비
+        const direct = r.usage_month.match(/^(\d{4})-(\d{2})$/);
+        if (direct) {
+          const ry = Number(direct[1]);
+          const rm = Number(direct[2]);
+          if (ry === requestedYear && rm === requestedMonthNum) {
+            for (const day of r.usage_dates ?? []) {
+              longTerm.push({
+                source: "longTerm",
+                date: `${pad(ry)}-${pad(rm)}-${pad(day)}`,
+                startTime: `${pad(r.start_hour)}:00`,
+                endTime: `${pad(r.end_hour)}:00`,
+                spaceType: r.space_type,
+                status: r.status,
+              });
+            }
+          }
+        }
+        continue;
+      }
+
+      // 연도 추정: 생성월 이상이면 같은 해, 미만이면 다음 해 이용으로 간주
+      const created = r.created_at;
+      const createdMonthNum = created.getMonth() + 1;
+      const inferredYear =
+        monthNum >= createdMonthNum
+          ? created.getFullYear()
+          : created.getFullYear() + 1;
+
+      if (inferredYear !== requestedYear || monthNum !== requestedMonthNum) continue;
+
+      for (const day of r.usage_dates ?? []) {
+        longTerm.push({
+          source: "longTerm",
+          date: `${inferredYear}-${pad(monthNum)}-${pad(day)}`,
+          startTime: `${pad(r.start_hour)}:00`,
+          endTime: `${pad(r.end_hour)}:00`,
+          spaceType: r.space_type,
+          status: r.status,
+        });
+      }
+    }
 
     logger.log("[reservations/status] GET success", {
       month,
