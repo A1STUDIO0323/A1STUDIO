@@ -216,12 +216,14 @@ export default function Header() {
                 <span
                   className={cn(
                     "hidden xl:inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
-                    role === "CM"
+                    role === "ADMIN"
+                      ? "border-purple-400 bg-purple-50 text-purple-700"
+                      : role === "CM"
                       ? "border-[#B98768]/40 bg-[#B98768]/10 text-[#B98768]"
                       : "border-[#D8CCBC] bg-[#F7F3EB] text-[#6f655d]"
                   )}
                 >
-                  {role === "CM" ? "CM" : "회원"}
+                  {role === "ADMIN" ? "ADMIN" : role === "CM" ? "CM" : "회원"}
                 </span>
                 <button
                   onClick={() => signOut({ callbackUrl: "/" })}
@@ -343,12 +345,14 @@ export default function Header() {
                 <span
                   className={cn(
                     "mt-0.5 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold",
-                    role === "CM"
+                    role === "ADMIN"
+                      ? "border-purple-400 bg-purple-50 text-purple-700"
+                      : role === "CM"
                       ? "border-[#B98768]/40 bg-[#B98768]/10 text-[#B98768]"
                       : "border-[#D8CCBC] bg-[#EFE7DA] text-[#6f655d]"
                   )}
                 >
-                  {role === "CM" ? "CM" : "회원"}
+                  {role === "ADMIN" ? "ADMIN" : role === "CM" ? "CM" : "회원"}
                 </span>
               </div>
               <button

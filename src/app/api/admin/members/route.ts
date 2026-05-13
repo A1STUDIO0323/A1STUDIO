@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
     const users = await prisma.users.findMany({
       where: { email: { not: null } },
-      select: { id: true, email: true, name: true, role: true, updated_at: true },
+      select: { id: true, email: true, name: true, phone: true, role: true, updated_at: true },
       orderBy: { updated_at: "desc" },
       take: 500,
     });
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
           id: user.id,
           email,
           name: user.name?.trim() || "회원",
-          phone: phoneMap.get(email) ?? "",
+          phone: user.phone?.trim() || phoneMap.get(email) || "",
           role,
           isBanned: bannedMap.has(email),
           banReason: bannedMap.get(email) ?? null,

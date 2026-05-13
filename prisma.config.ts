@@ -15,6 +15,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Prisma CLI(db push/migrate)는 Direct(5432) 우선 — Pooler(6543, PgBouncer transaction)는 DDL 불가.
+    // 런타임 PrismaClient는 본 설정을 보지 않고 자체적으로 env DATABASE_URL을 읽으므로 무관.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });

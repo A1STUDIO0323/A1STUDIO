@@ -9,6 +9,7 @@ interface SendMessageParams {
   to: string; // 수신자 전화번호 (01012345678 형식)
   text: string; // 메시지 내용
   from?: string; // 발신자 번호 (선택, 환경변수에서 기본값 사용)
+  subject?: string; // LMS 제목 (선택)
 }
 
 interface SendMessageResult {
@@ -101,11 +102,16 @@ async function sendSMSViaSolapi(params: SendMessageParams): Promise<SendMessageR
     const signature = crypto.createHmac('sha256', apiSecret).update(data).digest('hex');
 
     const url = 'https://api.solapi.com/messages/v4/send';
+    // 90바이트 초과 시 LMS로 자동 승격
+    const byteLen = Buffer.byteLength(params.text, 'utf8');
+    const msgType = byteLen > 90 ? 'LMS' : 'SMS';
     const body = {
       message: {
         to: normalizedTo,
         from: fromNumber,
         text: params.text,
+        type: msgType,
+        ...(msgType === 'LMS' && params.subject ? { subject: params.subject } : {}),
       },
     };
 
@@ -125,7 +131,7 @@ async function sendSMSViaSolapi(params: SendMessageParams): Promise<SendMessageR
     }
 
     const result = await response.json();
-    console.log('[SOLAPI] 발송 성공:', result);
+    console.log(`[SOLAPI] 발송 성공 type=${msgType} bytes=${byteLen}`, result);
 
     return {
       success: true,
@@ -240,6 +246,138 @@ export async function sendKakaoAlimtalk(params: SendMessageParams & {
   } catch (error) {
     console.error('[AlimTalk] 발송 오류, SMS로 대체:', error);
     return sendSMS(params);
+  }
+}
+
+/**
+ * SOLAPI 예약 발송 (LMS) — scheduledDate에 지정한 KST 시각에 발송
+ *
+ * 엔드포인트: /messages/v4/send-many/detail (예약 발송 지원)
+ * scheduledAt: KST 기준 발송 시각 (Date 객체). 과거 시각이면 즉시 발송 처리됨.
+ * 반환 messageId는 솔라피 groupId — 취소 시 사용.
+ */
+export async function sendScheduledLMS(params: SendMessageParams & {
+  scheduledAt: Date;
+  subject?: string;
+}): Promise<SendMessageResult> {
+  const LOG_PREFIX = "[SOLAPI:scheduled]";
+  try {
+    const apiKey = process.env.SOLAPI_API_KEY;
+    const apiSecret = process.env.SOLAPI_API_SECRET;
+    const fromNumber = params.from || process.env.SOLAPI_FROM_NUMBER;
+
+    if (!apiKey || !apiSecret || !fromNumber) {
+      console.error(`${LOG_PREFIX} 설정 누락 apiKey=${!!apiKey} secret=${!!apiSecret} from=${!!fromNumber}`);
+      return { success: false, error: "SOLAPI 설정이 완료되지 않았습니다" };
+    }
+
+    const normalizedTo = params.to.replace(/[^0-9]/g, "");
+    if (normalizedTo.length < 10 || normalizedTo.length > 11) {
+      return { success: false, error: "유효하지 않은 전화번호입니다" };
+    }
+
+    // 솔라피 scheduledDate: ISO8601 형식 (UTC 'Z' 또는 +09:00 모두 인식)
+    const scheduledIso = params.scheduledAt.toISOString();
+
+    const date = new Date().toISOString();
+    const salt = crypto.randomBytes(32).toString("hex");
+    const data = date + salt;
+    const signature = crypto.createHmac("sha256", apiSecret).update(data).digest("hex");
+
+    // /messages/v4/send-many/detail — 단건이어도 예약 발송 지원
+    const url = "https://api.solapi.com/messages/v4/send-many/detail";
+    const body: Record<string, unknown> = {
+      messages: [
+        {
+          to: normalizedTo,
+          from: fromNumber,
+          text: params.text,
+          type: "LMS",
+          ...(params.subject ? { subject: params.subject } : {}),
+        },
+      ],
+      scheduledDate: scheduledIso,
+      allowDuplicates: true,
+    };
+
+    console.log(`${LOG_PREFIX} start to=${normalizedTo} scheduledAt=${scheduledIso} len=${params.text.length}`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.error(`${LOG_PREFIX} fail status=${response.status}`, error);
+      return { success: false, error: `예약 발송 실패: ${JSON.stringify(error)}` };
+    }
+
+    const result = await response.json();
+    // send-many/detail 응답: { groupInfo: { groupId, ... }, messageList: { ... } }
+    const groupId = result.groupInfo?.groupId ?? result.groupId;
+    console.log(`${LOG_PREFIX} success groupId=${groupId} status=${result.groupInfo?.status ?? "?"}`);
+
+    return {
+      success: true,
+      messageId: groupId,
+    };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} 예외`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "알 수 없는 오류",
+    };
+  }
+}
+
+/**
+ * SOLAPI 그룹 예약 발송 취소
+ * groupId: sendScheduledLMS에서 반환된 messageId(=groupId)
+ */
+export async function cancelScheduledMessage(groupId: string): Promise<SendMessageResult> {
+  const LOG_PREFIX = "[SOLAPI:cancel]";
+  try {
+    const apiKey = process.env.SOLAPI_API_KEY;
+    const apiSecret = process.env.SOLAPI_API_SECRET;
+
+    if (!apiKey || !apiSecret) {
+      return { success: false, error: "SOLAPI 설정이 완료되지 않았습니다" };
+    }
+
+    const date = new Date().toISOString();
+    const salt = crypto.randomBytes(32).toString("hex");
+    const data = date + salt;
+    const signature = crypto.createHmac("sha256", apiSecret).update(data).digest("hex");
+
+    const url = `https://api.solapi.com/messages/v4/groups/${encodeURIComponent(groupId)}/schedule`;
+
+    console.log(`${LOG_PREFIX} start groupId=${groupId}`);
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        Authorization: `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.warn(`${LOG_PREFIX} fail status=${response.status} groupId=${groupId}`, error);
+      return { success: false, error: `예약 취소 실패: ${JSON.stringify(error)}` };
+    }
+
+    console.log(`${LOG_PREFIX} success groupId=${groupId}`);
+    return { success: true, messageId: groupId };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} 예외`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "알 수 없는 오류",
+    };
   }
 }
 

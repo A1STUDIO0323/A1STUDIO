@@ -56,7 +56,7 @@ type DashboardStats = {
   uniqueGuestCount: number;
 };
 
-const TABS = ["예약 관리", "시간 블록", "요금 관리", "후기 관리", "게시판 관리", "공지 관리", "CM 신청", "클래스/레슨", "CM 정산", "제작 의뢰서"];
+const TABS = ["예약 관리", "시간 블록", "요금 관리", "후기 관리", "게시판 관리", "공지 관리", "CM 신청", "클래스/레슨", "CM 정산", "제작 의뢰서", "장기대관"];
 
 export default function AdminPage() {
   const { isAdmin, adminLogout } = useAdmin();
@@ -439,6 +439,22 @@ export default function AdminPage() {
               className="mt-4 inline-flex rounded-lg bg-[#B98768] px-5 py-2.5 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"
             >
               제작 의뢰서 관리 페이지로 이동
+            </Link>
+          </div>
+        )}
+
+        {/* 장기대관 관리 탭 */}
+        {activeTab === 10 && (
+          <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-6 text-center">
+            <h3 className="text-lg font-bold text-[#3B342F]">장기대관 고객 관리</h3>
+            <p className="mt-2 text-sm text-[#6f655d]">
+              장기대관 고객을 등록하면 요금 안내문이 즉시 SMS로 발송되고, 매 이용일 오전 10시에 이용안내문이 자동 발송됩니다.
+            </p>
+            <Link
+              href="/admin/long-term-bookings"
+              className="mt-4 inline-flex rounded-lg bg-[#B98768] px-5 py-2.5 text-sm font-bold text-[#F7F3EB] hover:bg-[#a9785c] transition-all"
+            >
+              장기대관 관리 페이지로 이동
             </Link>
           </div>
         )}

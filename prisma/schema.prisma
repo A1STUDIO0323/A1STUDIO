@@ -747,75 +747,113 @@ model cm_settlements {
 }
 
 model intake_submissions {
-  id                  String   @id @default(cuid())
-  status              String   @default("NEW")
-  contact_name        String
-  contact_phone       String
-  contact_email       String
-  contact_role        String?
-  preferred_channel   String?
-  business_name       String?
-  business_number     String?
-  representative      String?
-  business_address    String?
-  business_phone      String?
-  business_email      String?
-  ecommerce_license   String?
-  industry            String?
-  goals               Json?
-  goal_summary        String?
-  target_tier         String?
-  brand_logo_status   String?
-  brand_color_main    String?
-  brand_color_sub     String?
-  brand_color_avoid   String?
-  tone_and_manner     Json?
-  reference_sites     Json?
-  menu_items          Json?
-  intro_text          String?
-  products            Json?
-  photo_status        String?
-  faqs                Json?
-  business_hours      String?
-  closed_days         String?
-  location            String?
-  parking             String?
-  social_links        Json?
-  domain_status       String?
-  domain_candidates   Json?
-  member_required     String?
-  signup_methods      Json?
-  signup_fields       Json?
-  member_tiers        String?
-  booking_unit        String?
-  booking_duration    String?
-  booking_capacity    String?
-  booking_targets     String?
-  booking_window      String?
-  booking_max_days    String?
-  refund_policy       String?
-  notification_prefs  Json?
-  pg_ready            Json?
-  payment_methods     Json?
-  refund_terms        String?
-  guest_checkout      String?
-  admin_operators     String?
-  admin_features      Json?
-  desired_open_date   String?
-  deadline            String?
-  budget_range        String?
-  payment_split       String?
-  infra_payer         String?
-  extra_requests      String?
-  agreed              Boolean  @default(false)
-  admin_memo          String?
-  source_ip           String?
-  user_agent          String?
-  created_at          DateTime @default(now())
-  updated_at          DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  status             String   @default("NEW")
+  contact_name       String
+  contact_phone      String
+  contact_email      String
+  contact_role       String?
+  preferred_channel  String?
+  business_name      String?
+  business_number    String?
+  representative     String?
+  business_address   String?
+  business_phone     String?
+  business_email     String?
+  ecommerce_license  String?
+  industry           String?
+  goals              Json?
+  goal_summary       String?
+  target_tier        String?
+  brand_logo_status  String?
+  brand_color_main   String?
+  brand_color_sub    String?
+  brand_color_avoid  String?
+  tone_and_manner    Json?
+  reference_sites    Json?
+  menu_items         Json?
+  intro_text         String?
+  products           Json?
+  photo_status       String?
+  faqs               Json?
+  business_hours     String?
+  closed_days        String?
+  location           String?
+  parking            String?
+  social_links       Json?
+  domain_status      String?
+  domain_candidates  Json?
+  member_required    String?
+  signup_methods     Json?
+  signup_fields      Json?
+  member_tiers       String?
+  booking_unit       String?
+  booking_duration   String?
+  booking_capacity   String?
+  booking_targets    String?
+  booking_window     String?
+  booking_max_days   String?
+  refund_policy      String?
+  notification_prefs Json?
+  pg_ready           Json?
+  payment_methods    Json?
+  refund_terms       String?
+  guest_checkout     String?
+  admin_operators    String?
+  admin_features     Json?
+  desired_open_date  String?
+  deadline           String?
+  budget_range       String?
+  payment_split      String?
+  infra_payer        String?
+  extra_requests     String?
+  agreed             Boolean  @default(false)
+  admin_memo         String?
+  source_ip          String?
+  user_agent         String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
 
   @@index([status])
   @@index([created_at])
   @@map("intake_submissions")
+  @@schema("public")
+}
+
+model long_term_bookings {
+  id             String @id @default(cuid())
+  status         String @default("DRAFT")
+  customer_name  String
+  customer_phone String
+
+  day_of_week String?
+  usage_month String
+  usage_dates Int[]
+  start_hour  Int
+  end_hour    Int
+
+  space_type      String @default("연습실")
+  hours_per_day   Int
+  total_hours     Int
+  hourly_rate     Int
+  gross_amount    Int
+  discount_rate   Float  @default(0)
+  discount_amount Int    @default(0)
+  final_amount    Int
+
+  payment_notice_sent_at    DateTime?
+  payment_notice_message_id String?
+  payment_confirmed_at      DateTime?
+
+  usage_notice_schedule  Json?
+  usage_notice_send_hour Int   @default(10)
+
+  admin_memo String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([status])
+  @@index([created_at])
+  @@map("long_term_bookings")
   @@schema("public")
 }

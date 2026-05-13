@@ -282,7 +282,9 @@ export function useMemberRole(email?: string | null) {
         }
         const data = (await res.json()) as { role?: MemberRole };
         if (mounted) {
-          setRole(data.role === "CM" ? "CM" : "MEMBER");
+          const next: MemberRole =
+            data.role === "ADMIN" ? "ADMIN" : data.role === "CM" ? "CM" : "MEMBER";
+          setRole(next);
         }
       } catch {
         if (mounted) setRole(localRole);
@@ -303,7 +305,9 @@ export function useMemberRole(email?: string | null) {
 
   return {
     role,
-    isCM: role === "CM",
+    // ADMIN은 CM 기능을 포함하는 최상위 등급입니다.
+    isCM: role === "CM" || role === "ADMIN",
+    isAdmin: role === "ADMIN",
     isMember: role === "MEMBER",
   };
 }
