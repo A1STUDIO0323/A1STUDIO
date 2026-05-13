@@ -65,9 +65,10 @@ export const NAV_LINKS = [
     href: "/one-day-class",
     children: [
       { label: "안내", href: "/one-day-class" },
-      { label: "목록", href: "/one-day-class/list" },
+      { label: "공고 목록", href: "/one-day-class/list" },
       { label: "공고 등록", href: "/one-day-class/announcements" },
       { label: "요청", href: "/one-day-class/requests" },
+      { label: "CM 목록", href: "/one-day-class/cm-list" },
     ],
   },
   {
@@ -75,9 +76,10 @@ export const NAV_LINKS = [
     href: "/lessons",
     children: [
       { label: "안내", href: "/lessons" },
-      { label: "목록", href: "/lessons/list" },
+      { label: "공고 목록", href: "/lessons/list" },
       { label: "공고 등록", href: "/lessons/announcements" },
       { label: "요청", href: "/lessons/requests" },
+      { label: "CM 목록", href: "/lessons/cm-list" },
     ],
   },
   // 예약 메뉴 임시 숨김 (코드 보관)

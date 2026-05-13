@@ -38,7 +38,7 @@
 ## 3. 라우트
 
 ### Public 페이지 (`src/app/`)
-홈, 소개(/about/company, /ceo, /space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + **/one-day-class/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='oneday', 실제 DB) + /one-day-class/list + /one-day-class/requests (MEMBER 전용) + /one-day-class/apply-cm, **/lessons** + **/lessons/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='lesson', 실제 DB) + /lessons/list + /lessons/requests (MEMBER 전용), /party-room + /party-room/booking + /party-room/booking/complete, **/reservations/status** (통합 예약현황 캘린더 — 연습실·파티룸·장기대관 시간 블록), **/long-term/apply** (고객용 장기대관 신청 폼, status='REQUESTED'로 저장), /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms, **/intake + /intake/details** (웹사이트 제작 의뢰 인테이크 폼)
+홈, 소개(/about/company, /ceo, /space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + **/one-day-class/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='oneday', 실제 DB) + /one-day-class/list + /one-day-class/requests (MEMBER 전용) + /one-day-class/apply-cm + **/one-day-class/cm-list** (can_oneday=true 승인 CM 공개), **/lessons** + **/lessons/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='lesson', 실제 DB) + /lessons/list + /lessons/requests (MEMBER 전용) + **/lessons/cm-list** (can_lesson=true 승인 CM 공개), /party-room + /party-room/booking + /party-room/booking/complete, **/reservations/status** (통합 예약현황 캘린더 — 연습실·파티룸·장기대관 시간 블록), **/long-term/apply** (고객용 장기대관 신청 폼, status='REQUESTED'로 저장), /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms, **/intake + /intake/details** (웹사이트 제작 의뢰 인테이크 폼)
 
 ### Admin 페이지 (`/admin/*`)
 /admin, /admin/board, /admin/class-offerings, /admin/class-requests, /admin/cm-applications, /admin/cm-settlements, /admin/intakes, /admin/members, /admin/reservations/calendar, /admin/reviews
@@ -67,8 +67,8 @@
 - **홈** → `/`
 - **소개** ▼ 회사 소개 / 대표 소개 / 공간 소개 / 비품 및 시설
 - **예약하기** ▼ 예약현황(`/reservations/status`) / 연습실(`/booking`) / 파티룸(`/party-room`) / 장기대관(`/long-term/apply`)
-- **원데이클래스** ▼ 안내(`/one-day-class`) / 목록(`/one-day-class/list`) / 공고 등록(`/one-day-class/announcements`, CM·ADMIN 전용) / 요청(`/one-day-class/requests`, MEMBER 전용)
-- **개인레슨** ▼ 안내(`/lessons`) / 목록(`/lessons/list`) / 공고 등록(`/lessons/announcements`, CM·ADMIN 전용) / 요청(`/lessons/requests`, MEMBER 전용)
+- **원데이클래스** ▼ 안내(`/one-day-class`) / 공고 목록(`/one-day-class/list`) / 공고 등록(`/one-day-class/announcements`, CM·ADMIN 전용) / 요청(`/one-day-class/requests`, MEMBER 전용) / CM 목록(`/one-day-class/cm-list`, can_oneday=true 승인 CM)
+- **개인레슨** ▼ 안내(`/lessons`) / 공고 목록(`/lessons/list`) / 공고 등록(`/lessons/announcements`, CM·ADMIN 전용) / 요청(`/lessons/requests`, MEMBER 전용) / CM 목록(`/lessons/cm-list`, can_lesson=true 승인 CM)
 - **요금안내** → `/pricing`
 - **이용안내** ▼ 이용수칙 / FAQ
 - **게시판** ▼ 공지·이벤트 / 자유게시판 / 분실물 / 후기
@@ -257,6 +257,20 @@
 - 코드: `lib/long-term-template.ts`, `api/admin/long-term-bookings/[id]`
 - 솔라피 예약 SMS는 발송 카운트 추적 (운영자가 한도 파악)
 
+### 10-9-3. CM 공개 노출 분류·위치 정책
+
+- **노출 분류 기준**: `cm_applications.status='APPROVED'` + `can_oneday` / `can_lesson` 플래그
+  - 원데이만 승인 → `/one-day-class/*`에만 노출
+  - 레슨만 승인 → `/lessons/*`에만 노출
+  - 둘 다 승인 → 두 메뉴 모두 노출
+- **노출 위치 2곳 — 독립 토글로 제어** (Phase 2 적용 — `cm_profiles` 컬럼 분리):
+  1. **본문 자동 카드** — `/one-day-class`, `/lessons` 메인 페이지의 `CmCardSection type="<type>" variant="section"` → 컬럼 `show_in_section`
+  2. **CM 목록 페이지** — `/one-day-class/cm-list`, `/lessons/cm-list` (`CmCardSection ... variant="list"`) → 컬럼 `show_in_list`
+- **마이페이지** (`CmProfileSection`)에서 두 위치를 개별 ON/OFF
+- **`is_public` (레거시)** — `show_in_section || show_in_list` 와 자동 동기화. 신규 코드는 사용하지 말 것
+- **마이그레이션 SQL**: `prisma/migrations/add_cm_profile_visibility_toggles.sql` — Supabase SQL Editor에서 실행 (백필 포함)
+- **fallback**: `show_in_section`/`show_in_list` 컬럼이 아직 없는 환경(마이그레이션 전)에서 `CmCardSection`은 자동으로 `is_public` 으로 fallback 쿼리
+
 ### 10-9-2. 클래스/레슨 공고 등록 권한 정책
 
 - **공고 등록**(`/one-day-class/announcements`, `/lessons/announcements`) — **CM 또는 ADMIN만** 가능
@@ -314,7 +328,7 @@
 
 ## 12. 신뢰성 주의
 
-이 문서는 **2026-05-13 시점의 스냅샷**입니다. (마지막 갱신: 클래스/레슨 공고 등록 실제 DB 통합 + CM 권한 분리) 코드는 계속 변경되니, 어긋나는 부분이 있으면 **항상 코드를 정답으로 삼고** 이 문서를 갱신해주세요. 특히 다음은 빠르게 바뀝니다:
+이 문서는 **2026-05-13 시점의 스냅샷**입니다. (마지막 갱신: CM 노출 위치 독립 토글 — Phase 2 완료) 코드는 계속 변경되니, 어긋나는 부분이 있으면 **항상 코드를 정답으로 삼고** 이 문서를 갱신해주세요. 특히 다음은 빠르게 바뀝니다:
 - 가격/이벤트 기간/공휴일 목록
 - 네비게이션 메뉴
 - 출연작·후기 등 컨텐츠

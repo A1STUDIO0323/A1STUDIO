@@ -539,8 +539,11 @@ model cm_profiles {
   subjects       String[] @default([])
   profile_image  String?
   portfolio_url  String?
-  is_public      Boolean  @default(true)
+  is_public      Boolean  @default(true) // 레거시 마스터 토글 — show_in_section || show_in_list 와 동기화
   is_active      Boolean  @default(true)
+  // 노출 위치 독립 토글 (Phase 2 — 2026-05-13)
+  show_in_section Boolean @default(true) // /one-day-class, /lessons 본문 CM 카드 노출
+  show_in_list    Boolean @default(true) // /one-day-class/cm-list, /lessons/cm-list 노출
   // 정산 정보 (비공개 — RLS 보호)
   bank_name      String?
   account_number String?

@@ -154,8 +154,8 @@ export default function OneDayClassPage() {
         {/* 모집 중인 원데이클래스 (OPEN 상태 자동 노출) */}
         <OpenOfferingsSection filterType="oneday" />
 
-        {/* 공개 CM 카드 (DB 기반 자동 노출) */}
-        <CmCardSection />
+        {/* 공개 CM 카드 (DB 기반 자동 노출 — 원데이클래스 승인 CM만) */}
+        <CmCardSection type="oneday" />
 
         {/* 누적 진행 안내 — 데이터 없을 때 */}
         <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-7 text-center">

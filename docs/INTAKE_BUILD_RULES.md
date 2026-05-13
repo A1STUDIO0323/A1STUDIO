@@ -204,6 +204,13 @@ console.error(`[Payment][FAIL] reason=${r} code=${c} at=${ts} stack=${e.stack}`)
 - 동일 폼 UI를 type prop으로 공유 (예: `AnnouncementsClient.tsx` 패턴) — 원데이클래스/레슨 코드 중복 방지
 - 어드민 라우트와 공개 라우트는 **반드시 분리** (`/api/admin/class-offerings` ≠ `/api/class-offerings`)
 
+### 9-6. CM 카드 분류별 공개 노출 원칙
+- CM 신청 단계에서 **`can_oneday` / `can_lesson` 플래그**를 받아 어느 분류로 활동할지 결정 (둘 다 가능)
+- CM 카드 노출은 두 위치: (1) 카테고리 메인 페이지 본문 (CmCardSection), (2) 전용 CM 목록 페이지 (`<category>/cm-list`)
+- 두 위치 모두 `cm_applications.status='APPROVED'` + `can_<type>=true` 기준으로 자동 분류 — 관리자가 카테고리를 별도로 지정하지 않음
+- 본문 임베드와 목록 페이지의 노출 토글은 **CM이 마이페이지에서 독립 제어** 가능하도록 컬럼 분리 (`show_in_section`, `show_in_list`) — A1STUDIO 검증 완료
+- 레거시 `is_public`은 두 컬럼의 OR 로 자동 동기화. 신규 코드는 분리 컬럼만 참조
+
 ---
 
 ## 10. 빌드 완료 체크리스트 (모든 티어 공통)

@@ -121,7 +121,7 @@ export default function LessonsPage() {
         <OpenOfferingsSection filterType="lesson" />
 
         {/* 공개 CM 카드 */}
-        <CmCardSection />
+        <CmCardSection type="lesson" />
 
         {/* 첫 레슨 모집 안내 */}
         <div className="rounded-2xl border border-[#D8CCBC] bg-[#EFE7DA] p-7 text-center">
