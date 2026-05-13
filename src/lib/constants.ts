@@ -50,7 +50,16 @@ export const NAV_LINKS = [
       { label: "비품 및 시설", href: "/equipment" },
     ],
   },
-  { label: "예약하기", href: "/booking" },
+  {
+    label: "예약하기",
+    href: "/booking",
+    children: [
+      { label: "예약현황", href: "/reservations/status" },
+      { label: "연습실", href: "/booking" },
+      { label: "파티룸", href: "/party-room" },
+      { label: "장기대관", href: "/long-term/apply" },
+    ],
+  },
   {
     label: "원데이클래스",
     href: "/one-day-class",

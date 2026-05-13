@@ -38,7 +38,7 @@
 ## 3. 라우트
 
 ### Public 페이지 (`src/app/`)
-홈, 소개(/about/company, /ceo, /space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + /announcements + /requests, /party-room + /party-room/booking + /party-room/booking/complete, /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms, **/intake + /intake/details** (웹사이트 제작 의뢰 인테이크 폼)
+홈, 소개(/about/company, /ceo, /space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + /announcements + /requests, /party-room + /party-room/booking + /party-room/booking/complete, **/reservations/status** (통합 예약현황 캘린더 — 연습실·파티룸·장기대관 시간 블록), **/long-term/apply** (고객용 장기대관 신청 폼, status='REQUESTED'로 저장), /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms, **/intake + /intake/details** (웹사이트 제작 의뢰 인테이크 폼)
 
 ### Admin 페이지 (`/admin/*`)
 /admin, /admin/board, /admin/class-offerings, /admin/class-requests, /admin/cm-applications, /admin/cm-settlements, /admin/intakes, /admin/members, /admin/reservations/calendar, /admin/reviews
@@ -49,9 +49,10 @@
 
 ### API 라우트 (`src/app/api/`)
 - **인증**: /auth/email-signup, /auth/callback, /auth/password-reset/{request,confirm}, /auth/sms/{send-code,verify-code}
-- **예약**: /reservations/{available,cancel,create}, /reservations/holds/expire, /reservations/payments/kakao/{ready,approve,cancel,fail}
+- **예약**: /reservations/{available,cancel,create}, /reservations/holds/expire, /reservations/payments/kakao/{ready,approve,cancel,fail}, **/reservations/status** (GET ?month=YYYY-MM, 읽기 전용 통합 조회 — 연습실/파티룸/장기대관)
 - **결제**: /payments/kakao/{ready,approve}, /charge/{ready,approve}
 - **파티룸**: /party-room/reservations/{available,create,cancel}, /party-room/payments/kakao/{ready,approve,cancel,fail}
+- **장기대관**: **/long-term/apply** (POST, 고객용 공개 신청 — 어드민 인증 없음, `long_term_bookings`에 `status='REQUESTED'` 저장 + 관리자에게 SMS+이메일 알림)
 - **게시판**: /board (CRUD), /board/[id], /board/[id]/{comments,like}, /board/categories
 - **회원**: /members/{profile,sync,withdraw}, /member-roles/role, /account/delete
 - **인테이크**: /intake/submit (zod 검증 + Prisma 저장 + SendGrid 메일 + SolAPI/CoolSMS 알림)
@@ -64,7 +65,7 @@
 
 - **홈** → `/`
 - **소개** ▼ 회사 소개 / 대표 소개 / 공간 소개 / 비품 및 시설
-- **예약하기** → `/booking`
+- **예약하기** ▼ 예약현황(`/reservations/status`) / 연습실(`/booking`) / 파티룸(`/party-room`) / 장기대관(`/long-term/apply`)
 - **원데이클래스** ▼ 클래스 공고 등록 / 클래스 요청
 - **요금안내** → `/pricing`
 - **이용안내** ▼ 이용수칙 / FAQ
@@ -121,6 +122,7 @@
 | BoardPost / BoardComment / BoardLike | 자유게시판 (카테고리 자유텍스트, 답글·좋아요) |
 | message_logs | SMS·알림톡 로그 |
 | party_reservations | 파티룸 예약 (별도 스키마) |
+| **long_term_bookings** | 장기대관. status: `REQUESTED`(고객 신청) → `DRAFT` → `PENDING_PAYMENT` → `SCHEDULED` → `COMPLETED` / `CANCELLED`. usage_dates(Int[]) + usage_month + start_hour/end_hour로 일자×시간 표현. 가격 필드는 관리자가 검토 후 산정 |
 | password_reset_tokens | 비밀번호 재설정 토큰 |
 | reviews | 후기 |
 | reservation_holds | HOLD 상태 보조 테이블 |
@@ -253,6 +255,15 @@
 - 코드: `lib/long-term-template.ts`, `api/admin/long-term-bookings/[id]`
 - 솔라피 예약 SMS는 발송 카운트 추적 (운영자가 한도 파악)
 
+### 10-9-1. 장기대관 고객 신청 흐름 (`/long-term/apply`)
+
+- 고객 공개 폼 → `POST /api/long-term/apply` → `long_term_bookings.status='REQUESTED'`로 저장
+- **어드민 페이지(`/admin/*`)로 고객이 진입하지 않도록 별도 공개 라우트 사용** (어드민 인증 없음)
+- 가격 필드(`hourly_rate` / `gross_amount` / `discount_*` / `final_amount`)는 0으로 저장 — 관리자가 검토 후 정식 등록(요금 안내문 발송)할 때 산정
+- 신청 접수 시 관리자에게 **SMS + 이메일** 동시 발송 (실패해도 신청 자체는 성공 응답)
+- 어드민 목록(`/admin/long-term-bookings`)에서 `REQUESTED`는 **"신청"** 뱃지(로즈)로 표시
+- 필요 env: `ADMIN_NOTIFY_PHONE` (없으면 `STUDIO_PHONE`), `ADMIN_NOTIFY_EMAIL` (없으면 `CONTACT_TO_EMAIL`)
+
 ### 10-10. ⚠️ 카카오페이 심사 중 — 결제 영역 변경 금지
 
 심사 통과 전까지 **수정 금지** 영역:
@@ -292,7 +303,7 @@
 
 ## 12. 신뢰성 주의
 
-이 문서는 **2026-05-13 시점의 스냅샷**입니다. 코드는 계속 변경되니, 어긋나는 부분이 있으면 **항상 코드를 정답으로 삼고** 이 문서를 갱신해주세요. 특히 다음은 빠르게 바뀝니다:
+이 문서는 **2026-05-13 시점의 스냅샷**입니다. (마지막 갱신: 예약현황 페이지·장기대관 고객 신청 흐름 추가) 코드는 계속 변경되니, 어긋나는 부분이 있으면 **항상 코드를 정답으로 삼고** 이 문서를 갱신해주세요. 특히 다음은 빠르게 바뀝니다:
 - 가격/이벤트 기간/공휴일 목록
 - 네비게이션 메뉴
 - 출연작·후기 등 컨텐츠

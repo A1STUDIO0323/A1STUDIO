@@ -187,6 +187,17 @@ console.error(`[Payment][FAIL] reason=${r} code=${c} at=${ts} stack=${e.stack}`)
 - 매 이용일 KST 10시: 이용안내문 솔라피 예약 발송
 - 이 흐름은 빌드 시 빠짐없이 포함 (3단계 이상)
 
+### 9-3. 장기대관 고객 신청 흐름 (공개 라우트 분리)
+- 고객 신청 페이지(`/long-term/apply`)와 어드민 페이지(`/admin/long-term-bookings`)를 **반드시 분리**
+- 고객 API는 어드민 인증 없이 동작하되, **`status='REQUESTED'` 로만 저장** (가격 필드 0)
+- 신청 접수 시 관리자에게 **SMS + 이메일 동시 알림** (절대지침 1번 로깅 적용)
+- 필요 env: `ADMIN_NOTIFY_PHONE`, `ADMIN_NOTIFY_EMAIL` (없으면 `STUDIO_PHONE`/`CONTACT_TO_EMAIL` fallback)
+
+### 9-4. 통합 예약현황 캘린더 (선택 — 의뢰별)
+- 의뢰처가 복수 예약 유형(룸/파티룸/장기대관)을 가질 경우, 단일 캘린더로 통합 노출 권장
+- 읽기 전용 API 1개로 월 단위 조회: `GET /api/reservations/status?month=YYYY-MM`
+- 카카오페이 심사 중 빌드라면 **SELECT만** 수행, 결제/예약 컬럼·라우트 변경 금지 (절대지침 10-10)
+
 ---
 
 ## 10. 빌드 완료 체크리스트 (모든 티어 공통)

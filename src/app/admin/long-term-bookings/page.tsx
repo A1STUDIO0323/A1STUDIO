@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { calcHourlyMixed } from "@/lib/pricing";
 
 const STATUS_LABEL: Record<string, string> = {
+  REQUESTED: "신청",
   DRAFT: "임시저장",
   PENDING_PAYMENT: "입금대기",
   SCHEDULED: "예약완료",
@@ -16,6 +17,7 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: "취소",
 };
 const STATUS_COLOR: Record<string, string> = {
+  REQUESTED: "bg-rose-100 text-rose-700",
   DRAFT: "bg-zinc-200 text-zinc-700",
   PENDING_PAYMENT: "bg-amber-100 text-amber-800",
   SCHEDULED: "bg-emerald-100 text-emerald-800",

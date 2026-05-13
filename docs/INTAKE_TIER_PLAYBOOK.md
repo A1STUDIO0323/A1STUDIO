@@ -230,6 +230,8 @@ model PostReport { ... }
 - [ ] ⚠️ **관리자 일괄 슬롯 생성/휴무** — 부분 구현, 의뢰별 보강
 - [ ] ⚠️ **다중 운영자 권한 분리** — `admin-auth`/`cm` 구조 있음, 매장별 세분화는 신규
 - [ ] ✅ **장기대관 안내문 자동 발송** (`lib/long-term-template.ts` 검증, 절대지침 9-2)
+- [ ] ✅ **장기대관 고객 신청 폼** (`/long-term/apply` + `POST /api/long-term/apply` 검증 — 어드민 분리, `status='REQUESTED'`, 관리자 SMS+이메일 알림)
+- [ ] ✅ **통합 예약현황 캘린더** (`/reservations/status` + `GET /api/reservations/status?month=YYYY-MM` 검증 — 연습실/파티룸/장기대관 시간 블록 통합)
 
 ### DB 모델 (Prisma)
 ```prisma
