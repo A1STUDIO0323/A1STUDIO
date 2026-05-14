@@ -194,6 +194,11 @@ export default function IntakePage() {
     }
     if (!form.agreed) errs.agreed = "정보 사용 동의에 체크해주세요.";
 
+    // 4단계 이상(결제 시스템) 선택 시 통신판매업 신고번호 필수
+    if (tierLevel >= 4 && !form.ecommerce_license.trim()) {
+      errs.ecommerce_license = "4단계 이상(결제 시스템) 선택 시 통신판매업 신고번호는 필수입니다. 미신고 시 1~3단계로 우선 진행을 권장드립니다.";
+    }
+
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       setError(`작성하지 않은 필수 항목이 ${Object.keys(errs).length}개 있습니다.`);
@@ -361,8 +366,13 @@ export default function IntakePage() {
             <Field label="대표 전화번호"><Input value={form.business_phone} onChange={(v) => update("business_phone", v)} /></Field>
             <Field label="대표 이메일"><Input value={form.business_email} onChange={(v) => update("business_email", v)} type="email" /></Field>
           </Grid>
-          <Field label="통신판매업 신고번호 (있을 경우)">
+          <Field label={showPayment ? "통신판매업 신고번호 (4단계 이상 필수)" : "통신판매업 신고번호 (있을 경우)"} error={fieldErrors.ecommerce_license}>
             <Input value={form.ecommerce_license} onChange={(v) => update("ecommerce_license", v)} />
+            {showPayment && (
+              <p className="mt-1 text-xs text-amber-700">
+                ⚠️ 결제(4단계 이상) 구현에는 통신판매업 신고가 필수입니다. 미신고 시 정부24(www.gov.kr) 또는 공정거래위원회(www.ftc.go.kr)에서 약 3~7일 내 신청 가능합니다.
+              </p>
+            )}
           </Field>
           <Note>📎 사업자등록증 사본은 1차 상담 시 이메일/카카오톡으로 보내주세요.</Note>
         </Card>
