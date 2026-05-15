@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Image from "next/image";
 import { User } from "lucide-react";
+import CmListClient from "./CmListClient";
 
 // CM 카드 섹션 — 공개 프로필 노출
 // - type prop이 지정되면 cm_applications.status='APPROVED' + can_<type>=true인 CM만 표시
@@ -144,6 +145,8 @@ function renderSection(
             승인된 CM이 마이페이지에 공개 프로필을 등록하면 이 자리에 자동으로 노출됩니다.
           </p>
         </div>
+      ) : variant === "list" ? (
+        <CmListClient profiles={profiles} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {profiles.map((cm) => (

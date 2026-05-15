@@ -46,7 +46,9 @@ type ScheduleEntry = {
   deliveryFailReason?: string;
 };
 
-const SUCCESS_CODES = new Set(["2000"]);
+// 솔라피 statusCode: "2000" = 그룹 접수 성공, "4000" = 단말기 수신 성공
+const SUCCESS_CODES = new Set(["2000", "4000"]);
+const SUCCESS_MESSAGES = new Set(["수신 완료", "success", "OK", "ok"]);
 const DELIVERY_EVENTS = new Set([
   "DELIVERY_COMPLETED",
   "DELIVERY_FAILED",
@@ -101,8 +103,18 @@ export async function POST(req: NextRequest) {
     }
 
     const statusCode = ev.statusCode ?? "";
-    const isDelivered = SUCCESS_CODES.has(statusCode);
-    const failReason = isDelivered ? undefined : (ev.statusMessage || statusCode || "발송 실패");
+    const statusMessage = ev.statusMessage ?? "";
+
+    // eventType이 있으면 우선 신뢰 (DELIVERY_COMPLETED는 statusCode와 무관하게 성공)
+    let isDelivered: boolean;
+    if (ev.eventType === "DELIVERY_COMPLETED" || ev.eventType === "DELIVERED") {
+      isDelivered = true;
+    } else if (ev.eventType === "DELIVERY_FAILED") {
+      isDelivered = false;
+    } else {
+      isDelivered = SUCCESS_CODES.has(statusCode) || SUCCESS_MESSAGES.has(statusMessage);
+    }
+    const failReason = isDelivered ? undefined : (statusMessage || statusCode || "발송 실패");
 
     try {
       // 해당 groupId를 schedule에 포함하는 long_term_bookings 찾기
