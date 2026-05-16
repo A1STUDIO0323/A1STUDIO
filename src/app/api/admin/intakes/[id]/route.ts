@@ -67,3 +67,34 @@ export async function PATCH(
     return NextResponse.json({ error: "수정 중 오류가 발생했습니다" }, { status: 500 });
   }
 }
+
+const DELETE_LOG_PREFIX = "[admin:intakes:delete]";
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireAdminOrLegacy(req);
+  if ("error" in auth) return auth.error;
+
+  const { id } = await params;
+  if (!id) {
+    return NextResponse.json({ error: "id가 필요합니다" }, { status: 400 });
+  }
+
+  logger.info(`${DELETE_LOG_PREFIX} start id=${id}`);
+
+  try {
+    await prisma.intake_submissions.delete({ where: { id } });
+    logger.info(`${DELETE_LOG_PREFIX} success id=${id}`);
+    return NextResponse.json({ ok: true });
+  } catch (err: unknown) {
+    const code = (err as { code?: string }).code;
+    if (code === "P2025") {
+      logger.warn(`${DELETE_LOG_PREFIX} not_found id=${id}`);
+      return NextResponse.json({ error: "해당 의뢰서를 찾을 수 없습니다" }, { status: 404 });
+    }
+    logger.error(`${DELETE_LOG_PREFIX} db_failed id=${id}`, err);
+    return NextResponse.json({ error: "삭제 중 오류가 발생했습니다" }, { status: 500 });
+  }
+}

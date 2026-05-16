@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, ChevronRight, Download, Filter, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Download, Filter, RefreshCw, Search, Trash2 } from "lucide-react";
 import { AdminGate } from "@/components/admin/AdminGate";
 import { ADMIN_PASSWORD_SESSION_KEY, useAdmin } from "@/lib/admin-context";
 import { cn } from "@/lib/utils";
@@ -308,6 +308,55 @@ export default function AdminIntakesPage() {
     return out;
   }, [items]);
 
+  async function deleteItem(it: Intake) {
+    const label = it.business_name || it.contact_name || it.id;
+    if (!confirm(`정말 삭제하시겠습니까?\n\n[${label}]\n이 작업은 되돌릴 수 없습니다.`)) return;
+    setSavingId(it.id);
+    try {
+      const res = await fetch(`/api/admin/intakes/${it.id}`, {
+        method: "DELETE",
+        headers: adminHeaders(),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        console.error("[admin:intakes:client] delete_failed", data);
+        alert(data.error || "삭제 실패");
+        return;
+      }
+      console.info("[admin:intakes:client] delete_success", { id: it.id });
+      setItems((prev) => prev.filter((x) => x.id !== it.id));
+      if (openId === it.id) setOpenId(null);
+    } catch (e) {
+      console.error("[admin:intakes:client] delete_error", e);
+      alert("삭제 중 오류가 발생했습니다");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  function csvEscape(s: unknown): string {
+    const str = s === null || s === undefined ? "" : typeof s === "object" ? JSON.stringify(s) : String(s);
+    if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+    return str;
+  }
+
+  function exportRowCsv(it: Intake) {
+    const rec = it as unknown as Record<string, unknown>;
+    const keys = Object.keys(rec);
+    const headerLine = keys.map(csvEscape).join(",");
+    const valueLine = keys.map((k) => csvEscape(rec[k])).join(",");
+    const csv = "﻿" + headerLine + "\n" + valueLine;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safeName = (it.business_name || it.contact_name || it.id).replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
+    a.download = `intake_${safeName}_${it.id.slice(0, 8)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    console.info("[admin:intakes:client] export_row_csv", { id: it.id });
+  }
+
   function exportCsv() {
     if (filtered.length === 0) {
       alert("내보낼 항목이 없습니다");
@@ -507,10 +556,29 @@ export default function AdminIntakesPage() {
                                     {savingId === it.id ? "저장 중..." : "메모 저장"}
                                   </button>
                                 </div>
-                                <div className="text-[10px] text-[#b0a89e] pt-2 border-t border-[#D8CCBC]/50">
-                                  ID: {it.id}
-                                  <br />
-                                  IP: {it.source_ip ?? "-"}
+                                <div className="pt-2 border-t border-[#D8CCBC]/50 space-y-2">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => exportRowCsv(it)}
+                                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-[#D8CCBC] bg-[#EFE7DA] px-3 py-2 text-xs font-semibold text-[#6f655d] hover:text-[#B98768]"
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                      이 의뢰서 CSV
+                                    </button>
+                                    <button
+                                      onClick={() => void deleteItem(it)}
+                                      disabled={savingId === it.id}
+                                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      {savingId === it.id ? "처리 중..." : "삭제"}
+                                    </button>
+                                  </div>
+                                  <div className="text-[10px] text-[#b0a89e]">
+                                    ID: {it.id}
+                                    <br />
+                                    IP: {it.source_ip ?? "-"}
+                                  </div>
                                 </div>
                               </div>
 

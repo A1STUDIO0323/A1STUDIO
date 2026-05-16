@@ -78,7 +78,10 @@
 
 ### Step 3. 프로젝트 셋업
 ```bash
-npx create-next-app@latest 고객사명 --typescript --tailwind --app
+npx create-next-app@latest 고객사명
+# 대화형 프롬프트 표준 응답값 (INTAKE_TIER_PLAYBOOK C-0 참조):
+# defaults? No, customize / TypeScript Yes / ESLint / React Compiler Yes
+# Tailwind Yes / src/ Yes / App Router Yes / import alias 기본(@/*) / AGENTS.md Yes
 cd 고객사명
 npm install lucide-react clsx tailwind-merge motion
 ```
