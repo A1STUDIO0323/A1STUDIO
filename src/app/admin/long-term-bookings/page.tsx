@@ -499,6 +499,34 @@ export default function LongTermBookingsAdminPage() {
     }
   };
 
+  const hardDeleteBooking = async (it: Booking) => {
+    if (it.status !== "CANCELLED") {
+      alert("취소된 항목만 완전 삭제할 수 있습니다.");
+      return;
+    }
+    if (!confirm(
+      `[${it.customer_name}] 장기대관을 완전히 삭제합니다.\n` +
+        `이 작업은 되돌릴 수 없습니다. 계속할까요?`
+    )) return;
+    setBusyId(it.id);
+    try {
+      console.info("[admin:long-term-bookings] hard_delete start", { id: it.id });
+      const res = await fetch(`/api/admin/long-term-bookings/${it.id}?hard=true`, {
+        method: "DELETE",
+        headers: adminHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "삭제 실패");
+      console.info("[admin:long-term-bookings] hard_delete success", { id: it.id });
+      await load();
+    } catch (err) {
+      console.error("[admin:long-term-bookings] hard_delete failed", err);
+      alert(err instanceof Error ? err.message : "삭제 실패");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const cancelBooking = async (id: string) => {
     if (!confirm("정말 취소하시겠습니까?\n예약된 이용안내문 발송도 함께 취소 시도합니다.")) return;
     setBusyId(id);
@@ -902,6 +930,16 @@ export default function LongTermBookingsAdminPage() {
                                   className="rounded border border-red-400 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                                 >
                                   <Trash2 size={12} className="inline" /> 취소
+                                </button>
+                              )}
+                              {it.status === "CANCELLED" && (
+                                <button
+                                  onClick={() => hardDeleteBooking(it)}
+                                  disabled={busyId === it.id}
+                                  className="rounded border border-red-600 bg-red-600 px-2 py-1 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                                  title="DB에서 완전 삭제 (되돌릴 수 없음)"
+                                >
+                                  <Trash2 size={12} className="inline" /> 완전삭제
                                 </button>
                               )}
                             </div>

@@ -94,6 +94,27 @@ export async function DELETE(
     return NextResponse.json({ error: "해당 항목을 찾을 수 없습니다" }, { status: 404 });
   }
 
+  // hard=true → 이미 취소된 항목을 DB에서 완전 삭제
+  const url = new URL(req.url);
+  if (url.searchParams.get("hard") === "true") {
+    if (booking.status !== "CANCELLED") {
+      logger.warn(`${LOG_PREFIX} hard_delete blocked id=${id} status=${booking.status}`);
+      return NextResponse.json({ error: "취소된 항목만 완전 삭제할 수 있습니다" }, { status: 400 });
+    }
+    try {
+      await prisma.long_term_bookings.delete({ where: { id } });
+      logger.info(`${LOG_PREFIX} hard_delete success id=${id}`);
+      return NextResponse.json({ ok: true, hardDeleted: true });
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code === "P2025") {
+        return NextResponse.json({ error: "해당 항목을 찾을 수 없습니다" }, { status: 404 });
+      }
+      logger.error(`${LOG_PREFIX} hard_delete db_failed id=${id}`, err);
+      return NextResponse.json({ error: "삭제 중 오류가 발생했습니다" }, { status: 500 });
+    }
+  }
+
   const schedule = (booking.usage_notice_schedule as unknown as UsageScheduleEntry[] | null) ?? [];
   const cancelResults: Array<{ day: number; groupId?: string; success: boolean; error?: string }> = [];
 
