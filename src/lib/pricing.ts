@@ -115,28 +115,96 @@ export function isWeekend(date: Date): boolean {
 }
 
 /**
+ * 한국 임시공휴일 (정부 임시 지정 — 패키지 반영 전까지 직접 추가)
+ *
+ * 예: 대통령 선거일, 국회의원 선거일, 임시공휴일 지정일
+ * date-holidays 패키지가 자동 반영하지 않으면 여기에 'YYYY-MM-DD' 형식으로 추가.
+ * 정식 법정공휴일·대체공휴일은 패키지가 처리하므로 여기에 넣지 말 것.
+ */
+const EXTRA_KR_HOLIDAYS: string[] = [
+  // 예시: '2027-04-15', // 22대 국회의원 선거 (가상)
+];
+
+// date-holidays 인스턴스 — 모듈 로드 시 1회 생성 (가벼움)
+import Holidays from "date-holidays";
+const krHolidays = new Holidays("KR");
+
+/**
+ * 대체공휴일 대상 공휴일명 (date-holidays 패키지의 한국어 name 기준)
+ * - 현충일은 대체공휴일 대상 아님 (2021년 확대에서도 제외)
+ * - 신정도 대상 아님
+ */
+const SUBSTITUTE_TARGET_NAMES = new Set<string>([
+  "어린이날",
+  "석가탄신일",
+  "성탄절",
+  "설날",
+  "추석",
+  "3·1절",
+  "광복절",
+  "개천절",
+  "한글날",
+]);
+
+/**
+ * 한국 대체공휴일 판정
+ *
+ * 규칙: 대체 대상 공휴일이 주말(토·일)과 겹치거나 다른 공휴일과 겹치면,
+ *       그 직후 첫 평일을 대체공휴일로 지정.
+ *
+ * 알고리즘: date(평일)에서 거꾸로 1일씩 거슬러 올라가며,
+ *   - 평일·非공휴일을 만나면 체인 종료
+ *   - 주말 또는 공휴일이 이어지는 동안 트리거(주말+대상공휴일 / 대상공휴일+대상공휴일 겹침) 검출
+ */
+function isKoreanSubstituteHoliday(date: Date): boolean {
+  const dow = date.getDay();
+  if (dow === 0 || dow === 6) return false; // 주말은 대체공휴일 후보 아님
+
+  // date 자체가 본 공휴일이면 대체공휴일 아님
+  const todayResult = krHolidays.isHoliday(date);
+  if (todayResult && todayResult.some((h) => h.type === "public")) return false;
+
+  for (let back = 1; back <= 9; back++) {
+    const prev = new Date(date);
+    prev.setDate(prev.getDate() - back);
+    const prevDow = prev.getDay();
+    const prevResult = krHolidays.isHoliday(prev);
+    const prevPublics = prevResult ? prevResult.filter((h) => h.type === "public") : [];
+    const prevIsPublic = prevPublics.length > 0;
+    const prevIsWeekend = prevDow === 0 || prevDow === 6;
+
+    if (!prevIsWeekend && !prevIsPublic) break; // 체인 끊김
+
+    if (prevIsPublic) {
+      const targets = prevPublics.filter((h) => SUBSTITUTE_TARGET_NAMES.has(h.name));
+      // 대상 공휴일이 주말에 떨어짐 → trigger
+      if (targets.length >= 1 && prevIsWeekend) return true;
+      // 대상 공휴일이 다른 공휴일과 겹침 → trigger
+      if (targets.length >= 1 && prevPublics.length >= 2) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * 공휴일 체크
+ * - 법정공휴일: date-holidays 패키지 (음력 기반 설/추석/부처님오신날 자동)
+ * - 대체공휴일: isKoreanSubstituteHoliday (패키지 미지원분 자체 계산)
+ * - 임시공휴일: EXTRA_KR_HOLIDAYS 보조 배열
  */
 export function checkIsHoliday(date: Date): boolean {
-  const holidays = [
-    '2026-01-01',
-    '2026-02-16', '2026-02-17', '2026-02-18',
-    '2026-03-01',
-    '2026-05-05',
-    '2026-05-24',
-    '2026-06-06',
-    '2026-08-15',
-    '2026-09-28', '2026-09-29', '2026-09-30',
-    '2026-10-03',
-    '2026-10-09',
-    '2026-12-25',
-  ];
-
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   const dateStr = `${y}-${m}-${d}`;
-  return holidays.includes(dateStr);
+
+  if (EXTRA_KR_HOLIDAYS.includes(dateStr)) return true;
+
+  const result = krHolidays.isHoliday(date);
+  if (result && result.some((h) => h.type === "public")) return true;
+
+  return isKoreanSubstituteHoliday(date);
 }
 
 /**

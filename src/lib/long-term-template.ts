@@ -39,6 +39,11 @@ export type PriceBreakdownItem = {
   hours: number;
   ratePerHour: number;
   subtotal: number;
+  /**
+   * 이 priceType에 기여한 이용일(일자) 목록 — 정렬됨.
+   * 요금 안내문에서 주말/공휴일 라인이 어느 날짜 때문인지 보여주는 용도.
+   */
+  dates?: number[];
 };
 
 /**
@@ -60,7 +65,7 @@ export function computeLongTermBreakdown(
   const startTime = `${String(startHour).padStart(2, "0")}:00`;
   const endTime = `${String(endHour).padStart(2, "0")}:00`;
 
-  const agg: Map<PriceType, { hours: number; original: number; event: number }> = new Map();
+  const agg: Map<PriceType, { hours: number; original: number; event: number; days: Set<number> }> = new Map();
   let totalHours = 0;
 
   for (const day of usageDates) {
@@ -68,10 +73,11 @@ export function computeLongTermBreakdown(
     const r = calcHourlyMixed(date, startTime, endTime);
     totalHours += r.duration;
     for (const seg of r.breakdown) {
-      const prev = agg.get(seg.priceType) ?? { hours: 0, original: 0, event: 0 };
+      const prev = agg.get(seg.priceType) ?? { hours: 0, original: 0, event: 0, days: new Set<number>() };
       prev.hours += seg.hours;
       prev.original += seg.originalPrice;
       prev.event += seg.eventPrice;
+      prev.days.add(day);
       agg.set(seg.priceType, prev);
     }
   }
@@ -90,6 +96,7 @@ export function computeLongTermBreakdown(
       hours: v.hours,
       ratePerHour: Math.round(v.event / v.hours), // 단일 priceType 내에선 일정한 단가
       subtotal: v.event,
+      dates: [...v.days].sort((a, b) => a - b),
     });
     totalOriginal += v.original;
     totalEvent += v.event;
@@ -126,10 +133,16 @@ export function buildPaymentNoticeText(b: LongTermBookingForTemplate): string {
     ...(b.priceBreakdown && b.priceBreakdown.length >= 2
       ? [
           // 시간대 혼합: 한 줄 확장
-          ...b.priceBreakdown.map(
-            (seg) =>
-              `(${b.spaceType} ${seg.label}) ${seg.hours}시간 × ${formatNumber(seg.ratePerHour)}원 = ${formatNumber(seg.subtotal)}원`
-          ),
+          // 주말/공휴일 라인은 어느 날짜 때문인지 함께 표시 (민감 항목)
+          ...b.priceBreakdown.flatMap((seg) => {
+            const base = `(${b.spaceType} ${seg.label}) ${seg.hours}시간 × ${formatNumber(seg.ratePerHour)}원 = ${formatNumber(seg.subtotal)}원`;
+            const isWeekendLine = seg.priceType === "weekend_offpeak" || seg.priceType === "weekend_peak";
+            if (isWeekendLine && seg.dates && seg.dates.length > 0) {
+              const dateList = seg.dates.map((d) => `${d}일`).join(", ");
+              return [base, `  └ ${dateList} (${seg.dates.length}일)`];
+            }
+            return [base];
+          }),
           `합계 = ${formatNumber(b.grossAmount)}원.`,
         ]
       : [
