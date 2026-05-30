@@ -6,12 +6,12 @@ import { ChevronLeft, ChevronRight, CalendarCheck, RefreshCw } from "lucide-reac
 import { cn } from "@/lib/utils";
 
 // 예약현황 (읽기 전용)
-// - 연/월/일 캘린더 → 일자 선택 시 09~24시 시간 블록 표시
+// - 연/월/일 캘린더 → 일자 선택 시 00~23시(24시간) 시간 블록 표시
 // - 데이터: 연습실(reservations) / 파티룸(party_reservations) / 장기대관(long_term_bookings)
 // - 카카오페이 심사 중: SELECT만 수행, 결제/예약 컬럼·라우트 변경 없음
 
 const DAYS_KR = ["일", "월", "화", "수", "목", "금", "토"] as const;
-const HOURS = Array.from({ length: 15 }, (_, i) => i + 9); // 09 ~ 23 시작 슬롯 (~24시까지 표시)
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 00 ~ 23 시작 슬롯 (24시간 전체 표시)
 
 type Block = {
   source: "practice" | "party" | "longTerm";
@@ -267,7 +267,7 @@ export default function ReservationStatusPage() {
             <span className="text-xs text-[#6f655d]">총 {selectedBlocks.length}건</span>
           </div>
 
-          {/* 시간 그리드 09:00 ~ 24:00 */}
+          {/* 시간 그리드 00:00 ~ 23:00 (24시간) */}
           <div className="space-y-1">
             {HOURS.map((h) => {
               const slotBlocks = selectedBlocks.filter((b) => blockCoversHour(b, h));
