@@ -52,6 +52,7 @@ function PartyRoomBookingContent() {
   // Step 4: 결제 수단 선택
   const [paymentMethod, setPaymentMethod] = useState<'points' | 'kakaopay' | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [checkingConflict, setCheckingConflict] = useState(false);
 
   // 알림 메시지
   const cancelled = searchParams.get('cancelled');
@@ -268,6 +269,40 @@ function PartyRoomBookingContent() {
       alert(error instanceof Error ? error.message : "결제 준비에 실패했습니다");
       setSubmitting(false);
     }
+  };
+
+  // "다음 단계"(Step 2 → 3) 진행 전 선예약 충돌 확인
+  // 연습실/파티룸 어떤 예약이든 같은 시간대 선예약이 있으면 팝업으로 안내하고 진행을 막는다.
+  const handleProceedToStep3 = async () => {
+    if (!selectedDate || !selectedPackage) return;
+
+    const pkg = PARTY_ROOM_PACKAGES[selectedPackage];
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+    setCheckingConflict(true);
+    try {
+      const res = await fetch("/api/reservations/check-conflict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: dateStr,
+          startTime: pkg.start,
+          endTime: pkg.end,
+        }),
+      });
+      const data = await res.json();
+      if (data?.conflict) {
+        alert("이미 해당 시간에는 예약이 있습니다.");
+        return;
+      }
+    } catch (err) {
+      // 충돌 검사 실패 시에도 진행은 허용 (서버 측 최종 가드 존재)
+      console.warn("[Party Room Booking] 충돌 검사 실패:", err);
+    } finally {
+      setCheckingConflict(false);
+    }
+
+    setCurrentStep(3);
   };
 
   if (loading || adultCheckLoading) {
@@ -560,11 +595,11 @@ function PartyRoomBookingContent() {
                 이전
               </button>
               <button
-                onClick={() => setCurrentStep(3)}
-                disabled={!canProceedToStep3}
+                onClick={handleProceedToStep3}
+                disabled={!canProceedToStep3 || checkingConflict}
                 className="flex-1 rounded-xl bg-[#B98768] px-6 py-4 text-base font-bold text-white transition-all hover:bg-[#a9785c] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                다음 단계
+                {checkingConflict ? "확인 중..." : "다음 단계"}
               </button>
             </div>
           </div>

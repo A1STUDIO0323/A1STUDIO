@@ -406,7 +406,51 @@ function BookingContent() {
     }
   };
 
+  // 진행 전 선예약 충돌 확인 — 연습실/파티룸 어떤 예약이든 같은 시간대 선예약이 있으면 팝업 안내 후 중단
+  // (불필요한 결제·입력 진행을 미리 막음. 서버 측 최종 가드는 별도 존재)
+  const resolveCandidateTimes = (): { start: string; end: string } | null => {
+    if (selectedType === "room") {
+      if (roomMode === "hourly") {
+        if (!startTime || !endTime) return null;
+        return { start: startTime, end: endTime };
+      }
+      const pkg = STUDIO_PACKAGES[roomMode];
+      return { start: pkg.start, end: pkg.end };
+    }
+    if (!selectedPackage) return null;
+    const pkg = PARTY_ROOM_PACKAGES[selectedPackage];
+    return { start: pkg.start, end: pkg.end };
+  };
+
+  const hasPreBookingConflict = async (): Promise<boolean> => {
+    if (!selectedDate) return false;
+    const times = resolveCandidateTimes();
+    if (!times) return false;
+    try {
+      const res = await fetch("/api/reservations/check-conflict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: format(selectedDate, "yyyy-MM-dd"),
+          startTime: times.start,
+          endTime: times.end,
+        }),
+      });
+      const data = await res.json();
+      return !!data?.conflict;
+    } catch (err) {
+      // 검사 실패 시 진행 허용 (서버 측 최종 가드 존재)
+      console.warn("[Booking] 충돌 검사 실패:", err);
+      return false;
+    }
+  };
+
   const handleSubmit = async () => {
+    if (await hasPreBookingConflict()) {
+      alert("이미 해당 시간에는 예약이 있습니다.");
+      return;
+    }
+
     if (selectedType === "room" && paymentMethod === "kakaopay") {
       await handleKakaoPayReservation();
       return;

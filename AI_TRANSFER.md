@@ -49,7 +49,7 @@
 
 ### API 라우트 (`src/app/api/`)
 - **인증**: /auth/email-signup, /auth/callback, /auth/password-reset/{request,confirm}, /auth/sms/{send-code,verify-code}
-- **예약**: /reservations/{available,cancel,create}, /reservations/holds/expire, /reservations/payments/kakao/{ready,approve,cancel,fail}, **/reservations/status** (GET ?month=YYYY-MM, 읽기 전용 통합 조회 — 연습실/파티룸/장기대관)
+- **예약**: /reservations/{available,cancel,create}, /reservations/holds/expire, /reservations/payments/kakao/{ready,approve,cancel,fail}, **/reservations/status** (GET ?month=YYYY-MM, 읽기 전용 통합 조회 — 연습실/파티룸/장기대관), **/reservations/check-conflict** (POST {date,startTime,endTime}, 읽기 전용 선예약 충돌 사전 확인 — 두 테이블 교차검사, 예약 진행 전 팝업 안내용)
 - **결제**: /payments/kakao/{ready,approve}, /charge/{ready,approve}
 - **파티룸**: /party-room/reservations/{available,create,cancel}, /party-room/payments/kakao/{ready,approve,cancel,fail}
 - **장기대관**: **/long-term/apply** (POST, 고객용 공개 신청 — 어드민 인증 없음, `long_term_bookings`에 `status='REQUESTED'` 저장 + 관리자에게 SMS+이메일 알림)
