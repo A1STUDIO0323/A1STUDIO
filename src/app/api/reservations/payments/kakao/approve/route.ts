@@ -15,6 +15,7 @@ import {
   normalizePhoneNumber,
 } from "@/lib/phone-utils";
 import { getPaymentErrorMessage } from "@/lib/payment-errors";
+import { hasAnySpaceConflict } from "@/lib/space-availability";
 
 function timeToHHMM(value: unknown): string {
   if (value == null) return "";
@@ -152,6 +153,12 @@ export async function GET(request: NextRequest) {
 
     if (existingReservations && existingReservations.length > 0) {
       console.error("[연습실 카카오페이] 승인 후 예약 불가 — 시간대 중복");
+      throw new Error("이미 예약된 시간대입니다");
+    }
+
+    // 최종 가드: 두 테이블(연습실 reservations + 파티룸 party_reservations) 동시 충돌 검사
+    if (await hasAnySpaceConflict(supabase, { date, startTime, endTime })) {
+      console.error("[연습실 카카오페이] 승인 후 시간대 충돌(연습실/파티룸) — 예약 생성 중단");
       throw new Error("이미 예약된 시간대입니다");
     }
 

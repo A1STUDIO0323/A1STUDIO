@@ -10,6 +10,7 @@ import {
   getPaymentErrorMessage,
   type PaymentErrorReason,
 } from "@/lib/payment-errors";
+import { hasPracticeConflict } from "@/lib/space-availability";
 
 /**
  * 파티룸 예약 생성 (포인트 결제)
@@ -166,6 +167,26 @@ export async function POST(request: NextRequest) {
           error: getPaymentErrorMessage(reason),
           reason,
         },
+        { status: 409 }
+      );
+    }
+
+    // 3-1. 공유 공간 교차검사: 같은 시간대 연습실(reservations) 예약과 충돌 확인
+    if (
+      await hasPracticeConflict(supabase, {
+        date,
+        startTime: packageInfo.start,
+        endTime: packageInfo.end,
+        endDate: endDateStr,
+      })
+    ) {
+      console.warn("[Party Room Create] 연습실 예약과 시간 충돌:", {
+        date,
+        package_type,
+      });
+      const reason: PaymentErrorReason = "slot_already_booked";
+      return NextResponse.json(
+        { error: getPaymentErrorMessage(reason), reason },
         { status: 409 }
       );
     }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { readyPartyRoomPayment } from "@/lib/kakaopay";
-import { calcPartyRoomPoints, PartyRoomPackage, PARTY_ROOM_MAX_HEADCOUNT } from "@/lib/pricing";
+import { calcPartyRoomPoints, PartyRoomPackage, PARTY_ROOM_MAX_HEADCOUNT, PARTY_ROOM_PACKAGES } from "@/lib/pricing";
+import { hasPracticeConflict } from "@/lib/space-availability";
 import { isAdult } from "@/lib/age-check";
 import { cookies } from "next/headers";
 import {
@@ -110,6 +111,37 @@ export async function POST(request: NextRequest) {
         },
         { status: 409 }
       );
+    }
+
+    // 3-1. 공유 공간 교차검사: 같은 시간대 연습실(reservations) 예약과 충돌 확인
+    {
+      const pkgInfo = PARTY_ROOM_PACKAGES[package_type as PartyRoomPackage];
+      const endDateObj = new Date(date);
+      if (package_type === "night" || package_type === "allday") {
+        endDateObj.setDate(endDateObj.getDate() + 1);
+      }
+      const endDateStr = endDateObj.toISOString().split("T")[0];
+      if (
+        pkgInfo &&
+        (await hasPracticeConflict(supabase, {
+          date,
+          startTime: pkgInfo.start,
+          endTime: pkgInfo.end,
+          endDate: endDateStr,
+        }))
+      ) {
+        console.warn("[파티룸 카카오 ready] 연습실 예약과 시간 충돌:", {
+          date,
+          package_type,
+        });
+        return NextResponse.json(
+          {
+            error: getPaymentErrorMessage("slot_already_booked"),
+            reason: "slot_already_booked" as const,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     await deleteExpiredPaymentLocksForUser(user.id, "reservation");

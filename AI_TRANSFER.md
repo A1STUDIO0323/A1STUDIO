@@ -230,6 +230,10 @@
   - `/api/reservations/available` 가 `reservation_type` 필터 없이 모든 예약을 반환하는 것은 **의도된 동작 (버그 아님)**
   - 중복 예약 체크도 `room_id` / `reservation_type` 분기 없이 같은 날짜·시간 충돌만 확인
   - 관리자 캘린더, 가용 시간 조회에서도 두 상품을 함께 표시
+- **두 테이블 교차검사** (`src/lib/space-availability.ts`): 예약은 `reservations`(연습실 + `/booking` 파티룸)와 `party_reservations`(`/party-room/booking`) **두 테이블**로 나뉘어 저장된다. 같은 물리 공간이므로 양쪽을 **반드시 교차검사**해야 한다.
+  - `hasPracticeConflict` / `hasPartyConflict`: 후보 예약이 상대 테이블 점유와 시간 겹침인지 확인. **자정 넘김(overnight) 인식**(나잇 19:00→익일 07:00 등), 상태값 **대소문자 혼용**(파티룸 카카오 승인은 소문자 `confirmed` 저장) 모두 처리.
+  - 적용 지점: 파티룸 `available`/`create`/`kakao ready`/`kakao approve` → 연습실 교차검사, 연습실 `available`/`create`/`kakao ready`/`kakao approve` → 파티룸 교차검사.
+  - 과거 버그: 두 테이블이 서로를 안 봐서, 연습실 `00:00~02:00` 예약이 있어도 전날 파티룸 나잇/올데이 패키지가 막히지 않고 이중 예약 가능했음.
 
 ### 10-5. 상세 에러/로그 메시지 필수
 

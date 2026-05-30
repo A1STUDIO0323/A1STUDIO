@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import {
+  fetchPracticeIntervals,
+  partyPackageInterval,
+  overlaps,
+} from "@/lib/space-availability";
 
 /**
  * 파티룸 예약 가능 날짜 조회
@@ -90,6 +95,27 @@ export async function GET(request: NextRequest) {
           }
           if (!unavailable.allday.includes(endDateStr)) {
             unavailable.allday.push(endDateStr);
+          }
+        }
+      }
+    }
+
+    // 교차검사: 같은 물리 공간의 연습실(reservations) 점유와 시간이 겹치는 날짜도 차단
+    // (연습실 00:00~02:00 예약이 전날 나잇/올데이 패키지와 겹치는 경우 등)
+    const practiceIntervals = await fetchPracticeIntervals(
+      supabase,
+      startDate,
+      endDate
+    );
+    if (practiceIntervals.length > 0) {
+      const lastDay = new Date(parseInt(year), parseInt(monthNum), 0).getDate();
+      for (let d = 1; d <= lastDay; d++) {
+        const dateStr = `${year}-${monthNum}-${String(d).padStart(2, "0")}`;
+        for (const pkg of ["day", "night", "allday"] as const) {
+          if (unavailable[pkg].includes(dateStr)) continue;
+          const candIv = partyPackageInterval(dateStr, pkg);
+          if (practiceIntervals.some((iv) => overlaps(iv, candIv))) {
+            unavailable[pkg].push(dateStr);
           }
         }
       }

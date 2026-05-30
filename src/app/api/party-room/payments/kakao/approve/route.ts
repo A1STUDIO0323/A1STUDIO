@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { formatPhoneNumber, isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone-utils";
 import { releasePaymentLock } from "@/lib/payment-lock";
 import { getPaymentErrorMessage } from "@/lib/payment-errors";
+import { hasAnySpaceConflict } from "@/lib/space-availability";
 
 function timeToHHMM(value: unknown): string {
   if (value == null) return "";
@@ -81,6 +82,23 @@ export async function GET(request: NextRequest) {
 
     const packageInfo = PARTY_ROOM_PACKAGES[packageType as keyof typeof PARTY_ROOM_PACKAGES];
     const durationHours = packageInfo.hours;
+
+    // 최종 가드: 두 테이블(연습실 reservations + 파티룸 party_reservations) 동시 충돌 검사.
+    // 결제는 이미 승인됨 → 충돌이면 INSERT를 막고 실패 처리하여 이중 예약 방지.
+    if (
+      await hasAnySpaceConflict(supabase, {
+        date,
+        startTime: packageInfo.start,
+        endTime: packageInfo.end,
+        endDate: endDateStr,
+      })
+    ) {
+      console.error(
+        "[파티룸 카카오 approve] 승인 후 시간대 충돌(연습실/파티룸) — 예약 생성 중단:",
+        { date, packageType }
+      );
+      throw new Error("이미 예약된 시간대입니다");
+    }
 
     // party_reservations INSERT
     const { data: reservation, error: insertError } = await supabase
