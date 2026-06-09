@@ -3,7 +3,44 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { getAdminClient } from '@/lib/supabase/admin';
 import type { User as SupabaseAuthUser } from '@supabase/supabase-js';
+
+/**
+ * 신규 가입 도중 거절된 사용자 정리:
+ *  - 카카오/구글 콜백에서 휴대폰 중복 등의 사유로 가입을 막을 때,
+ *    이미 생성된 auth.users + public.users 행이 "빈 프로필"로 남아
+ *    로그인 상태가 유지되는 문제를 막는다.
+ *  - service_role 로 새로 생성된 auth.users 를 삭제하고 세션도 종료한다.
+ */
+async function rejectNewSignup(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+  reason: string
+) {
+  console.warn(`[auth/callback] 신규 가입 거절 정리 시작 userId=${userId} reason=${reason}`);
+  try {
+    // 1) public.users 정리 — 트리거가 자동 생성했을 수 있으므로 본인 행만 삭제
+    await prisma.users.deleteMany({ where: { id: userId } }).catch((e) => {
+      console.error('[auth/callback] public.users 삭제 실패', e);
+    });
+    // 2) auth.users 정리 — service_role 필요
+    const admin = getAdminClient();
+    const { error: delErr } = await admin.auth.admin.deleteUser(userId);
+    if (delErr) {
+      console.error('[auth/callback] auth.users 삭제 실패', delErr);
+    }
+  } catch (e) {
+    console.error('[auth/callback] 가입 거절 정리 중 예외', e);
+  }
+  // 3) 현재 세션 종료 (쿠키 제거)
+  try {
+    await supabase.auth.signOut();
+  } catch (e) {
+    console.error('[auth/callback] signOut 실패', e);
+  }
+  console.warn(`[auth/callback] 신규 가입 거절 정리 완료 userId=${userId}`);
+}
 
 function prismaPayloadFromAuthUser(user: SupabaseAuthUser) {
   const email = (user.email ?? '').trim().toLowerCase() || null;
@@ -158,7 +195,12 @@ export async function GET(request: Request) {
             kakaoPhone,
             existingEmail: existingByPhone.email,
             newEmail: user.email,
+            newUserId: user.id,
           });
+
+          // 빈 프로필 + 로그인 상태로 남는 문제 방지:
+          // 방금 생성된 auth.users / public.users 행을 삭제하고 세션 종료
+          await rejectNewSignup(supabase, user.id, 'phone_duplicate');
 
           return NextResponse.redirect(
             new URL('/signup/error?reason=phone_duplicate', request.url)
