@@ -1,7 +1,17 @@
 # A1 STUDIO — AI 인계 문서
 
-마지막 갱신: 2026-05-13
+마지막 갱신: 2026-06-10
 원천: 현재 코드베이스 기준 스냅샷 + AI 작업 메모리. 의심되면 항상 코드를 우선합니다.
+
+## 최근 변경 사항 (2026-06-10)
+
+- **Supabase RLS 3단계 적용 완료** — `supabase/rls/` 의 SQL 3개 (legacy 토큰 deny-all → 사용자 데이터 본인-only → 공개/관리자). 적용 후 anon key 로 본인 외 데이터 노출 차단.
+- **`is_admin()` SECURITY DEFINER 헬퍼 추가** — `public.is_admin()` 으로 RLS 정책 내부에서 관리자 우회. `users.role='ADMIN'` 매칭.
+- **예약 충돌 검사 service_role 전환** — `src/lib/space-availability.ts` 의 fetchPracticeIntervals/fetchPartyIntervals 가 `getAdminClient()` 사용해 RLS 우회. 모든 사용자 예약을 보고 정확한 충돌 검사.
+- **`src/lib/supabase/admin.ts` 신규** — service-role 클라이언트 싱글톤. 서버 전용, 클라이언트 노출 절대 금지.
+- **카카오 콜백 phone_duplicate 정리 강화** — 휴대폰 중복 시 방금 생성된 auth.users + public.users 행 삭제 + 세션 종료 후 `/signup/error` 리다이렉트.
+- **자정 넘김 예약 지원** — `/booking` 연습실 시간제에서 익일 07:00까지 예약 가능. `reservations.end_date` (nullable date) 컬럼 신규. `calcHourlyMixed` 4번째 인자 `endsNextDay` 추가. mypage/complete 표시 "익일 HH:MM" 형식.
+- **예약 enum 케이스 분리** — `RESERVATION_STATUSES`(대문자 enum 전용) vs `PARTY_STATUSES`(text 컬럼 혼용) — 카카오 승인 시 lowercase 'confirmed' 호환.
 
 > **신규 문서 참조 (자동 홈페이지 제작 의뢰 처리)**:
 > - [docs/INTAKE_BUILD_RULES.md](docs/INTAKE_BUILD_RULES.md) — `/intake` 의뢰 받아 신규 홈페이지 자동 빌드 시 적용할 통합 절대지침

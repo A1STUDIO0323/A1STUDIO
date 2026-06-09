@@ -45,6 +45,8 @@ function BookingContent() {
   const [reservedSlots, setReservedSlots] = useState<{ start_time: string; end_time: string }[]>([]);
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
+  // 자정 넘김: 종료시간이 익일이면 true (예: 23:00~익일 02:00)
+  const [endsNextDay, setEndsNextDay] = useState<boolean>(false);
   const [selectedPackage, setSelectedPackage] = useState<PartyRoomPackage | null>(null);
   // 연습실 모드: 'hourly' | 'day' | 'night' | 'allday'
   const [roomMode, setRoomMode] = useState<'hourly' | StudioPackage>('hourly');
@@ -130,6 +132,7 @@ function BookingContent() {
     if (roomMode === 'hourly') {
       setStartTime("");
       setEndTime("");
+      setEndsNextDay(false);
     }
 
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -148,10 +151,12 @@ function BookingContent() {
     if (roomMode === 'hourly') {
       setStartTime("");
       setEndTime("");
+      setEndsNextDay(false);
     } else {
       const pkg = STUDIO_PACKAGES[roomMode];
       setStartTime(pkg.start);
       setEndTime(pkg.end);
+      setEndsNextDay(false); // 패키지는 항상 당일 종료
     }
   }, [selectedType, roomMode]);
 
@@ -171,12 +176,13 @@ function BookingContent() {
         setPriceInfo(null);
         return;
       }
-      const pricing = calcHourlyMixed(selectedDate, startTime, endTime);
+      const pricing = calcHourlyMixed(selectedDate, startTime, endTime, endsNextDay);
       const points = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
       setTotalPoints(points);
       setPriceInfo({
         kind: 'hourly',
         ...pricing,
+        endsNextDay,
         finalPrice: points,
       });
     } else {
@@ -194,7 +200,7 @@ function BookingContent() {
         finalPrice: points,
       });
     }
-  }, [selectedType, selectedDate, startTime, endTime, roomMode]);
+  }, [selectedType, selectedDate, startTime, endTime, endsNextDay, roomMode]);
 
   // 패키지 선택 시 요금 계산 (파티룸)
   useEffect(() => {
@@ -299,6 +305,10 @@ function BookingContent() {
         if (roomMode === 'hourly') {
           payload.start_time = startTime;
           payload.end_time = endTime;
+          // 자정 넘김 예약: end_date 를 익일로 명시 (서버는 nullable 처리)
+          if (endsNextDay) {
+            payload.end_date = format(addDays(selectedDate, 1), "yyyy-MM-dd");
+          }
         } else {
           const pkg = STUDIO_PACKAGES[roomMode];
           payload.start_time = pkg.start;
@@ -353,6 +363,9 @@ function BookingContent() {
       if (roomMode === 'hourly') {
         kakaoBody.startTime = startTime;
         kakaoBody.endTime = endTime;
+        if (endsNextDay) {
+          kakaoBody.endDate = format(addDays(selectedDate, 1), "yyyy-MM-dd");
+        }
       } else {
         const pkg = STUDIO_PACKAGES[roomMode];
         kakaoBody.startTime = pkg.start;
@@ -427,14 +440,19 @@ function BookingContent() {
     const times = resolveCandidateTimes();
     if (!times) return false;
     try {
+      // 자정 넘김: hourly 모드 + endsNextDay 일 때만 endDate 전달
+      const body: Record<string, unknown> = {
+        date: format(selectedDate, "yyyy-MM-dd"),
+        startTime: times.start,
+        endTime: times.end,
+      };
+      if (selectedType === "room" && roomMode === "hourly" && endsNextDay) {
+        body.endDate = format(addDays(selectedDate, 1), "yyyy-MM-dd");
+      }
       const res = await fetch("/api/reservations/check-conflict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: format(selectedDate, "yyyy-MM-dd"),
-          startTime: times.start,
-          endTime: times.end,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       return !!data?.conflict;
@@ -632,6 +650,7 @@ function BookingContent() {
                       onChange={(e) => {
                         setStartTime(e.target.value);
                         setEndTime("");
+                        setEndsNextDay(false);
                       }}
                       className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-[#3B342F] focus:border-[#B98768] focus:outline-none"
                     >
@@ -647,14 +666,30 @@ function BookingContent() {
                   <div>
                     <label className="block text-sm font-medium text-[#3B342F] mb-2">
                       종료 시간
+                      {endsNextDay && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-[#B98768]/15 px-2 py-0.5 text-xs font-semibold text-[#B98768]">
+                          익일
+                        </span>
+                      )}
                     </label>
                     <select
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
+                      // 자정 넘김 식별을 위해 익일 옵션은 "HH:00#next" 인코딩 사용
+                      value={endTime ? (endsNextDay ? `${endTime}#next` : endTime) : ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v.endsWith("#next")) {
+                          setEndTime(v.replace("#next", ""));
+                          setEndsNextDay(true);
+                        } else {
+                          setEndTime(v);
+                          setEndsNextDay(false);
+                        }
+                      }}
                       disabled={!startTime}
                       className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-4 py-3 text-[#3B342F] focus:border-[#B98768] focus:outline-none disabled:opacity-50"
                     >
                       <option value="">선택하세요</option>
+                      {/* 당일 종료 옵션 */}
                       {timeSlots
                         .filter((slot) => slot.time > startTime)
                         .map((slot) => (
@@ -662,6 +697,20 @@ function BookingContent() {
                             {slot.time} {slot.disabled ? "(예약됨 또는 지난 시간)" : ""}
                           </option>
                         ))}
+                      {/* 익일 종료 옵션: 시작 시간이 18:00 이상일 때만 노출 (07:00까지) */}
+                      {(() => {
+                        const startHour = startTime ? parseInt(startTime.split(":")[0], 10) : -1;
+                        if (startHour < 18) return null;
+                        return Array.from({ length: 8 }, (_, i) => {
+                          const hh = i.toString().padStart(2, "0");
+                          const value = `${hh}:00#next`;
+                          return (
+                            <option key={`next-${hh}`} value={value}>
+                              익일 {hh}:00
+                            </option>
+                          );
+                        });
+                      })()}
                     </select>
                   </div>
                 </div>
@@ -838,7 +887,9 @@ function BookingContent() {
                 <span className="text-[#6f655d]">이용 시간</span>
                 <span className="font-semibold text-[#3B342F]">
                   {selectedType === 'room' && roomMode === 'hourly' && (
-                    `${startTime} ~ ${endTime}`
+                    endsNextDay
+                      ? `${startTime} ~ 익일 ${endTime} (${priceInfo?.duration ?? 0}시간)`
+                      : `${startTime} ~ ${endTime}`
                   )}
                   {selectedType === 'room' && roomMode !== 'hourly' && (
                     `${STUDIO_PACKAGES[roomMode].label} (${STUDIO_PACKAGES[roomMode].start} ~ ${STUDIO_PACKAGES[roomMode].end})`

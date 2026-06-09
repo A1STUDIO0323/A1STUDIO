@@ -698,7 +698,11 @@ function MyPageContent() {
                         <div className="flex items-center gap-2 text-[#6f655d]">
                           <Clock className="w-4 h-4" />
                           <span>
-                            {reservation.start_time} ~ {reservation.end_time}
+                            {/* 자정 넘김 예약: end_date 가 date 보다 미래면 "익일" 표기 */}
+                            {reservation.start_time} ~
+                            {reservation.end_date && reservation.end_date > reservation.date
+                              ? ` 익일 ${reservation.end_time}`
+                              : ` ${reservation.end_time}`}
                             {reservation.duration_hours && ` (${reservation.duration_hours}시간)`}
                           </span>
                         </div>
@@ -850,7 +854,10 @@ function MyPageContent() {
               <p className="text-sm text-[#9b9189] mb-1">예약 날짜 및 시간</p>
               <p className="font-semibold text-[#3B342F] mb-3">
                 {format(new Date(selectedReservation.date), "yyyy년 M월 d일 (eee)", { locale: ko })}<br />
-                {selectedReservation.start_time} ~ {selectedReservation.end_time}
+                {selectedReservation.start_time} ~
+                {selectedReservation.end_date && selectedReservation.end_date > selectedReservation.date
+                  ? ` 익일 ${selectedReservation.end_time}`
+                  : ` ${selectedReservation.end_time}`}
               </p>
 
               {/* 환불 정책 안내 */}

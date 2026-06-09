@@ -25,6 +25,7 @@ function timeToHHMM(value: unknown): string {
 
 type PracticeReservationCookie = {
   date: string;
+  endDate?: string | null; // 자정 넘김 예약 종료 날짜 (없으면 당일 종료)
   startTime: string;
   endTime: string;
   totalAmount: number;
@@ -102,6 +103,9 @@ export async function GET(request: NextRequest) {
 
     const { date, guestName, guestPhone, packageType } = reservationData;
     let { startTime, endTime } = reservationData;
+    // 자정 넘김 예약: 쿠키에 저장된 endDate 가 date 보다 미래면 익일 종료
+    const endDate = reservationData.endDate ?? null;
+    const endsNextDay = !!(endDate && endDate > date);
 
     // 연습실 패키지: 시간 강제 (서버 신뢰값)
     if (packageType && ['day', 'night', 'allday'].includes(packageType)) {
@@ -112,6 +116,12 @@ export async function GET(request: NextRequest) {
 
     if (!date || !startTime || !endTime) {
       return NextResponse.redirect(new URL("/booking?failed=true", request.url));
+    }
+
+    if (endsNextDay) {
+      console.log("[연습실 카카오페이 approve] 자정 넘김 예약:", {
+        date, endDate, startTime, endTime,
+      });
     }
 
     await approvePayment({
@@ -127,7 +137,8 @@ export async function GET(request: NextRequest) {
       const pricing = calcStudioPackagePoints(reservationDate, packageType);
       totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
     } else {
-      const pricing = calcHourlyMixed(reservationDate, startTime, endTime);
+      // 자정 넘김 예약 정확 계산
+      const pricing = calcHourlyMixed(reservationDate, startTime, endTime, endsNextDay);
       totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
     }
 
@@ -157,7 +168,12 @@ export async function GET(request: NextRequest) {
     }
 
     // 최종 가드: 두 테이블(연습실 reservations + 파티룸 party_reservations) 동시 충돌 검사
-    if (await hasAnySpaceConflict({ date, startTime, endTime })) {
+    if (await hasAnySpaceConflict({
+      date,
+      startTime,
+      endTime,
+      endDate: endsNextDay ? endDate : null,
+    })) {
       console.error("[연습실 카카오페이] 승인 후 시간대 충돌(연습실/파티룸) — 예약 생성 중단");
       throw new Error("이미 예약된 시간대입니다");
     }
@@ -186,6 +202,10 @@ export async function GET(request: NextRequest) {
     };
     if (packageType) {
       insertPayload.package_type = packageType;
+    }
+    if (endsNextDay && endDate) {
+      // 자정 넘김 예약: 종료 날짜를 별도 컬럼에 저장 (nullable)
+      insertPayload.end_date = endDate;
     }
 
     const { data: reservation, error: insertError } = await supabase

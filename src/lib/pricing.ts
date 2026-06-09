@@ -260,7 +260,8 @@ export function calcPoints(
 export function calcHourlyMixed(
   date: Date,
   startTime: string,
-  endTime: string
+  endTime: string,
+  endsNextDay: boolean = false
 ): {
   originalPrice: number;
   eventPrice: number;
@@ -271,7 +272,12 @@ export function calcHourlyMixed(
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
   const startMin = sh * 60 + (sm || 0);
-  const endMin = eh * 60 + (em || 0);
+  // 자정 넘김 예약: 종료가 익일이면 endMin 에 1440 분(24시간) 추가
+  // 안전 가드: endsNextDay=false 인데 endMin <= startMin 이면 같은 의미로 처리
+  let endMin = eh * 60 + (em || 0);
+  if (endsNextDay || endMin <= startMin) {
+    endMin += 1440;
+  }
 
   const isEvent = isEventPeriod(date);
   let originalPrice = 0;
@@ -280,8 +286,10 @@ export function calcHourlyMixed(
 
   let cursor = startMin;
   while (cursor < endMin) {
-    const hour = Math.floor(cursor / 60);
-    const nextBoundary = (hour + 1) * 60;
+    const absoluteHour = Math.floor(cursor / 60);
+    // 자정 넘김 구간은 hour 가 24~30 이 될 수 있음 → 가격 분류는 (hour % 24) 기준
+    const hour = absoluteHour % 24;
+    const nextBoundary = (absoluteHour + 1) * 60;
     const segEnd = Math.min(nextBoundary, endMin);
     const segHours = (segEnd - cursor) / 60;
     const priceType = getPriceType(date, hour);

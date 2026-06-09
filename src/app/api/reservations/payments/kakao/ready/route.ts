@@ -49,11 +49,12 @@ export async function POST(request: NextRequest) {
     userId = user.id;
 
     const body = await request.json();
-    const { date, packageType } = body as {
+    const { date, packageType, endDate } = body as {
       date?: string;
       startTime?: string;
       endTime?: string;
       packageType?: StudioPackage;
+      endDate?: string | null; // 자정 넘김 예약 종료 날짜
     };
     let { startTime, endTime } = body as {
       startTime?: string;
@@ -65,6 +66,12 @@ export async function POST(request: NextRequest) {
       const pkg = STUDIO_PACKAGES[packageType];
       startTime = pkg.start;
       endTime = pkg.end;
+    }
+
+    // 자정 넘김 여부 판단: endDate 가 date 보다 미래면 익일 종료
+    const endsNextDay = !!(endDate && date && endDate > date);
+    if (endsNextDay) {
+      console.log("[연습실 카카오 ready] 자정 넘김 예약:", { date, endDate, startTime, endTime });
     }
 
     if (!date || !startTime || !endTime) {
@@ -105,10 +112,16 @@ export async function POST(request: NextRequest) {
 
     // 공유 공간 교차검사: 같은 시간대 파티룸(party_reservations) 예약과 충돌 확인
     if (
-      await hasPartyConflict({ date, startTime, endTime })
+      await hasPartyConflict({
+        date,
+        startTime,
+        endTime,
+        endDate: endsNextDay ? endDate : null,
+      })
     ) {
       console.warn("[연습실 카카오 ready] 파티룸 예약과 시간 충돌:", {
         date,
+        endDate,
         startTime,
         endTime,
       });
@@ -156,7 +169,8 @@ export async function POST(request: NextRequest) {
       const pricing = calcStudioPackagePoints(reservationDate, packageType);
       totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
     } else {
-      const pricing = calcHourlyMixed(reservationDate, startTime, endTime);
+      // 자정 넘김 예약은 endsNextDay=true 로 정확히 시간 가산
+      const pricing = calcHourlyMixed(reservationDate, startTime, endTime, endsNextDay);
       totalAmount = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
     }
 
@@ -210,7 +224,7 @@ export async function POST(request: NextRequest) {
 
     const itemName = packageType
       ? `A1 STUDIO 연습실 ${STUDIO_PACKAGES[packageType].label} (${date})`
-      : `A1 STUDIO 연습실 예약 (${date} ${startTime}~${endTime})`;
+      : `A1 STUDIO 연습실 예약 (${date} ${startTime}~${endsNextDay ? `익일 ${endTime}` : endTime})`;
 
     const kakaoResult = await readyPracticeRoomPayment({
       userId: user.id,
@@ -221,6 +235,8 @@ export async function POST(request: NextRequest) {
 
     const reservationPayload = {
       date,
+      // 자정 넘김 예약 — 승인 단계에서 reservation INSERT 시 end_date 컬럼에 저장
+      endDate: endsNextDay ? endDate ?? null : null,
       startTime,
       endTime,
       totalAmount,

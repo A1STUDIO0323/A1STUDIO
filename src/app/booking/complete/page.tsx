@@ -67,6 +67,11 @@ function BookingCompleteContent() {
     typeof reservation.end_time === "string"
       ? reservation.end_time.slice(0, 5)
       : String(reservation.end_time ?? "").slice(0, 5);
+  // 자정 넘김 예약 여부 (end_date 가 date 보다 미래일 때)
+  const endsNextDay =
+    typeof reservation.end_date === "string" &&
+    typeof reservation.date === "string" &&
+    reservation.end_date > reservation.date;
   const durationLabel =
     reservation.duration_hours != null
       ? `${reservation.duration_hours}시간`
@@ -109,7 +114,7 @@ function BookingCompleteContent() {
                 <div>
                   <p className="text-sm text-[#9b9189] mb-1">이용 시간</p>
                   <p className="font-semibold text-[#3B342F]">
-                    {startDisp} ~ {endDisp}
+                    {startDisp} ~ {endsNextDay ? `익일 ${endDisp}` : endDisp}
                     {durationLabel && (
                       <span className="text-sm text-[#9b9189] ml-2">
                         ({durationLabel})

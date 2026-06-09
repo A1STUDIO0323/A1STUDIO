@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       reservation_type = 'room',
       package_type, // 'day' | 'night' | 'allday' (연습실 패키지 또는 파티룸)
       headcount,
+      end_date, // 자정 넘김 예약 종료 날짜 (nullable)
     } = body;
     let { start_time, end_time } = body;
 
@@ -65,6 +66,15 @@ export async function POST(request: NextRequest) {
       const pkg = STUDIO_PACKAGES[package_type as StudioPackage];
       start_time = pkg.start;
       end_time = pkg.end;
+    }
+
+    // 자정 넘김 여부: end_date 가 date 보다 미래일 때만 인정 (연습실 시간제 한정)
+    const endsNextDay =
+      reservation_type === 'room' &&
+      !package_type &&
+      !!(end_date && date && end_date > date);
+    if (endsNextDay) {
+      console.log("[예약 create] 자정 넘김 예약:", { date, end_date, start_time, end_time });
     }
 
     if (!date || !start_time || !end_time) {
@@ -173,9 +183,16 @@ export async function POST(request: NextRequest) {
 
     // 공유 공간 교차검사: 같은 시간대 파티룸(party_reservations) 예약과 충돌 확인
     if (
-      await hasPartyConflict({ date, startTime: start_time, endTime: end_time })
+      await hasPartyConflict({
+        date,
+        startTime: start_time,
+        endTime: end_time,
+        endDate: endsNextDay ? end_date : null,
+      })
     ) {
-      console.warn("[예약] 파티룸 예약과 시간 충돌:", { date, start_time, end_time });
+      console.warn("[예약] 파티룸 예약과 시간 충돌:", {
+        date, end_date, start_time, end_time,
+      });
       const reason: PaymentErrorReason = "slot_already_booked";
       return NextResponse.json(
         { error: getPaymentErrorMessage(reason), reason },
@@ -203,9 +220,9 @@ export async function POST(request: NextRequest) {
       priceType = pricing.dayType;
       duration = STUDIO_PACKAGES[package_type as StudioPackage].hours;
     } else {
-      // 연습실 시간제 (피크/비피크 경계 포함 정확 계산)
+      // 연습실 시간제 (피크/비피크 경계 포함 정확 계산) + 자정 넘김 정확 계산
       const reservationDate = new Date(date);
-      const pricing = calcHourlyMixed(reservationDate, start_time, end_time);
+      const pricing = calcHourlyMixed(reservationDate, start_time, end_time, endsNextDay);
       pointsToUse = pricing.isEvent ? pricing.eventPrice : pricing.originalPrice;
       priceType = 'hourly_mixed';
       duration = pricing.duration;
@@ -278,6 +295,10 @@ export async function POST(request: NextRequest) {
     // 패키지 정보 저장 (파티룸 또는 연습실 패키지)
     if (package_type) {
       reservationData.package_type = package_type;
+    }
+    // 자정 넘김 예약 — 종료 날짜 저장 (nullable)
+    if (endsNextDay && end_date) {
+      reservationData.end_date = end_date;
     }
 
     const { data: reservation, error: insertError } = await supabase

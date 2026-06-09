@@ -111,9 +111,10 @@ export async function fetchPracticeIntervals(
   const supabase = getAdminClient();
   const lo = addDaysStr(fromDate, -1);
   const hi = addDaysStr(toDate, 1);
+  // end_date 도 함께 조회 — 자정 넘김 예약 정확 계산
   const { data, error } = await supabase
     .from("reservations")
-    .select("date, start_time, end_time, status")
+    .select("date, start_time, end_time, end_date, status")
     .gte("date", lo)
     .lte("date", hi)
     .in("status", RESERVATION_STATUSES);
@@ -125,7 +126,8 @@ export async function fetchPracticeIntervals(
     const iv = toInterval(
       String(r.date),
       String(r.start_time),
-      String(r.end_time)
+      String(r.end_time),
+      r.end_date ? String(r.end_date) : null
     );
     out.push({ source: "practice", ...iv });
   }
