@@ -138,7 +138,7 @@ model Reservation {
   guestPhone        String             @map("guest_phone")
   guestEmail        String?            @map("guest_email")
   date              String
-  endDate           String?            @map("end_date") @db.Date
+  endDate           DateTime?          @map("end_date") @db.Date
   startTime         String             @map("start_time")
   endTime           String             @map("end_time")
   headcount         Int                @default(1)
