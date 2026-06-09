@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       const endDateStr = endDateObj.toISOString().split("T")[0];
       if (
         pkgInfo &&
-        (await hasPracticeConflict(supabase, {
+        (await hasPracticeConflict({
           date,
           startTime: pkgInfo.start,
           endTime: pkgInfo.end,

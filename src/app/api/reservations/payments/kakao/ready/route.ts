@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     // 공유 공간 교차검사: 같은 시간대 파티룸(party_reservations) 예약과 충돌 확인
     if (
-      await hasPartyConflict(supabase, { date, startTime, endTime })
+      await hasPartyConflict({ date, startTime, endTime })
     ) {
       console.warn("[연습실 카카오 ready] 파티룸 예약과 시간 충돌:", {
         date,

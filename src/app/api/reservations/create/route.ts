@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     // 공유 공간 교차검사: 같은 시간대 파티룸(party_reservations) 예약과 충돌 확인
     if (
-      await hasPartyConflict(supabase, { date, startTime: start_time, endTime: end_time })
+      await hasPartyConflict({ date, startTime: start_time, endTime: end_time })
     ) {
       console.warn("[예약] 파티룸 예약과 시간 충돌:", { date, start_time, end_time });
       const reason: PaymentErrorReason = "slot_already_booked";

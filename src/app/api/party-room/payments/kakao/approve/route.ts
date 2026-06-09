@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
     // 최종 가드: 두 테이블(연습실 reservations + 파티룸 party_reservations) 동시 충돌 검사.
     // 결제는 이미 승인됨 → 충돌이면 INSERT를 막고 실패 처리하여 이중 예약 방지.
     if (
-      await hasAnySpaceConflict(supabase, {
+      await hasAnySpaceConflict({
         date,
         startTime: packageInfo.start,
         endTime: packageInfo.end,

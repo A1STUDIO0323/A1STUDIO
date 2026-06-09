@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     // 3-1. 공유 공간 교차검사: 같은 시간대 연습실(reservations) 예약과 충돌 확인
     if (
-      await hasPracticeConflict(supabase, {
+      await hasPracticeConflict({
         date,
         startTime: packageInfo.start,
         endTime: packageInfo.end,

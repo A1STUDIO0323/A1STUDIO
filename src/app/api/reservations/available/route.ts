@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const fmt = (relMin: number) =>
       `${String(Math.floor(relMin / 60)).padStart(2, "0")}:${String(relMin % 60).padStart(2, "0")}`;
 
-    const partyIntervals = await fetchPartyIntervals(supabase, dateStr, dateStr);
+    const partyIntervals = await fetchPartyIntervals(dateStr, dateStr);
     for (const iv of partyIntervals) {
       const s = Math.max(iv.startMin, dayStartMin);
       const e = Math.min(iv.endMin, dayEndMin);

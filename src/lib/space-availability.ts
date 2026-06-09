@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { getAdminClient } from "@/lib/supabase/admin";
 
 /**
  * 공유 공간(연습실 ↔ 파티룸) 교차 예약 충돌 검사 유틸
@@ -19,8 +19,12 @@ export type SpaceInterval = {
   endMin: number;
 };
 
-// PAID / HOLD / CONFIRMED — 대소문자 혼용 모두 포함
-const ACTIVE_STATUSES = [
+// reservations.status 는 Postgres ENUM(ReservationStatus) → 대문자 값만 허용.
+// 소문자를 .in() 에 넣으면 "invalid input value for enum" 으로 쿼리 전체가 실패하므로 분리한다.
+const RESERVATION_STATUSES = ["PAID", "HOLD", "CONFIRMED"];
+
+// party_reservations.status 는 일반 text 컬럼 → 카카오 승인이 소문자 'confirmed' 로 저장하므로 대소문자 모두 포함.
+const PARTY_STATUSES = [
   "PAID",
   "HOLD",
   "CONFIRMED",
@@ -101,10 +105,10 @@ export function partyPackageInterval(
 
 /** reservations(연습실 + /booking 파티룸) 점유 구간 — 범위 양끝 ±1일 패딩 */
 export async function fetchPracticeIntervals(
-  supabase: SupabaseClient,
   fromDate: string,
   toDate: string
 ): Promise<SpaceInterval[]> {
+  const supabase = getAdminClient();
   const lo = addDaysStr(fromDate, -1);
   const hi = addDaysStr(toDate, 1);
   const { data, error } = await supabase
@@ -112,7 +116,7 @@ export async function fetchPracticeIntervals(
     .select("date, start_time, end_time, status")
     .gte("date", lo)
     .lte("date", hi)
-    .in("status", ACTIVE_STATUSES);
+    .in("status", RESERVATION_STATUSES);
   if (error) throw new Error(`연습실 예약 조회 실패: ${error.message}`);
 
   const out: SpaceInterval[] = [];
@@ -130,10 +134,10 @@ export async function fetchPracticeIntervals(
 
 /** party_reservations 점유 구간 — 범위 양끝 ±1일 패딩 */
 export async function fetchPartyIntervals(
-  supabase: SupabaseClient,
   fromDate: string,
   toDate: string
 ): Promise<SpaceInterval[]> {
+  const supabase = getAdminClient();
   const lo = addDaysStr(fromDate, -1);
   const hi = addDaysStr(toDate, 1);
   const { data, error } = await supabase
@@ -141,7 +145,7 @@ export async function fetchPartyIntervals(
     .select("date, start_time, end_time, end_date, status")
     .gte("date", lo)
     .lte("date", hi)
-    .in("status", ACTIVE_STATUSES);
+    .in("status", PARTY_STATUSES);
   if (error) throw new Error(`파티룸 예약 조회 실패: ${error.message}`);
 
   const out: SpaceInterval[] = [];
@@ -163,7 +167,6 @@ export async function fetchPartyIntervals(
  * 파티룸 예약 라우트에서 호출 → 연습실 측 점유와의 교차검사.
  */
 export async function hasPracticeConflict(
-  supabase: SupabaseClient,
   candidate: {
     date: string;
     startTime: string;
@@ -178,7 +181,6 @@ export async function hasPracticeConflict(
     candidate.endDate ?? null
   );
   const intervals = await fetchPracticeIntervals(
-    supabase,
     candidate.date,
     candidate.endDate ?? candidate.date
   );
@@ -190,7 +192,6 @@ export async function hasPracticeConflict(
  * 연습실 예약 라우트에서 호출 → 파티룸 측 점유와의 교차검사.
  */
 export async function hasPartyConflict(
-  supabase: SupabaseClient,
   candidate: {
     date: string;
     startTime: string;
@@ -205,7 +206,6 @@ export async function hasPartyConflict(
     candidate.endDate ?? null
   );
   const intervals = await fetchPartyIntervals(
-    supabase,
     candidate.date,
     candidate.endDate ?? candidate.date
   );
@@ -217,7 +217,6 @@ export async function hasPartyConflict(
  * 결제 확정(approve) 직전 등 INSERT 직전 최종 가드용 — 같은 상품끼리 + 교차 충돌을 한 번에 검사.
  */
 export async function hasAnySpaceConflict(
-  supabase: SupabaseClient,
   candidate: {
     date: string;
     startTime: string;
@@ -234,8 +233,8 @@ export async function hasAnySpaceConflict(
   const from = candidate.date;
   const to = candidate.endDate ?? candidate.date;
   const [practice, party] = await Promise.all([
-    fetchPracticeIntervals(supabase, from, to),
-    fetchPartyIntervals(supabase, from, to),
+    fetchPracticeIntervals(from, to),
+    fetchPartyIntervals(from, to),
   ]);
   return [...practice, ...party].some((iv) => overlaps(iv, candIv));
 }

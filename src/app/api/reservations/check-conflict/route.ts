@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { hasAnySpaceConflict } from "@/lib/space-availability";
 
 /**
@@ -30,8 +29,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
-    const conflict = await hasAnySpaceConflict(supabase, {
+    const conflict = await hasAnySpaceConflict({
       date,
       startTime,
       endTime,
