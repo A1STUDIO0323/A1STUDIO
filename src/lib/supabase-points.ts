@@ -1,5 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
+import { getAdminClient } from "@/lib/supabase/admin";
+
+/**
+ * 포인트 RPC(use_points / charge_points / refund_points) 는 SECURITY DEFINER 로
+ * 임의의 user_id 를 인자로 받아 잔액을 조작한다. 일반 인증 사용자에게 EXECUTE 권한이
+ * 남아 있으면 다른 사용자 포인트를 차감할 수 있는 권한 상승 취약점이 되므로
+ * **반드시 service_role 클라이언트로만 호출**해야 한다.
+ *
+ * DB 레벨에서도 `REVOKE EXECUTE ... FROM anon, authenticated;` 를 적용해 이중 방어.
+ * 본 모듈은 서버 라우트(api/...)에서만 호출되며, 클라이언트로 노출되지 않는다.
+ */
+function getPointsRpcClient() {
+  return getAdminClient();
+}
 
 /**
  * 포인트 연산 결과
@@ -50,7 +64,8 @@ export async function deductPointsDB(params: {
   description: string;
   reservationId?: string;
 }): Promise<PointResult> {
-  const supabase = await createClient();
+  // ⚠️ 보안: SECURITY DEFINER RPC 는 반드시 service_role 클라이언트로만 호출
+  const supabase = getPointsRpcClient();
 
   if (params.points <= 0) {
     return {
@@ -150,7 +165,8 @@ export async function chargePointsDB(params: {
   bonusPoints?: number;
   description?: string;
 }): Promise<PointResult> {
-  const supabase = await createClient();
+  // ⚠️ 보안: SECURITY DEFINER RPC 는 반드시 service_role 클라이언트로만 호출
+  const supabase = getPointsRpcClient();
 
   if (params.points <= 0) {
     return {
@@ -211,7 +227,8 @@ export async function refundPointsDB(params: {
   /** 예약 미생성 시 환불 등 — RPC가 NULL 허용 시 생략 */
   reservationId?: string | null;
 }): Promise<PointResult> {
-  const supabase = await createClient();
+  // ⚠️ 보안: SECURITY DEFINER RPC 는 반드시 service_role 클라이언트로만 호출
+  const supabase = getPointsRpcClient();
 
   if (params.points <= 0) {
     return {
