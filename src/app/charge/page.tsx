@@ -71,6 +71,21 @@ export default function ChargePage() {
       const data = await response.json();
 
       if (!response.ok) {
+        // 진행 중인 결제 안내 — 남은 시간을 MM:SS 로 표시
+        if (
+          response.status === 409 &&
+          data?.reason === "payment_in_progress" &&
+          typeof data?.retryAfter === "number"
+        ) {
+          const sec = Math.max(1, Math.floor(data.retryAfter));
+          const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+          const ss = String(sec % 60).padStart(2, "0");
+          alert(
+            `결제 실패: 이미 진행 중인 결제가 있습니다. ${mm}:${ss} 후 다시 시도해주세요.`
+          );
+          setProcessingId(null);
+          return;
+        }
         throw new Error(data.error || "결제 준비에 실패했습니다");
       }
 

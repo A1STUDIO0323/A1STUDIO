@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { readyPayment } from "@/lib/kakaopay";
-import { acquirePaymentLock } from "@/lib/payment-lock";
+import {
+  acquirePaymentLock,
+  deleteExpiredPaymentLocksForUser,
+  getActivePaymentLocksForUser,
+} from "@/lib/payment-lock";
 import {
   getPaymentErrorMessage,
   reasonFromCaughtKakaoError,
@@ -52,12 +56,43 @@ export async function POST(request: NextRequest) {
 
     // 결제 중복 방지 락 획득
     const lockKey = `charge_${package_id}`;
-    const lockAcquired = await acquirePaymentLock(user.id, "charge", lockKey, 600); // 10분
-    
-    if (!lockAcquired) {
+    // 만료된 락 정리 후 활성 락 확인 — 사용자에게 정확한 남은 대기시간 안내
+    await deleteExpiredPaymentLocksForUser(user.id, "charge");
+    const activeLocks = await getActivePaymentLocksForUser(user.id, "charge");
+    if (activeLocks.length > 0) {
+      const nowMs = Date.now();
+      let minExpires = Infinity;
+      for (const row of activeLocks) {
+        const t = new Date(row.expires_at).getTime();
+        if (t < minExpires) minExpires = t;
+      }
+      const retryAfter = Math.max(1, Math.ceil((minExpires - nowMs) / 1000));
+      console.log("[충전 ready] 활성 락 존재, retryAfter:", retryAfter, "초");
       const reason: PaymentErrorReason = "payment_in_progress";
       return NextResponse.json(
-        { error: getPaymentErrorMessage(reason), reason },
+        { error: getPaymentErrorMessage(reason), reason, retryAfter },
+        { status: 409 }
+      );
+    }
+
+    const lockAcquired = await acquirePaymentLock(user.id, "charge", lockKey, 600); // 10분
+
+    if (!lockAcquired) {
+      // 위 활성 락 검사를 통과했는데도 락 획득 실패 → 동시성 경합. 한 번 더 확인 후 응답.
+      const again = await getActivePaymentLocksForUser(user.id, "charge");
+      let retryAfter: number | undefined;
+      if (again.length > 0) {
+        const nowMs = Date.now();
+        let minExpires = Infinity;
+        for (const row of again) {
+          const t = new Date(row.expires_at).getTime();
+          if (t < minExpires) minExpires = t;
+        }
+        retryAfter = Math.max(1, Math.ceil((minExpires - nowMs) / 1000));
+      }
+      const reason: PaymentErrorReason = "payment_in_progress";
+      return NextResponse.json(
+        { error: getPaymentErrorMessage(reason), reason, retryAfter },
         { status: 409 }
       );
     }
