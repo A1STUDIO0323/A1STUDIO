@@ -249,10 +249,13 @@ function PartyRoomBookingContent() {
 
       if (!response.ok) {
         if (response.status === 409 && typeof data.retryAfter === "number") {
-          const retryMinutes = Math.max(1, Math.ceil(data.retryAfter / 60));
+          // 남은 시간을 MM:SS 로 정확히 표기 (/charge 와 통일)
+          const sec = Math.max(1, Math.floor(data.retryAfter));
+          const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+          const ss = String(sec % 60).padStart(2, "0");
           alert(
             `이미 진행 중인 결제가 있습니다.\n\n` +
-              `약 ${retryMinutes}분 후 다시 시도해 주세요.\n` +
+              `${mm}:${ss} 후 다시 시도해 주세요.\n` +
               `(또는 페이지를 새로고침한 뒤 다시 시도해 주세요)`
           );
         } else {
