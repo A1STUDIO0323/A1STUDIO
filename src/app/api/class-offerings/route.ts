@@ -32,6 +32,9 @@ export async function GET(req: NextRequest) {
               display_name: true,
               profile_image: true,
               subjects: true,
+              bio: true,
+              career: true,
+              portfolio_url: true,
               is_public: true,
               is_active: true,
             },
@@ -43,6 +46,7 @@ export async function GET(req: NextRequest) {
   });
 
   // 잔여 정원 계산 + 비공개 CM 정보 마스킹
+  // bio/career/portfolio_url 은 모달 상세 표시용 — is_public 인 경우에만 노출
   const result = offerings.map((o) => ({
     id: o.id,
     type: o.type,
@@ -61,6 +65,9 @@ export async function GET(req: NextRequest) {
             display_name: o.cm.cm_profile.display_name,
             profile_image: o.cm.cm_profile.profile_image,
             subjects: o.cm.cm_profile.subjects,
+            bio: o.cm.cm_profile.bio,
+            career: o.cm.cm_profile.career,
+            portfolio_url: o.cm.cm_profile.portfolio_url,
           }
         : null,
   }));
