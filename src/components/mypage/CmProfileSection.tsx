@@ -50,6 +50,7 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
   // 파일 업로드 진행/에러 상태 (DB 저장과 별개로 즉시 업로드)
   const [imageUploading, setImageUploading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [portfolioUrl, setPortfolioUrl] = useState("");
   const [isPublic, setIsPublic] = useState(false);
@@ -145,6 +146,26 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
     setProfileImage("");
     setImageError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // 드래그앤드롭 핸들러 — 빈 상태 dropzone 과 미리보기 상태 모두에서 사용
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (imageUploading) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    void handleImageFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!imageUploading) setDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
   };
 
   const handleSave = async () => {
@@ -338,9 +359,16 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
 
         <Field label="프로필 이미지">
           <div className="space-y-3">
-            {/* 미리보기 + 제거 버튼 */}
+            {/* 미리보기 + 제거 버튼 — 미리보기 영역에도 드래그앤드롭으로 교체 가능 */}
             {profileImage ? (
-              <div className="flex items-center gap-4">
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={`flex items-center gap-4 rounded-lg p-2 transition-colors ${
+                  dragOver ? "bg-[#B98768]/10 ring-2 ring-[#B98768]" : ""
+                }`}
+              >
                 <div className="relative h-20 w-20 overflow-hidden rounded-full border border-[#D8CCBC] bg-[#F7F3EB]">
                   {/* next/image 가 외부 도메인을 모를 수 있어 unoptimized 로 안전 처리 */}
                   <Image
@@ -371,6 +399,7 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
                     <X className="w-3.5 h-3.5" />
                     제거
                   </button>
+                  <span className="text-[10px] text-[#9b9189]">또는 파일을 끌어놓아 교체</span>
                 </div>
               </div>
             ) : (
@@ -378,17 +407,29 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={imageUploading}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[#D8CCBC] bg-[#F7F3EB] px-4 py-6 text-sm font-semibold text-[#6f655d] hover:border-[#B98768] hover:text-[#B98768] disabled:opacity-50"
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-sm font-semibold transition-colors disabled:opacity-50 ${
+                  dragOver
+                    ? "border-[#B98768] bg-[#B98768]/10 text-[#B98768]"
+                    : "border-[#D8CCBC] bg-[#F7F3EB] text-[#6f655d] hover:border-[#B98768] hover:text-[#B98768]"
+                }`}
               >
                 {imageUploading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     업로드 중...
                   </>
+                ) : dragOver ? (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    여기에 놓으세요
+                  </>
                 ) : (
                   <>
                     <Upload className="w-4 h-4" />
-                    이미지 선택 (JPG/PNG/WEBP · 5MB 이하)
+                    이미지 선택 또는 끌어놓기 (JPG/PNG/WEBP · 5MB 이하)
                   </>
                 )}
               </button>
