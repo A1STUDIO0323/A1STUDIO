@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Loader2, Save, Eye, EyeOff, Award } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
+import { Loader2, Save, Eye, EyeOff, Award, Upload, X } from "lucide-react";
 import CmSettlementsView from "./CmSettlementsView";
+
+const LOG_PREFIX = "[CmProfileSection]";
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const SUBJECTS = [
   { id: "vocal",   label: "보컬" },
@@ -42,6 +47,10 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
   const [career, setCareer] = useState("");
   const [subjects, setSubjects] = useState<Set<string>>(new Set());
   const [profileImage, setProfileImage] = useState("");
+  // 파일 업로드 진행/에러 상태 (DB 저장과 별개로 즉시 업로드)
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [portfolioUrl, setPortfolioUrl] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   // Phase 2 — 노출 위치 독립 토글 (본문 카드 / CM 목록 페이지)
@@ -91,6 +100,51 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
       else next.add(id);
       return next;
     });
+  };
+
+  // 프로필 이미지 파일 업로드 — 선택 즉시 /api/cm/upload-profile-image 호출,
+  // 응답 URL 을 profileImage state 에 채우고 미리보기. DB 저장은 "저장하기" 버튼에서 처리.
+  const handleImageFile = async (file: File) => {
+    setImageError(null);
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setImageError("JPG / PNG / WEBP 형식만 업로드 가능합니다");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setImageError("파일 크기는 5MB 이하만 가능합니다");
+      return;
+    }
+    setImageUploading(true);
+    try {
+      console.log(`${LOG_PREFIX} upload start name=${file.name} size=${file.size}`);
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/cm/upload-profile-image", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.url) {
+        console.warn(`${LOG_PREFIX} upload failed`, data);
+        setImageError(data?.error ?? "업로드에 실패했습니다");
+        return;
+      }
+      console.log(`${LOG_PREFIX} upload success url=${data.url}`);
+      setProfileImage(data.url);
+    } catch (err) {
+      console.error(`${LOG_PREFIX} upload exception`, err);
+      setImageError("네트워크 오류로 업로드에 실패했습니다");
+    } finally {
+      setImageUploading(false);
+      // 같은 파일을 다시 선택해도 onChange 가 발화하도록 초기화
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleImageRemove = () => {
+    setProfileImage("");
+    setImageError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSave = async () => {
@@ -282,14 +336,97 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
           />
         </Field>
 
-        <Field label="프로필 이미지 URL">
-          <input
-            type="url"
-            value={profileImage}
-            onChange={(e) => setProfileImage(e.target.value)}
-            className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2 focus:border-[#B98768] focus:outline-none"
-            placeholder="https:// (선택)"
-          />
+        <Field label="프로필 이미지">
+          <div className="space-y-3">
+            {/* 미리보기 + 제거 버튼 */}
+            {profileImage ? (
+              <div className="flex items-center gap-4">
+                <div className="relative h-20 w-20 overflow-hidden rounded-full border border-[#D8CCBC] bg-[#F7F3EB]">
+                  {/* next/image 가 외부 도메인을 모를 수 있어 unoptimized 로 안전 처리 */}
+                  <Image
+                    src={profileImage}
+                    alt="CM 프로필 미리보기"
+                    fill
+                    sizes="80px"
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={imageUploading}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#D8CCBC] bg-white px-3 py-1.5 text-xs font-semibold text-[#3B342F] hover:border-[#B98768] disabled:opacity-50"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    다른 이미지로 변경
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleImageRemove}
+                    disabled={imageUploading}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#D8CCBC] bg-white px-3 py-1.5 text-xs font-semibold text-red-500 hover:border-red-300 disabled:opacity-50"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    제거
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={imageUploading}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[#D8CCBC] bg-[#F7F3EB] px-4 py-6 text-sm font-semibold text-[#6f655d] hover:border-[#B98768] hover:text-[#B98768] disabled:opacity-50"
+              >
+                {imageUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    업로드 중...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    이미지 선택 (JPG/PNG/WEBP · 5MB 이하)
+                  </>
+                )}
+              </button>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleImageFile(f);
+              }}
+            />
+
+            {imageError && (
+              <p className="text-xs text-red-600">{imageError}</p>
+            )}
+
+            {/* URL 직접 입력도 허용 — 외부 호스팅 사용 시 */}
+            <details className="text-xs text-[#9b9189]">
+              <summary className="cursor-pointer hover:text-[#B98768]">
+                직접 URL 입력 (외부 호스팅 사용 시)
+              </summary>
+              <input
+                type="url"
+                value={profileImage}
+                onChange={(e) => setProfileImage(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2 text-sm focus:border-[#B98768] focus:outline-none"
+                placeholder="https://..."
+              />
+            </details>
+
+            <p className="text-xs text-[#9b9189]">
+              저장하기 버튼을 눌러야 공개 카드에 반영됩니다.
+            </p>
+          </div>
         </Field>
 
         <Field label="포트폴리오 URL">
