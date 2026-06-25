@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { Calendar, Clock, Users, User, Loader2, X } from "lucide-react";
+import { Calendar, Clock, Users, User, Loader2 } from "lucide-react";
+import ApplyModal from "./ApplyModal";
 
 const SUBJECT_LABELS: Record<string, string> = {
   vocal: "보컬", dance: "댄스", act: "연기", musical: "뮤지컬", etc: "기타",
@@ -126,9 +125,11 @@ function Group({
       <h2 className="text-lg font-bold text-[#3B342F] mb-4">{title}</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((o) => (
+          // 카드 전체 클릭 → 상세·신청 모달 오픈 (마감되어도 상세 열람은 가능)
           <article
             key={o.id}
-            className="flex flex-col rounded-2xl border border-[#D8CCBC] bg-white p-5"
+            onClick={() => onApply(o)}
+            className="flex flex-col rounded-2xl border border-[#D8CCBC] bg-white p-5 cursor-pointer transition-colors hover:border-[#B98768]/60 hover:bg-[#F7F3EB]"
           >
             <div className="flex items-start justify-between gap-2 mb-2">
               <h3 className="font-bold text-[#3B342F] line-clamp-2">{o.title}</h3>
@@ -177,7 +178,11 @@ function Group({
                 {o.price_points.toLocaleString("ko-KR")}P
               </p>
               <button
-                onClick={() => onApply(o)}
+                onClick={(e) => {
+                  // 카드 onClick 과 중복 발화 방지
+                  e.stopPropagation();
+                  onApply(o);
+                }}
                 disabled={o.remaining <= 0}
                 className="rounded-lg bg-[#B98768] px-4 py-2 text-sm font-bold text-white hover:bg-[#a9785c] disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -191,170 +196,4 @@ function Group({
   );
 }
 
-function ApplyModal({
-  offering,
-  onClose,
-  onSuccess,
-}: {
-  offering: Offering;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [authed, setAuthed] = useState(false);
-  const [requestNote, setRequestNote] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pointBalance, setPointBalance] = useState<number | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setAuthed(!!user);
-      setAuthChecked(true);
-      if (user) {
-        supabase
-          .from("user_points")
-          .select("balance")
-          .eq("user_id", user.id)
-          .maybeSingle()
-          .then(({ data }) => setPointBalance(data?.balance ?? 0));
-      }
-    });
-  }, []);
-
-  const handleSubmit = async () => {
-    setError(null);
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/class-enrollments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          offering_id: offering.id,
-          request_note: requestNote,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "신청 실패");
-        return;
-      }
-      alert("신청이 완료되었습니다. 포인트가 임시 차감(HOLD)되었으며, 수업 완료 시 사용 확정됩니다.");
-      onSuccess();
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const insufficient =
-    pointBalance != null && pointBalance < offering.price_points;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-[#3B342F]">
-            {offering.type === "oneday" ? "원데이클래스" : "개인레슨"} 신청
-          </h2>
-          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-[#EFE7DA]">
-            <X className="w-5 h-5 text-[#6f655d]" />
-          </button>
-        </div>
-
-        <div className="mb-4 rounded-xl bg-[#F7F3EB] p-4 space-y-1 text-sm">
-          <p className="font-semibold text-[#3B342F]">{offering.title}</p>
-          <p className="text-xs text-[#6f655d]">
-            {offering.scheduled_at
-              ? new Date(offering.scheduled_at).toLocaleString("ko-KR")
-              : "일정 매칭 후 안내"} · {offering.duration_minutes}분
-          </p>
-          {offering.cm && (
-            <p className="text-xs text-[#6f655d]">CM {offering.cm.display_name}</p>
-          )}
-        </div>
-
-        {!authChecked ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="w-5 h-5 animate-spin text-[#B98768]" />
-          </div>
-        ) : !authed ? (
-          <>
-            <p className="text-sm text-[#6f655d] mb-4">
-              신청을 위해 로그인이 필요합니다.
-            </p>
-            <button
-              onClick={() => router.push(`/login?redirect=/one-day-class`)}
-              className="w-full rounded-xl bg-[#B98768] px-4 py-3 text-sm font-bold text-white hover:bg-[#a9785c]"
-            >
-              로그인
-            </button>
-          </>
-        ) : (
-          <>
-            {offering.type === "lesson" && (
-              <div className="mb-4">
-                <label className="block text-xs font-semibold text-[#3B342F] mb-1">
-                  희망 분야·일정·목표 (선택)
-                </label>
-                <textarea
-                  rows={3}
-                  value={requestNote}
-                  onChange={(e) => setRequestNote(e.target.value)}
-                  className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2 text-sm focus:border-[#B98768] focus:outline-none resize-none"
-                  placeholder="예) 평일 저녁 8시 이후 / 발성 기초부터 / 뮤지컬 오디션 준비 중"
-                />
-              </div>
-            )}
-
-            <div className="mb-4 rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] p-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-[#6f655d]">필요 포인트</span>
-                <span className="font-bold text-[#B98768]">
-                  {offering.price_points.toLocaleString("ko-KR")}P
-                </span>
-              </div>
-              {pointBalance != null && (
-                <div className="flex justify-between mt-1">
-                  <span className="text-[#6f655d]">보유 포인트</span>
-                  <span className="text-[#3B342F]">
-                    {pointBalance.toLocaleString("ko-KR")}P
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <p className="mb-4 text-xs text-[#9b9189] leading-relaxed">
-              · 신청 시 포인트가 임시 차감(HOLD)됩니다.<br />
-              · 수업 완료 시 사용 확정, 취소·환불 시 포인트가 복구됩니다.
-            </p>
-
-            {error && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-                {error}
-              </div>
-            )}
-
-            {insufficient ? (
-              <button
-                onClick={() => router.push("/charge")}
-                className="w-full rounded-xl bg-[#B98768] px-4 py-3 text-sm font-bold text-white hover:bg-[#a9785c]"
-              >
-                포인트 충전하기
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="w-full rounded-xl bg-[#B98768] px-4 py-3 text-sm font-bold text-white hover:bg-[#a9785c] disabled:opacity-50"
-              >
-                {submitting ? "신청 중..." : "신청 확정하기"}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+// ApplyModal 은 components/one-day-class/ApplyModal.tsx 로 분리 — announcements 페이지와 공유

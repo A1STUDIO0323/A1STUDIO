@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Trash2, Loader2, LogIn, ShieldAlert, Calendar, Clock, Users, Tag, CheckCircle2 } from "lucide-react";
 import { useSession, signIn } from "@/lib/auth-client";
 import { useMemberRole } from "@/lib/member-role";
 import { cn } from "@/lib/utils";
+import ApplyModal from "@/components/one-day-class/ApplyModal";
 
 // 클래스/레슨 공고 등록 페이지 — type별로 재사용
 // - CM 또는 ADMIN만 등록 가능
@@ -72,7 +72,6 @@ const COPY: Record<"oneday" | "lesson", Copy> = {
 };
 
 export default function AnnouncementsClient({ type }: Props) {
-  const router = useRouter();
   const { data: session, status: authStatus } = useSession();
   const { role, isCM, isAdmin } = useMemberRole(session?.user?.email);
 
@@ -81,6 +80,8 @@ export default function AnnouncementsClient({ type }: Props) {
   const [offerings, setOfferings] = useState<Offering[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // 카드 클릭 또는 "신청하기" 클릭 시 상세·신청 모달 오픈
+  const [openTarget, setOpenTarget] = useState<Offering | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -193,12 +194,24 @@ export default function AnnouncementsClient({ type }: Props) {
                   canDelete={isAdmin || (isCM && o.cm?.display_name === session?.user?.name)}
                   busy={busyId === o.id}
                   onDelete={() => handleDelete(o.id)}
-                  onApply={() => router.push(type === "oneday" ? "/one-day-class" : "/lessons")}
+                  onApply={() => setOpenTarget(o)}
                 />
               ))}
             </div>
           )}
         </section>
+
+        {/* 카드 클릭 / 신청하기 → 공용 상세·신청 모달 */}
+        {openTarget && (
+          <ApplyModal
+            offering={openTarget}
+            onClose={() => setOpenTarget(null)}
+            onSuccess={() => {
+              setOpenTarget(null);
+              void load();
+            }}
+          />
+        )}
 
         {/* 신청 위치 안내 */}
         <p className="mt-6 text-center text-[11px] text-[#9b9189]">
@@ -510,7 +523,11 @@ function OfferingCard({
     SUBJECT_OPTIONS.find((s) => s.value === offering.subject)?.label ?? offering.subject;
 
   return (
-    <article className="flex flex-col rounded-2xl border border-[#D8CCBC] bg-white p-5">
+    // 카드 어디든 클릭 → 상세·신청 모달
+    <article
+      onClick={onApply}
+      className="flex flex-col rounded-2xl border border-[#D8CCBC] bg-white p-5 cursor-pointer transition-colors hover:border-[#B98768]/60 hover:bg-[#F7F3EB]"
+    >
       <div className="mb-2 flex items-start justify-between gap-2">
         <h3 className="line-clamp-2 font-bold text-[#3B342F]">{offering.title}</h3>
         {subjectLabel && (
@@ -552,7 +569,11 @@ function OfferingCard({
         <div className="flex gap-1.5">
           {canDelete && (
             <button
-              onClick={onDelete}
+              onClick={(e) => {
+                // 카드 onClick 과 중복 발화 방지
+                e.stopPropagation();
+                onDelete();
+              }}
               disabled={busy}
               title="공고 삭제"
               className="rounded-lg border border-[#D8CCBC] p-2 text-[#9b9189] hover:border-red-300 hover:text-red-500 disabled:opacity-50"
@@ -561,7 +582,11 @@ function OfferingCard({
             </button>
           )}
           <button
-            onClick={onApply}
+            onClick={(e) => {
+              // 카드 onClick 과 중복 발화 방지
+              e.stopPropagation();
+              onApply();
+            }}
             className="rounded-lg bg-[#B98768] px-4 py-2 text-sm font-bold text-white hover:bg-[#a9785c]"
           >
             신청하기
