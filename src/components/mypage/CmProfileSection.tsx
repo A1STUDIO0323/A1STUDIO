@@ -54,8 +54,9 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [portfolioUrl, setPortfolioUrl] = useState("");
   const [isPublic, setIsPublic] = useState(false);
-  // Phase 2 — 노출 위치 독립 토글 (본문 카드 / CM 목록 페이지)
-  const [showInSection, setShowInSection] = useState(true);
+  // 원데이클래스/개인레슨 본문 CM 카드는 항상 공개(비공개 토글 제거).
+  // CM 목록 페이지(/one-day-class/cm-list, /lessons/cm-list)만 사용자가 ON/OFF 가능.
+  const showInSection = true;
   const [showInList, setShowInList] = useState(true);
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -81,8 +82,8 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
         setProfileImage(p.profile_image ?? "");
         setPortfolioUrl(p.portfolio_url ?? "");
         setIsPublic(p.is_public);
-        // 마이그레이션 전(컬럼 미존재) — undefined 면 is_public 값으로 fallback
-        setShowInSection(p.show_in_section ?? p.is_public);
+        // show_in_section 은 항상 true 로 고정 (본문 노출 비공개 옵션 제거)
+        // show_in_list 만 사용자 토글 — undefined 면 is_public 으로 fallback
         setShowInList(p.show_in_list ?? p.is_public);
         setBankName(p.bank_name ?? "");
         setAccountNumber(p.account_number ?? "");
@@ -186,8 +187,9 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
           subjects: Array.from(subjects),
           profile_image: profileImage,
           portfolio_url: portfolioUrl,
-          is_public: showInSection || showInList,
-          show_in_section: showInSection,
+          // 본문 카드는 항상 공개 → is_public 도 항상 true
+          is_public: true,
+          show_in_section: true,
           show_in_list: showInList,
           bank_name: bankName,
           account_number: accountNumber,
@@ -238,7 +240,7 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
         )}
       </div>
 
-      {/* 공개 노출 토글 — 노출 위치별 독립 제어 (Phase 2) */}
+      {/* 공개 노출 설정 — CM 목록 페이지만 ON/OFF 가능. 본문 CM 카드는 항상 공개. */}
       <div className="rounded-2xl border border-[#D8CCBC] bg-white p-5 space-y-4">
         <div>
           <p className="font-semibold text-[#3B342F] flex items-center gap-2">
@@ -246,40 +248,14 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
             공개 노출 설정
           </p>
           <p className="text-xs text-[#6f655d] mt-0.5">
-            노출 위치를 개별 ON/OFF 할 수 있습니다. 둘 다 OFF 면 어디에도 노출되지 않습니다.
+            원데이클래스/개인레슨 본문의 CM 카드는 <strong>항상 공개</strong>됩니다.
+            아래 항목만 개별 ON/OFF 할 수 있습니다.
           </p>
         </div>
 
-        {/* 토글 1: 본문 자동 카드 */}
-        <div className="flex items-center justify-between rounded-xl border border-[#EFE7DA] bg-[#F7F3EB]/60 p-3">
-          <div className="min-w-0 pr-3">
-            <p className="text-sm font-semibold text-[#3B342F] flex items-center gap-2">
-              {showInSection ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-              원데이클래스/개인레슨 본문에 CM 카드 자동 노출
-            </p>
-            <p className="text-xs text-[#9b9189] mt-0.5">
-              /one-day-class, /lessons 메인 페이지 하단의 CM 카드 섹션
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowInSection((v) => !v)}
-            aria-label="본문 카드 노출 토글"
-            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-              showInSection ? "bg-[#B98768]" : "bg-[#D8CCBC]"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition-transform ${
-                showInSection ? "translate-x-5" : "translate-x-0.5"
-              }`}
-            />
-          </button>
-        </div>
-
-        {/* 토글 2: CM 목록 페이지 노출 */}
-        <div className="flex items-center justify-between rounded-xl border border-[#EFE7DA] bg-[#F7F3EB]/60 p-3">
-          <div className="min-w-0 pr-3">
+        {/* CM 목록 페이지 노출 토글 */}
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-[#EFE7DA] bg-[#F7F3EB]/60 p-3">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-[#3B342F] flex items-center gap-2">
               {showInList ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
               CM 목록 페이지 공개 노출
@@ -290,14 +266,16 @@ export default function CmProfileSection({ onLoaded }: { onLoaded?: (hasCm: bool
           </div>
           <button
             type="button"
-            onClick={() => setShowInList((v) => !v)}
+            role="switch"
+            aria-checked={showInList}
             aria-label="CM 목록 노출 토글"
-            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+            onClick={() => setShowInList((v) => !v)}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#B98768] focus:ring-offset-2 ${
               showInList ? "bg-[#B98768]" : "bg-[#D8CCBC]"
             }`}
           >
             <span
-              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition-transform ${
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
                 showInList ? "translate-x-5" : "translate-x-0.5"
               }`}
             />
