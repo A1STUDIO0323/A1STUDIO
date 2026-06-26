@@ -18,6 +18,8 @@ function serializeProfile(row: users) {
     phone: r.phone,
     phoneVerified: r.phone_verified,
     marketingAgreed: r.marketing_agreed,
+    privacyAgreed: r.privacy_agreed,
+    termsAgreed: r.terms_agreed,
     createdAt: r.created_at.toISOString(),
     updatedAt: r.updated_at.toISOString(),
   };

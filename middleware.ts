@@ -46,6 +46,8 @@ const LOW_SECURITY_PATHS = [
   "/guide", // 이용안내 - 이용수칙·FAQ
   "/location", // 오시는길
   "/contact", // 문의
+  "/notices", // 게시판 - 공지·이벤트 (열람 공개)
+  "/reviews", // 게시판 - 후기 (열람 공개)
   "/events", // 오픈이벤트 안내
   "/availability", // 예약가능 시간 열람
   "/privacy", // 개인정보처리방침
@@ -67,6 +69,8 @@ const PUBLIC_PATHS = [
   "/events",
   "/contact",
   "/location",
+  "/notices",
+  "/reviews",
   "/availability",
   "/privacy",
   "/terms",

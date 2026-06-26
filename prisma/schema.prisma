@@ -474,6 +474,9 @@ model users {
   phone            String?   @unique(map: "profiles_phone_key")
   phone_verified   Boolean   @default(false)
   marketing_agreed Boolean   @default(false)
+  privacy_agreed   Boolean   @default(false) // 개인정보 수집·이용 동의(필수)
+  terms_agreed     Boolean   @default(false) // 서비스 이용약관 동의(필수)
+  terms_agreed_at  DateTime? // 필수약관 동의 시각
   nickname         String?
   role             String    @default("MEMBER") // "MEMBER" | "CM" | "ADMIN" — 메모리 규칙: 자동 부여 없음, 관리자 UI에서만 수동 승격
   accounts         Account[]

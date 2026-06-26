@@ -58,8 +58,8 @@
   2. 페이지 내부 sessionStorage 비밀번호 인증(레거시) — Phase B-5에서 제거 예정
 
 ### 신원확인 게이트 (전화번호 인증 — `middleware.ts`)
-- **보안 낮은 경로(`LOW_SECURITY_PATHS`)**: 홈(`/`)·소개(`/about/*`)·`/equipment`·`/spaces`·이용안내(`/pricing`,`/guide`)·`/location`·`/contact`·`/events`·`/availability`·`/privacy`·`/terms`. 로그인/전화번호 인증 없이 누구나 열람 가능(비로그인은 `PUBLIC_PATHS`로도 허용).
-- **신원확인 필요 경로(그 외 전부)**: 예약하기(`/booking`,`/party-room`,`/reservations`,`/long-term`)·원데이클래스(`/one-day-class`)·개인레슨(`/lessons`)·게시판(`/board`,`/notices`,`/reviews`)·`/mypage`·`/charge`·`/dashboard` 등. 로그인 사용자가 진입 시 프로필 미완성→`/onboarding/profile`, 전화번호 미인증→`/onboarding/phone` 강제 리다이렉트(카카오 사용자는 자동완성으로 스킵). 비로그인은 `/login?next=...`.
+- **보안 낮은 경로(`LOW_SECURITY_PATHS`)**: 홈(`/`)·소개(`/about/*`)·`/equipment`·`/spaces`·이용안내(`/pricing`,`/guide`)·`/location`·`/contact`·공지·이벤트(`/notices`)·후기(`/reviews`)·`/events`·`/availability`·`/privacy`·`/terms`. 로그인/전화번호 인증 없이 누구나 열람 가능(비로그인은 `PUBLIC_PATHS`로도 허용). ※ 게시판이지만 `/notices`·`/reviews`는 열람 공개.
+- **신원확인 필요 경로(그 외 전부)**: 예약하기(`/booking`,`/party-room`,`/reservations`,`/long-term`)·원데이클래스(`/one-day-class`)·개인레슨(`/lessons`)·게시판 글쓰기·자유게시판(`/board`)·`/mypage`·`/charge`·`/dashboard` 등. 로그인 사용자가 진입 시 프로필 미완성→`/onboarding/profile`, 전화번호 미인증→`/onboarding/phone` 강제 리다이렉트(카카오 사용자는 자동완성으로 스킵). 비로그인은 `/login?next=...`.
 - **방식**: 보안 낮은 경로만 화이트리스트(`LOW_SECURITY_PATHS`)로 열고 나머지는 기본 인증 강제 → 분류 누락 시 더 안전한 쪽(인증 강제)으로 동작.
 
 ### API 라우트 (`src/app/api/`)

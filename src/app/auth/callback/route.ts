@@ -69,6 +69,93 @@ function sanitizePostAuthRedirect(next: string | null): string {
   return '/';
 }
 
+const SIGNUP_CONSENT_COOKIE = 'a1_signup_consent';
+
+/**
+ * 약관 동의 게이트.
+ *  - 회원가입 페이지에서 약관에 동의하면 OAuth 직전에 `a1_signup_consent` 쿠키에
+ *    동의 내용을 담아 보낸다. 콜백에서 이 쿠키를 읽어 DB에 영구 저장한다.
+ *  - 쿠키가 없고 DB에도 필수약관 동의 기록이 없으면 = 약관 동의를 거치지 않은
+ *    신규 사용자(로그인 버튼으로 우회)로 보고, 회원가입 페이지(`/signup?needConsent=1`)로
+ *    유도한다. 세션은 유지한 채 약관 동의만 추가로 받는다.
+ *  - 반환값: { redirect } 가 있으면 호출부에서 즉시 그 경로로 리다이렉트해야 한다.
+ */
+async function resolveTermsConsent(
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+  user: SupabaseAuthUser
+): Promise<{ redirect?: string }> {
+  const raw = cookieStore.get(SIGNUP_CONSENT_COOKIE)?.value;
+
+  // 1) 회원가입 페이지에서 보낸 동의 쿠키 처리
+  if (raw) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(raw)) as {
+        privacy?: boolean;
+        terms?: boolean;
+        marketing?: boolean;
+      };
+
+      if (parsed?.privacy === true && parsed?.terms === true) {
+        const marketing = parsed.marketing === true;
+        await prisma.users.upsert({
+          where: { id: user.id },
+          create: {
+            id: user.id,
+            email: user.email ?? null,
+            provider: user.app_metadata?.provider ?? null,
+            privacy_agreed: true,
+            terms_agreed: true,
+            marketing_agreed: marketing,
+            terms_agreed_at: new Date(),
+            updated_at: new Date(),
+          },
+          update: {
+            privacy_agreed: true,
+            terms_agreed: true,
+            marketing_agreed: marketing,
+            terms_agreed_at: new Date(),
+            updated_at: new Date(),
+          },
+        });
+        // 쿠키 폐기
+        cookieStore.set(SIGNUP_CONSENT_COOKIE, '', { maxAge: 0, path: '/' });
+        console.log('[auth/callback] 약관 동의 저장 완료(쿠키)', {
+          userId: user.id,
+          marketing,
+        });
+        return {};
+      }
+
+      console.warn('[auth/callback] 동의 쿠키에 필수약관 동의가 없음', {
+        userId: user.id,
+      });
+    } catch (e) {
+      console.error('[auth/callback] 동의 쿠키 파싱 실패', e);
+    }
+  }
+
+  // 2) DB에 필수약관 동의 기록이 있는지 확인 (기존 회원은 백필로 true)
+  try {
+    const row = await prisma.users.findUnique({
+      where: { id: user.id },
+      select: { terms_agreed: true },
+    });
+    if (row?.terms_agreed) {
+      return {};
+    }
+  } catch (e) {
+    console.error('[auth/callback] 약관 동의 상태 조회 실패', e);
+    // 조회 실패 시에도 안전하게 약관 동의를 받도록 유도
+  }
+
+  // 3) 약관 미동의 신규 사용자 → 회원가입 약관 동의 페이지로 유도 (세션 유지)
+  console.warn('[auth/callback] 약관 미동의 신규 사용자 → /signup 유도', {
+    userId: user.id,
+    provider: user.app_metadata?.provider ?? null,
+  });
+  return { redirect: '/signup?needConsent=1' };
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
@@ -264,6 +351,12 @@ export async function GET(request: Request) {
         }
       }
 
+      // 약관 동의 게이트: 미동의 신규 사용자는 회원가입 약관 동의로 유도
+      const consentGate = await resolveTermsConsent(cookieStore, user);
+      if (consentGate.redirect) {
+        return NextResponse.redirect(new URL(consentGate.redirect, request.url));
+      }
+
       // 카카오: 저장 직후 프로필 다시 조회
       const profile = await prisma.users.findUnique({
         where: { id: user.id },
@@ -314,6 +407,12 @@ export async function GET(request: Request) {
   // 온보딩 플로우: 프로필 완성도에 따라 리다이렉트
   if (user?.id) {
     try {
+      // 약관 동의 게이트: 미동의 신규 사용자는 회원가입 약관 동의로 유도
+      const consentGate = await resolveTermsConsent(cookieStore, user);
+      if (consentGate.redirect) {
+        return NextResponse.redirect(new URL(consentGate.redirect, request.url));
+      }
+
       const profile = await prisma.users.findUnique({
         where: { id: user.id },
         select: { name: true, birth_year: true, phone: true, phone_verified: true },
