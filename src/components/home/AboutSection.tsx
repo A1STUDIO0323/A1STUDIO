@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import Image from "next/image";
 
 const careers = [
   { year: "2025", title: "슈가" },
@@ -92,13 +93,16 @@ export default function AboutSection() {
 
         <div className="mb-10 grid grid-cols-1 gap-8 sm:grid-cols-[200px_1fr]">
           {/* 대표 사진 */}
-          <div className="w-full max-w-[200px] self-start overflow-hidden rounded-xl border border-black/10 bg-[#f5f5f3] sm:max-w-none"
+          <div className="relative w-full max-w-[200px] self-start overflow-hidden rounded-xl border border-black/10 bg-[#f5f5f3] sm:max-w-none"
             style={{ aspectRatio: "3 / 4" }}
           >
-            <img
+            <Image
               src="/CEO.jpg"
               alt="A1STUDIO 대표"
-              className="h-full w-full object-cover object-center"
+              fill
+              quality={95}
+              sizes="(max-width: 640px) 100vw, 400px"
+              className="object-cover object-center"
             />
           </div>
 
