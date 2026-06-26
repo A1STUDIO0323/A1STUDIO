@@ -12,7 +12,8 @@ type NextStatus = (typeof VALID_NEXT_STATUS)[number];
  * APPROVED 처리 시 부수효과:
  *  1. cm_applications.status = APPROVED
  *  2. cm_profiles 자동 생성 (이미 있으면 유지)
- *  3. member_roles.role = 'CM' (email 기준)
+ *  3. users.role = 'CM' (계정 id 기준 — 권한의 진실)
+ *  4. member_roles.role = 'CM' (email 기준 — 레거시 호환용, 관리자 목록 표시)
  */
 export async function PATCH(
   req: NextRequest,
@@ -93,7 +94,14 @@ export async function PATCH(
       },
     });
 
-    // member_roles.role = 'CM' upsert (email 기준)
+    // users.role = 'CM' 동기화 (계정 id 기준 — 권한의 진실).
+    // 이미 ADMIN인 사용자는 강등하지 않도록 제외.
+    await tx.users.updateMany({
+      where: { id: application.user_id, role: { not: "ADMIN" } },
+      data: { role: "CM" },
+    });
+
+    // member_roles.role = 'CM' upsert (email 기준 — 레거시 호환/관리자 목록 표시용)
     await tx.memberRole.upsert({
       where: { email: application.user.email! },
       update: { role: "CM" },

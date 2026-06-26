@@ -5,6 +5,13 @@
 
 ## 최근 변경 사항 (2026-06-26)
 
+- **CM 권한 user.id 기준 일원화 (유령 CM 버그 수정)** — 과거엔 CM 권한이 이메일 기반 `member_roles` 테이블에 저장되고 역할 조회가 이메일로 폴백 → Supabase에서 계정 삭제 후 같은 이메일로 재가입하면 새 MEMBER 계정에 옛 CM이 복원되던 버그.
+  - **권한의 진실 = `users.role`(계정 id 기준)** 으로 통일. 이메일 폴백 제거: `/api/member-roles/role`(GET), `/api/admin/members`(목록) 모두 `users.role`만 사용.
+  - CM 신청 승인(`/api/admin/cm-applications/[id]`)이 이제 `users.role='CM'`도 동기화(ADMIN 제외). `cm_profiles`/`member_roles`는 기존대로 유지(레거시 호환·관리자 목록).
+  - 마이그레이션: **`supabase-migration-cm-role-unify.sql`** — `cm_profiles` 있는 계정 CM 백필 + `users.role=CM` 아닌 이메일의 레거시 `member_roles` CM 행 정리.
+  - 진단 스크립트: `prisma/scripts/diagnose-cm-roles.mjs` (읽기 전용, 어댑터+dotenv).
+  - 메모리 규칙(신규=MEMBER, 관리자 UI 수동 승격)과 일치. 관리자 승격 UI(`/api/admin/members/[id]/role`)는 기존대로 `users.role` 갱신.
+
 - **OAuth 신규 가입 약관 동의 게이트** — 로그인 버튼(`/login`)으로 들어온 신규 사용자도 필수 약관에 동의하도록 강제. 기준은 `users.terms_agreed` 컬럼.
   - 회원가입(`/signup`): 약관 체크 → OAuth 직전 동의 내용을 쿠키(`a1_signup_consent`, SameSite=Lax, 10분)에 담아 전송 → 콜백에서 DB 저장.
   - 로그인 우회 신규자: 콜백(`/auth/callback`)에서 쿠키 없음 + `terms_agreed=false` 감지 시 `/signup?needConsent=1` 로 유도(세션 유지). 회원가입 페이지가 로그인 상태를 감지해 "약관 동의 게이트" 모드로 전환, 동의 시 `/api/members/agree-terms` 호출 후 온보딩 진행.

@@ -61,10 +61,9 @@ export async function GET(req: NextRequest) {
 
     const userMembers = users.map((user) => {
         const email = (user.email ?? "").trim().toLowerCase();
-        // users.role(권한의 진실)을 우선, 미설정 시 legacy member_roles에서 백필
-        const role = user.role && user.role !== "MEMBER"
-          ? normalizeRole(user.role)
-          : legacyRoleMap.get(email) ?? "MEMBER";
+        // 권한의 진실은 계정(user.id) 기준 users.role 하나로 일원화.
+        // (이메일 기반 legacy member_roles 폴백 제거 — 재가입/계정삭제 시 유령 CM 방지)
+        const role = normalizeRole(user.role);
         return {
           id: user.id,
           email,
