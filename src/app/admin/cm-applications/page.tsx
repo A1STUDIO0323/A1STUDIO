@@ -161,8 +161,23 @@ export default function AdminCmApplicationsPage() {
               const isOpen = openId === app.id;
               return (
               <div key={app.id} className="rounded-2xl border border-[#D8CCBC] bg-white p-5">
-                {/* 컴팩트 헤더 (접힌 상태에서도 보임) */}
-                <div className="flex items-start justify-between gap-3 mb-3">
+                {/* 컴팩트 헤더 (접힌 상태에서도 보임) — 영역 전체 클릭으로 토글 */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setOpenId(isOpen ? null : app.id);
+                    setMemo(app.admin_memo ?? "");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setOpenId(isOpen ? null : app.id);
+                      setMemo(app.admin_memo ?? "");
+                    }
+                  }}
+                  className="flex items-start justify-between gap-3 mb-3 cursor-pointer rounded-lg -m-1 p-1 hover:bg-[#F7F3EB] transition-colors"
+                >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold shrink-0 ${STATUS_COLOR[app.status]}`}>
                       {STATUS_LABEL[app.status]}
@@ -176,15 +191,9 @@ export default function AdminCmApplicationsPage() {
                       </span>
                     )}
                   </div>
-                  <button
-                    onClick={() => {
-                      setOpenId(isOpen ? null : app.id);
-                      setMemo(app.admin_memo ?? "");
-                    }}
-                    className="shrink-0 text-xs text-[#B98768] hover:underline"
-                  >
+                  <span className="shrink-0 text-xs text-[#B98768]">
                     {isOpen ? "접기" : "상세"}
-                  </button>
+                  </span>
                 </div>
 
                 {isOpen && (
