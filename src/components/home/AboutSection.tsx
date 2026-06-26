@@ -91,16 +91,15 @@ export default function AboutSection() {
         </div>
 
         <div className="mb-10 grid grid-cols-1 gap-8 sm:grid-cols-[200px_1fr]">
-          {/* 사진 플레이스홀더 */}
-          <div className="flex w-full max-w-[200px] flex-col items-center justify-center gap-2 self-start rounded-xl border border-dashed border-[#ccc] bg-[#f5f5f3] sm:max-w-none"
+          {/* 대표 사진 */}
+          <div className="w-full max-w-[200px] self-start overflow-hidden rounded-xl border border-black/10 bg-[#f5f5f3] sm:max-w-none"
             style={{ aspectRatio: "3 / 4" }}
           >
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.2">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="12" cy="10" r="3" />
-              <path d="M6 21c0-3.314 2.686-6 6-6s6 2.686 6 6" />
-            </svg>
-            <span className="text-[11px] uppercase tracking-[2px] text-[#aaa]">대표 사진</span>
+            <img
+              src="/CEO.jpg"
+              alt="A1STUDIO 대표"
+              className="h-full w-full object-cover object-center"
+            />
           </div>
 
           {/* 텍스트 영역 */}

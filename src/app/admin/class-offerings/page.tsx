@@ -245,6 +245,15 @@ export default function AdminClassOfferingsPage() {
   );
 }
 
+// 저장 시 new Date(scheduledAt).toISOString() 로 로컬(KST) → UTC 변환해 보관하므로,
+// 수정 화면 로딩도 UTC 가 아닌 "로컬 시각" 으로 되돌려야 라운드트립이 대칭이 됨.
+// (UTC 그대로 표시하면 낮 12시가 오전 3시로 9시간 밀려 보임)
+function toLocalHourInput(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:00`;
+}
+
 function OfferingFormModal({
   offering,
   cms,
@@ -265,7 +274,7 @@ function OfferingFormModal({
   const [capacity, setCapacity] = useState(offering?.capacity ?? (offering?.type === "lesson" ? 1 : 8));
   const [pricePoints, setPricePoints] = useState(offering?.price_points ?? 20000);
   const [scheduledAt, setScheduledAt] = useState(
-    offering?.scheduled_at ? new Date(offering.scheduled_at).toISOString().slice(0, 16) : ""
+    offering?.scheduled_at ? toLocalHourInput(offering.scheduled_at) : ""
   );
   const [status, setStatus] = useState(offering?.status ?? "DRAFT");
   const [submitting, setSubmitting] = useState(false);
