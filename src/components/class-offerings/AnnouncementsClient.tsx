@@ -7,6 +7,7 @@ import { useSession, signIn } from "@/lib/auth-client";
 import { useMemberRole } from "@/lib/member-role";
 import { cn } from "@/lib/utils";
 import ApplyModal from "@/components/one-day-class/ApplyModal";
+import HourDateTimePicker from "@/components/class-offerings/HourDateTimePicker";
 
 // 클래스/레슨 공고 등록 페이지 — type별로 재사용
 // - CM 또는 ADMIN만 등록 가능
@@ -430,22 +431,9 @@ function CreateForm({
       </div>
 
       <Field label="예정 일시 (선택)" hint="시간 단위(정시)만 설정 가능 · 비워두면 '일정 매칭 예정'으로 표시">
-        <input
-          type="datetime-local"
-          // 정시 단위만 — step=3600s (브라우저가 분 휠을 숨기거나 비활성화)
-          step={3600}
+        <HourDateTimePicker
           value={scheduledAt}
-          // 안전 가드: 사용자가 직접 분을 입력하더라도 무조건 :00 으로 보정
-          onChange={(e) => {
-            const v = e.target.value; // "YYYY-MM-DDTHH:MM"
-            if (!v) {
-              setScheduledAt("");
-              return;
-            }
-            // 'YYYY-MM-DDTHH' 까지만 살리고 분은 00 으로 고정
-            const normalized = v.length >= 13 ? `${v.slice(0, 13)}:00` : v;
-            setScheduledAt(normalized);
-          }}
+          onChange={setScheduledAt}
           className="form-input"
         />
       </Field>

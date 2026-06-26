@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Plus, RefreshCw, Loader2, Edit, X, Users, CheckCircle2, XCircle, UserX } from "lucide-react";
 import { ADMIN_PASSWORD_SESSION_KEY, useAdmin } from "@/lib/admin-context";
 import { AdminGate } from "@/components/admin/AdminGate";
+import HourDateTimePicker from "@/components/class-offerings/HourDateTimePicker";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "초안",
@@ -434,10 +435,9 @@ function OfferingFormModal({
           </div>
 
           <Field label={type === "lesson" ? "예정일시 (선택, 매칭 후 지정 가능)" : "수업 일시"}>
-            <input
-              type="datetime-local"
+            <HourDateTimePicker
               value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
+              onChange={setScheduledAt}
               className="w-full rounded-lg border border-[#D8CCBC] bg-[#F7F3EB] px-3 py-2 focus:border-[#B98768] focus:outline-none"
             />
           </Field>
