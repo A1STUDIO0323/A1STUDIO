@@ -1,7 +1,15 @@
 # A1 STUDIO — AI 인계 문서
 
-마지막 갱신: 2026-06-10
+마지막 갱신: 2026-06-26
 원천: 현재 코드베이스 기준 스냅샷 + AI 작업 메모리. 의심되면 항상 코드를 우선합니다.
+
+## 최근 변경 사항 (2026-06-26)
+
+- **OAuth 신규 가입 약관 동의 게이트** — 로그인 버튼(`/login`)으로 들어온 신규 사용자도 필수 약관에 동의하도록 강제. 기준은 `users.terms_agreed` 컬럼.
+  - 회원가입(`/signup`): 약관 체크 → OAuth 직전 동의 내용을 쿠키(`a1_signup_consent`, SameSite=Lax, 10분)에 담아 전송 → 콜백에서 DB 저장.
+  - 로그인 우회 신규자: 콜백(`/auth/callback`)에서 쿠키 없음 + `terms_agreed=false` 감지 시 `/signup?needConsent=1` 로 유도(세션 유지). 회원가입 페이지가 로그인 상태를 감지해 "약관 동의 게이트" 모드로 전환, 동의 시 `/api/members/agree-terms` 호출 후 온보딩 진행.
+  - 신규 API: **`/api/members/agree-terms`** (POST) — 필수약관 동의 저장(privacy/terms=true, marketing 선택).
+  - 신규 컬럼: `users.privacy_agreed`, `users.terms_agreed`, `users.terms_agreed_at`. 적용 SQL: **`supabase-migration-terms-consent.sql`** (기존 회원 grandfather UPDATE 포함). ⚠️ 배포 전 이 SQL 먼저 실행 필요.
 
 ## 최근 변경 사항 (2026-06-10)
 
@@ -70,7 +78,8 @@
 - **장기대관**: **/long-term/apply** (POST, 고객용 공개 신청 — 어드민 인증 없음, `long_term_bookings`에 `status='REQUESTED'` 저장 + 관리자에게 SMS+이메일 알림)
 - **클래스/레슨 공고**: **/class-offerings** (GET 공개 — OPEN 상태 목록, POST CM/ADMIN 전용 — `class_offerings`에 즉시 OPEN 저장), **/class-offerings/[id]** (DELETE — CM은 본인 공고+신청자 0건일 때만, ADMIN은 제한 없음). 어드민 라우트(`/api/admin/class-offerings`)는 별도 유지
 - **게시판**: /board (CRUD), /board/[id], /board/[id]/{comments,like}, /board/categories
-- **회원**: /members/{profile,sync,withdraw}, /member-roles/role, /account/delete
+- **회원**: /members/{profile,sync,withdraw,agree-terms}, /member-roles/role, /account/delete
+  - **agree-terms** (POST): 로그인 우회 신규 가입자의 필수약관 동의 저장(privacy/terms=true, marketing 선택 → `users.terms_agreed` 등)
 - **인테이크**: /intake/submit (zod 검증 + Prisma 저장 + SendGrid 메일 + SolAPI/CoolSMS 알림)
 - **관리자**: /admin/{auth,board,dashboard,members,members/actions,reservations/calendar,reservations/cancel,reviews,intakes,intakes/[id],cm-applications,cm-applications/[id],cm-list,cm-settlements,cm-settlements/[id],class-offerings,class-offerings/[id],class-offerings/[id]/enrollments,class-enrollments/[id]}
 - **기타**: /lost-items, /notices, /events, /one-day-class, /find-account, /contact, /test/send-sms, /debug/*
