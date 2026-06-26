@@ -57,6 +57,11 @@
   1. `middleware.ts` — `/admin` 진입 시 Supabase 세션 + `users.role === "ADMIN"` 검증, 아니면 `/`로 리다이렉트
   2. 페이지 내부 sessionStorage 비밀번호 인증(레거시) — Phase B-5에서 제거 예정
 
+### 신원확인 게이트 (전화번호 인증 — `middleware.ts`)
+- **보안 낮은 경로(`LOW_SECURITY_PATHS`)**: 홈(`/`)·소개(`/about/*`)·`/equipment`·`/spaces`·이용안내(`/pricing`,`/guide`)·`/location`·`/contact`·`/events`·`/availability`·`/privacy`·`/terms`. 로그인/전화번호 인증 없이 누구나 열람 가능(비로그인은 `PUBLIC_PATHS`로도 허용).
+- **신원확인 필요 경로(그 외 전부)**: 예약하기(`/booking`,`/party-room`,`/reservations`,`/long-term`)·원데이클래스(`/one-day-class`)·개인레슨(`/lessons`)·게시판(`/board`,`/notices`,`/reviews`)·`/mypage`·`/charge`·`/dashboard` 등. 로그인 사용자가 진입 시 프로필 미완성→`/onboarding/profile`, 전화번호 미인증→`/onboarding/phone` 강제 리다이렉트(카카오 사용자는 자동완성으로 스킵). 비로그인은 `/login?next=...`.
+- **방식**: 보안 낮은 경로만 화이트리스트(`LOW_SECURITY_PATHS`)로 열고 나머지는 기본 인증 강제 → 분류 누락 시 더 안전한 쪽(인증 강제)으로 동작.
+
 ### API 라우트 (`src/app/api/`)
 - **인증**: /auth/email-signup, /auth/callback, /auth/password-reset/{request,confirm}, /auth/sms/{send-code,verify-code}
 - **예약**: /reservations/{available,cancel,create}, /reservations/holds/expire, /reservations/payments/kakao/{ready,approve,cancel,fail}, **/reservations/status** (GET ?month=YYYY-MM, 읽기 전용 통합 조회 — 연습실/파티룸/장기대관), **/reservations/check-conflict** (POST {date,startTime,endTime}, 읽기 전용 선예약 충돌 사전 확인 — 두 테이블 교차검사, 예약 진행 전 팝업 안내용)

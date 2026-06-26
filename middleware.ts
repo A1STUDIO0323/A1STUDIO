@@ -28,6 +28,30 @@ const ADMIN_PATHS = ["/admin"];
 const ONBOARDING_PATHS = ["/onboarding/profile", "/onboarding/phone"];
 const AUTH_ONLY_PATHS = ["/login", "/signup"];
 
+/**
+ * 보안이 낮은(신원확인 불필요) 메뉴 경로.
+ * 홈·소개·이용안내·오시는길·문의 등 단순 열람 페이지로,
+ * 로그인/전화번호 인증이 없어도 누구나 둘러볼 수 있다.
+ *
+ * ⚠️ 여기에 "없는" 경로는 기본적으로 신원확인(전화번호 인증)을 강제한다.
+ *    (예약하기·원데이클래스·개인레슨·게시판·마이페이지 등은 의도적으로 제외)
+ *    분류를 빠뜨려도 더 안전한(인증 강제) 쪽으로 동작하도록 화이트리스트 방식 사용.
+ */
+const LOW_SECURITY_PATHS = [
+  "/", // 홈
+  "/about", // 소개 (회사소개/대표소개/공간소개)
+  "/equipment", // 비품및시설 (소개 하위)
+  "/spaces", // 공간소개
+  "/pricing", // 이용안내 - 요금안내
+  "/guide", // 이용안내 - 이용수칙·FAQ
+  "/location", // 오시는길
+  "/contact", // 문의
+  "/events", // 오픈이벤트 안내
+  "/availability", // 예약가능 시간 열람
+  "/privacy", // 개인정보처리방침
+  "/terms", // 이용약관
+];
+
 // 비로그인 사용자에게 허용되는 공개 경로
 const PUBLIC_PATHS = [
   "/",
@@ -35,6 +59,7 @@ const PUBLIC_PATHS = [
   "/signup",
   "/forgot-password",
   "/reset-password",
+  "/about",
   "/spaces",
   "/equipment",
   "/pricing",
@@ -44,6 +69,7 @@ const PUBLIC_PATHS = [
   "/location",
   "/availability",
   "/privacy",
+  "/terms",
   "/auth",
   "/api",
 ];
@@ -126,62 +152,79 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // 3-2. 프로필 완성 여부 강제 검증 — 모든 경로에 적용 (옵션 B)
-  let profile: {
-    name?: string | null;
-    birthYear?: number | null;
-    phoneVerified?: boolean;
-    provider?: string | null;
-  } | null = null;
+  // 3-2. 신원확인 게이트 — 보안 낮은 메뉴는 미인증 상태여도 열람 허용,
+  //      그 외(예약하기·원데이클래스·개인레슨·게시판·마이페이지 등)는
+  //      클릭 즉시 프로필 완성 + 전화번호 인증을 강제한다.
+  const isLowSecurityPath = matchesPath(pathname, LOW_SECURITY_PATHS);
 
-  try {
-    const profileRes = await fetch(
-      new URL("/api/members/profile", request.url).toString(),
-      {
-        headers: {
-          cookie: request.headers.get("cookie") ?? "",
-        },
-      }
+  if (isLowSecurityPath) {
+    // 보안 낮은 경로 → 온보딩 게이트 스킵, 둘러보기 허용
+    console.log(
+      `${ONB_LOG_PREFIX} low-security path → skip identity gate userId=${user.id} path=${pathname}`
     );
+  } else {
+    // 신원확인 필요 경로 → 프로필/전화번호 인증 강제 검증
+    let profile: {
+      name?: string | null;
+      birthYear?: number | null;
+      phoneVerified?: boolean;
+      provider?: string | null;
+    } | null = null;
 
-    if (profileRes.ok) {
-      const data = await profileRes.json();
-      profile = data?.profile ?? null;
-    } else {
-      console.warn(
-        `${LOG_PREFIX} profile fetch failed status=${profileRes.status} userId=${user.id}`
+    try {
+      const profileRes = await fetch(
+        new URL("/api/members/profile", request.url).toString(),
+        {
+          headers: {
+            cookie: request.headers.get("cookie") ?? "",
+          },
+        }
       );
-    }
-  } catch (err) {
-    console.error(`${LOG_PREFIX} profile check error userId=${user.id}`, err);
-    // production: 안전상 /login 강제 (계속 진행 시 락 가능성)
-    if (process.env.NODE_ENV === "production") {
+
+      if (profileRes.ok) {
+        const data = await profileRes.json();
+        profile = data?.profile ?? null;
+      } else {
+        console.warn(
+          `${LOG_PREFIX} profile fetch failed status=${profileRes.status} userId=${user.id} path=${pathname}`
+        );
+      }
+    } catch (err) {
       console.error(
-        `${LOG_PREFIX} production: redirecting to /login due to profile error`
+        `${LOG_PREFIX} profile check error userId=${user.id} path=${pathname}`,
+        err
       );
-      return NextResponse.redirect(new URL("/login", request.url));
+      // production: 안전상 /login 강제 (계속 진행 시 락 가능성)
+      if (process.env.NODE_ENV === "production") {
+        console.error(
+          `${LOG_PREFIX} production: redirecting to /login due to profile error`
+        );
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+      // dev: 통과 (디버깅 편의)
+      console.warn(`${LOG_PREFIX} dev: allowing access despite profile error`);
     }
-    // dev: 통과 (디버깅 편의)
-    console.warn(`${LOG_PREFIX} dev: allowing access despite profile error`);
-  }
 
-  // 3-3. 카카오 사용자는 자동 완성 — 온보딩 강제 스킵
-  const skipOnboarding = profile?.provider === "kakao";
+    // 카카오 사용자는 자동 완성 — 온보딩 강제 스킵
+    const skipOnboarding = profile?.provider === "kakao";
 
-  if (!skipOnboarding) {
-    // 프로필 미완성 (이름/출생연도) → /onboarding/profile
-    if (!profile || !profile.name || !profile.birthYear) {
-      console.log(
-        `${ONB_LOG_PREFIX} forcing /onboarding/profile userId=${user.id} from=${pathname}`
-      );
-      return NextResponse.redirect(new URL("/onboarding/profile", request.url));
-    }
-    // 전화번호 미인증 → /onboarding/phone
-    if (!profile.phoneVerified) {
-      console.log(
-        `${ONB_LOG_PREFIX} forcing /onboarding/phone userId=${user.id} from=${pathname}`
-      );
-      return NextResponse.redirect(new URL("/onboarding/phone", request.url));
+    if (!skipOnboarding) {
+      // 프로필 미완성 (이름/출생연도) → /onboarding/profile
+      if (!profile || !profile.name || !profile.birthYear) {
+        console.log(
+          `${ONB_LOG_PREFIX} forcing /onboarding/profile userId=${user.id} from=${pathname}`
+        );
+        return NextResponse.redirect(
+          new URL("/onboarding/profile", request.url)
+        );
+      }
+      // 전화번호 미인증 → /onboarding/phone (신원확인 필요 메뉴 클릭 시점)
+      if (!profile.phoneVerified) {
+        console.log(
+          `${ONB_LOG_PREFIX} forcing /onboarding/phone userId=${user.id} from=${pathname}`
+        );
+        return NextResponse.redirect(new URL("/onboarding/phone", request.url));
+      }
     }
   }
 
