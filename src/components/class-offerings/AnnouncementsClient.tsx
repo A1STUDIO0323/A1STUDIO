@@ -299,6 +299,7 @@ function CreateForm({
   const [duration, setDuration] = useState(type === "oneday" ? 120 : 60);
   const [capacity, setCapacity] = useState(copy.capacityDefault);
   const [pricePoints, setPricePoints] = useState(0);
+  // "YYYY-MM-DDTHH:MM" — HourDateTimePicker 컴포넌트가 채움 (정시 단위)
   const [scheduledAt, setScheduledAt] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
