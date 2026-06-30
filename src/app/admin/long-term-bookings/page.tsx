@@ -7,6 +7,7 @@ import { AdminGate } from "@/components/admin/AdminGate";
 import { ADMIN_PASSWORD_SESSION_KEY, useAdmin } from "@/lib/admin-context";
 import { cn } from "@/lib/utils";
 import { calcHourlyMixed } from "@/lib/pricing";
+import { buildTimeGroups } from "@/lib/long-term-template";
 
 const STATUS_LABEL: Record<string, string> = {
   REQUESTED: "신청",
@@ -91,6 +92,7 @@ type FormState = {
   dayOfWeek: string;
   usageMonth: string;
   usageDatesText: string;
+  timeExceptionsText: string;
   startHour: string;
   endHour: string;
   spaceType: string;
@@ -111,6 +113,7 @@ const initialForm: FormState = {
   dayOfWeek: "",
   usageMonth: "",
   usageDatesText: "",
+  timeExceptionsText: "",
   startHour: "14",
   endHour: "18",
   spaceType: "연습실",
@@ -146,6 +149,35 @@ function parseDates(text: string): number[] {
     .filter(Boolean)
     .map((s) => parseInt(s.replace(/[^0-9]/g, ""), 10))
     .filter((n) => Number.isFinite(n) && n >= 1 && n <= 31);
+}
+
+type TimeOverride = { day: number; startHour: number; endHour: number };
+
+/**
+ * 예외 시간 입력 파싱
+ * - 한 줄에 하나, 또는 "/" 로 구분된 항목
+ * - 각 항목: "<날짜들> <시작>-<종료>"  예) "7,9 12-15", "8 13-16", "7일, 9일 12시~15시"
+ * - 같은 날짜가 여러 번 나오면 마지막 입력이 우선
+ */
+function parseTimeExceptions(text: string): TimeOverride[] {
+  const map = new Map<number, TimeOverride>();
+  const entries = text
+    .split(/[\n/]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const entry of entries) {
+    const timeMatch = entry.match(/(\d{1,2})\s*시?\s*[-~]\s*(\d{1,2})/);
+    if (!timeMatch) continue;
+    const startHour = parseInt(timeMatch[1], 10);
+    const endHour = parseInt(timeMatch[2], 10);
+    if (!Number.isFinite(startHour) || !Number.isFinite(endHour)) continue;
+    const daysPart = entry.slice(0, timeMatch.index).trim();
+    const days = parseDates(daysPart);
+    for (const day of days) {
+      map.set(day, { day, startHour, endHour });
+    }
+  }
+  return [...map.values()].sort((a, b) => a.day - b.day);
 }
 
 // 한국어 요일 문자열 → JS getDay() 인덱스 (일=0, 월=1, ..., 토=6)
@@ -200,12 +232,18 @@ function getLongTermDiscountPct(totalHours: number): number {
 }
 
 function formToBody(form: FormState) {
+  const timeOverrides = parseTimeExceptions(form.timeExceptionsText);
+  // 예외 시간 날짜가 이용 날짜에 빠져 있어도 자동 포함 (합집합)
+  const usageDates = Array.from(
+    new Set([...parseDates(form.usageDatesText), ...timeOverrides.map((o) => o.day)])
+  ).sort((a, b) => a - b);
   return {
     customerName: form.customerName.trim(),
     customerPhone: form.customerPhone.replace(/[^0-9]/g, ""),
     dayOfWeek: form.dayOfWeek.trim() || null,
     usageMonth: form.usageMonth.trim(),
-    usageDates: parseDates(form.usageDatesText),
+    usageDates,
+    timeOverrides,
     startHour: parseInt(form.startHour, 10),
     endHour: parseInt(form.endHour, 10),
     spaceType: form.spaceType.trim() || "연습실",
@@ -291,11 +329,14 @@ export default function LongTermBookingsAdminPage() {
       );
       if (!ok) return;
     }
+    // 예외 시간 날짜도 자동으로 합쳐 이용 날짜 누락 방지
+    const exceptionDays = parseTimeExceptions(form.timeExceptionsText).map((o) => o.day);
+    const merged = Array.from(new Set([...dates, ...exceptionDays])).sort((a, b) => a - b);
     // 요일 한글이 이용 날짜란에서 왔다면 dayOfWeek 필드로 자동 이동시켜 UX 일관성 확보
     const dayOfWeekLabels = ["일", "월", "화", "수", "목", "금", "토"];
     setForm({
       ...form,
-      usageDatesText: dates.join(", "),
+      usageDatesText: merged.join(", "),
       ...(movedFromDatesField && !form.dayOfWeek.trim()
         ? { dayOfWeek: weekdays.sort((a, b) => a - b).map((w) => dayOfWeekLabels[w]).join(", ") }
         : {}),
@@ -308,15 +349,25 @@ export default function LongTermBookingsAdminPage() {
       alert("이용월을 먼저 입력해주세요.");
       return;
     }
-    const dates = parseDates(form.usageDatesText);
-    if (dates.length === 0) {
-      alert("이용 날짜를 먼저 입력해주세요. (자동 채우기 활용 가능)");
-      return;
-    }
     const startH = parseInt(form.startHour, 10);
     const endH = parseInt(form.endHour, 10);
     if (!Number.isFinite(startH) || !Number.isFinite(endH) || endH <= startH) {
       alert("시작/종료 시간이 올바르지 않습니다.");
+      return;
+    }
+    // 예외 시간 파싱 + 유효성
+    const overrides = parseTimeExceptions(form.timeExceptionsText);
+    const badOverride = overrides.find((o) => o.endHour <= o.startHour);
+    if (badOverride) {
+      alert(`예외 시간이 올바르지 않습니다. (${badOverride.day}일: ${badOverride.startHour}-${badOverride.endHour})`);
+      return;
+    }
+    // 예외 시간 날짜를 포함한 전체 이용 날짜(합집합)
+    const dates = Array.from(
+      new Set([...parseDates(form.usageDatesText), ...overrides.map((o) => o.day)])
+    ).sort((a, b) => a - b);
+    if (dates.length === 0) {
+      alert("이용 날짜를 먼저 입력해주세요. (자동 채우기 활용 가능)");
       return;
     }
     const now = new Date();
@@ -333,15 +384,18 @@ export default function LongTermBookingsAdminPage() {
       return;
     }
 
-    const startTime = `${String(startH).padStart(2, "0")}:00`;
-    const endTime = `${String(endH).padStart(2, "0")}:00`;
-
+    const ovMap = new Map(overrides.map((o) => [o.day, o]));
     let totalOriginal = 0;
     let totalEvent = 0;
     let totalHours = 0;
     const breakdownSummary: Record<string, number> = {};
 
     for (const day of dates) {
+      const ov = ovMap.get(day);
+      const sH = ov ? ov.startHour : startH;
+      const eH = ov ? ov.endHour : endH;
+      const startTime = `${String(sH).padStart(2, "0")}:00`;
+      const endTime = `${String(eH).padStart(2, "0")}:00`;
       const date = new Date(year, monthNum - 1, day);
       const r = calcHourlyMixed(date, startTime, endTime);
       totalOriginal += r.originalPrice;
@@ -364,14 +418,16 @@ export default function LongTermBookingsAdminPage() {
     const breakdownText = Object.entries(breakdownSummary)
       .map(([k, v]) => `  • ${k}: ${v}시간`)
       .join("\n");
+    const { label: groupsLabel, mixed } = buildTimeGroups(dates, startH, endH, overrides);
     const ok = confirm(
       `계산 결과를 폼에 반영할까요?\n\n` +
-        `▶ 총 이용시간: ${totalHours}시간 (${dates.length}일 × ${endH - startH}시간)\n` +
+        (mixed ? `▶ 시간대 (예외 시간 반영):\n${groupsLabel}\n\n` : "") +
+        `▶ 총 이용시간: ${totalHours}시간 (${dates.length}일)\n` +
         `▶ 이벤트가 총액: ${totalEvent.toLocaleString("ko-KR")}원\n` +
         `▶ 정가 총액: ${totalOriginal.toLocaleString("ko-KR")}원\n` +
         `▶ 가중평균 시간당 단가: ${avgHourlyRate.toLocaleString("ko-KR")}원/시\n` +
         `▶ 장기대관 할인: ${discountPct}% (${totalHours}시간 구간)\n\n` +
-        `시간대 내역:\n${breakdownText}\n\n` +
+        `피크/비피크 내역:\n${breakdownText}\n\n` +
         `[확인]을 누르면 시간당 단가/할인율 필드에 반영됩니다.`
     );
     if (!ok) return;
@@ -664,6 +720,20 @@ export default function LongTermBookingsAdminPage() {
                     </button>
                   </div>
                 </Field>
+                <div className="md:col-span-2">
+                  <Field label="예외 시간 (선택) — 기본 시간과 다른 날짜만 입력">
+                    <textarea
+                      value={form.timeExceptionsText}
+                      onChange={(e) => setForm({ ...form, timeExceptionsText: e.target.value })}
+                      className="input min-h-[64px] font-mono"
+                      placeholder={"예) 7,9 12-15 / 8 13-16\n(한 줄에 하나씩 또는 / 로 구분, '날짜들 시작-종료')"}
+                    />
+                  </Field>
+                  <p className="mt-1 text-xs text-[#8a7d70]">
+                    여기 없는 날짜는 위 <b>시작/종료 시</b> 기본값이 적용됩니다. 예외 날짜는 이용 날짜에 자동 포함되고,
+                    이용안내문 발송 시각도 그 날짜 시작시각 기준으로 자동 보정됩니다. 가격은 <b>가격 자동 계산</b>으로 반영하세요.
+                  </p>
+                </div>
                 <Field label="이용 연도 (생략 시 자동)">
                   <input
                     value={form.scheduleYear}

@@ -10,6 +10,7 @@ import {
   buildPaymentNoticeText,
   buildUsageNoticeText,
   buildKstScheduleDate,
+  buildTimeGroups,
   parseUsageMonth,
   computeLongTermBreakdown,
 } from "@/lib/long-term-template";
@@ -33,6 +34,17 @@ const CreateSchema = z.object({
   scheduleUsageNotice: z.boolean().default(true),
   // 발송 예약 기준 연도 (이용월이 다음 해라면 지정)
   scheduleYear: z.number().int().min(2024).max(2100).optional(),
+  // 날짜별 예외 시간 (선택). 해당 날짜는 기본 startHour/endHour 대신 이 값으로 계산/안내.
+  timeOverrides: z
+    .array(
+      z.object({
+        day: z.number().int().min(1).max(31),
+        startHour: z.number().int().min(0).max(24),
+        endHour: z.number().int().min(0).max(24),
+      })
+    )
+    .optional()
+    .default([]),
 });
 
 /**
@@ -84,13 +96,34 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-  const hoursPerDay = data.endHour - data.startHour;
+  const hoursPerDay = data.endHour - data.startHour; // 기본(대표) 하루 시간
   if (hoursPerDay <= 0) {
     return NextResponse.json({ error: "종료 시간이 시작 시간보다 커야 합니다" }, { status: 400 });
   }
 
-  const totalDays = data.usageDates.length;
-  const totalHours = hoursPerDay * totalDays;
+  const overrides = data.timeOverrides ?? [];
+  // 예외 시간 날짜도 이용일에 포함되도록 합집합 처리
+  const usageDates = Array.from(new Set([...data.usageDates, ...overrides.map((o) => o.day)])).sort(
+    (a, b) => a - b
+  );
+  // 예외 시간 유효성: 각 override는 종료 > 시작
+  const badOverride = overrides.find((o) => o.endHour <= o.startHour);
+  if (badOverride) {
+    return NextResponse.json(
+      { error: `예외 시간이 올바르지 않습니다 (${badOverride.day}일: ${badOverride.startHour}-${badOverride.endHour})` },
+      { status: 400 }
+    );
+  }
+
+  const totalDays = usageDates.length;
+  // 예외 시간 반영한 실제 총 이용시간
+  const totalHours = usageDates.reduce((sum, day) => {
+    const ov = overrides.find((o) => o.day === day);
+    return sum + ((ov ? ov.endHour : data.endHour) - (ov ? ov.startHour : data.startHour));
+  }, 0);
+  const { label: timeGroupsLabel } = buildTimeGroups(usageDates, data.startHour, data.endHour, overrides);
+  // 예외 시간이 하나라도 있으면 시간그룹 표기로 전환 (기본 시간 표기와 불일치 방지)
+  const mixedTimes = overrides.length > 0;
 
   // 연습실은 시간대(피크/비피크) 정확 합산. grossAmount는 단가×시간이 아닌 정확한 시간대별 합으로 계산.
   let grossAmount: number;
@@ -101,7 +134,7 @@ export async function POST(req: NextRequest) {
       const now = new Date();
       const fallbackYear = monthNum < now.getMonth() + 1 ? now.getFullYear() + 1 : now.getFullYear();
       const year = data.scheduleYear ?? fallbackYear;
-      const calc = computeLongTermBreakdown(year, monthNum, data.usageDates, data.startHour, data.endHour);
+      const calc = computeLongTermBreakdown(year, monthNum, usageDates, data.startHour, data.endHour, overrides);
       grossAmount = calc.totalEvent;
       breakdown = calc.breakdown;
     } catch (err) {
@@ -114,9 +147,15 @@ export async function POST(req: NextRequest) {
   const discountAmount = Math.round(grossAmount * data.discountRate);
   const finalAmount = grossAmount - discountAmount;
 
+  // 예외 시간은 별도 컬럼 없이 메모에 기록을 남겨 추후 추적 가능하게 함
+  const memoWithOverrides = mixedTimes
+    ? [data.adminMemo?.trim() || null, `[예외 시간]\n${timeGroupsLabel}`].filter(Boolean).join("\n\n")
+    : data.adminMemo ?? null;
+
   logger.info(
     `${LOG_PREFIX} create start name=${data.customerName} phone=${data.customerPhone} ` +
       `days=${totalDays} hoursPerDay=${hoursPerDay} totalHours=${totalHours} ` +
+      `mixedTimes=${mixedTimes} overrides=${overrides.length} ` +
       `gross=${grossAmount} discount=${discountAmount} final=${finalAmount}`
   );
 
@@ -129,7 +168,7 @@ export async function POST(req: NextRequest) {
         customer_phone: data.customerPhone,
         day_of_week: data.dayOfWeek ?? null,
         usage_month: data.usageMonth,
-        usage_dates: data.usageDates,
+        usage_dates: usageDates,
         start_hour: data.startHour,
         end_hour: data.endHour,
         space_type: data.spaceType,
@@ -141,7 +180,7 @@ export async function POST(req: NextRequest) {
         discount_amount: discountAmount,
         final_amount: finalAmount,
         usage_notice_send_hour: data.usageNoticeSendHour,
-        admin_memo: data.adminMemo ?? null,
+        admin_memo: memoWithOverrides,
         status: "DRAFT",
       },
     });
@@ -168,6 +207,8 @@ export async function POST(req: NextRequest) {
     discountAmount: created.discount_amount,
     finalAmount: created.final_amount,
     priceBreakdown: breakdown,
+    mixedTimes,
+    timeGroupsLabel,
   };
 
   // 2) 요금 안내문 즉시 발송 (옵션)
@@ -216,13 +257,21 @@ export async function POST(req: NextRequest) {
     const fallbackYear = monthNum < now.getMonth() + 1 ? now.getFullYear() + 1 : now.getFullYear();
     const year = data.scheduleYear ?? fallbackYear;
 
+    // 예외 시간 날짜는 발송시각도 그 날짜 시작시각 기준으로 보정 (관리자가 설정한 오프셋 유지)
+    const sendOffset = data.startHour - data.usageNoticeSendHour;
+    const sendHourForDay = (day: number) => {
+      const ov = overrides.find((o) => o.day === day);
+      if (!ov) return data.usageNoticeSendHour;
+      return Math.min(23, Math.max(0, ov.startHour - sendOffset));
+    };
+
     logger.info(
       `${LOG_PREFIX} usage_notice schedule_start id=${created.id} year=${year} month=${monthNum} ` +
         `days=${created.usage_dates.length} bytes=${usageBytes}`
     );
 
     for (const day of created.usage_dates) {
-      const scheduledAt = buildKstScheduleDate(year, monthNum, day, data.usageNoticeSendHour, 0);
+      const scheduledAt = buildKstScheduleDate(year, monthNum, day, sendHourForDay(day), 0);
       const isPast = scheduledAt.getTime() <= Date.now();
       if (isPast) {
         logger.warn(`${LOG_PREFIX} usage_notice skip_past id=${created.id} day=${day} scheduledAt=${scheduledAt.toISOString()}`);

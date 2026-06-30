@@ -155,7 +155,7 @@
 | BoardPost / BoardComment / BoardLike | 자유게시판 (카테고리 자유텍스트, 답글·좋아요) |
 | message_logs | SMS·알림톡 로그 |
 | party_reservations | 파티룸 예약 (별도 스키마) |
-| **long_term_bookings** | 장기대관. status: `REQUESTED`(고객 신청) → `DRAFT` → `PENDING_PAYMENT` → `SCHEDULED` → `COMPLETED` / `CANCELLED`. usage_dates(Int[]) + usage_month + start_hour/end_hour로 일자×시간 표현. 가격 필드는 관리자가 검토 후 산정 |
+| **long_term_bookings** | 장기대관. status: `REQUESTED`(고객 신청) → `DRAFT` → `PENDING_PAYMENT` → `SCHEDULED` → `COMPLETED` / `CANCELLED`. usage_dates(Int[]) + usage_month + start_hour/end_hour로 일자×시간 표현(start/end_hour는 **대표/기본** 시간 — 날짜별 예외 시간은 등록 시 계산 반영 후 `admin_memo`에 기록). 가격 필드는 관리자가 검토 후 산정 |
 | password_reset_tokens | 비밀번호 재설정 토큰 |
 | reviews | 후기 |
 | reservation_holds | HOLD 상태 보조 테이블 |
@@ -293,6 +293,7 @@
 - 매 이용일 KST 10시: 이용안내문 솔라피 **예약** 발송
 - 코드: `lib/long-term-template.ts`, `api/admin/long-term-bookings/[id]`
 - 솔라피 예약 SMS는 발송 카운트 추적 (운영자가 한도 파악)
+- **예외 시간(날짜별 다른 시간) 지원** (2026-06-30): 신규 등록 폼의 "예외 시간" 칸에 `7,9 12-15 / 8 13-16` 형식 입력 → 해당 날짜만 기본 start/end 대신 그 시간 적용. `POST`(+`preview`)에 `timeOverrides:[{day,startHour,endHour}]` 전달. 예외 날짜는 `usage_dates`에 자동 합집합 포함, 가격/총시간/요금·이용 안내문 시간그룹 표기·이용안내문 발송시각(시작-오프셋)까지 자동 반영. **DB 컬럼 추가 없음**(db push 금지) — 예외 시간 명세는 `admin_memo`에 `[예외 시간]`으로 append 기록. `start_hour/end_hour`는 대표(기본) 시간만 저장. 사후 "이용안내 추가" 재등록 경로는 균일 시간 기준(예외 미반영)이라는 한계 있음
 
 ### 10-9-3. CM 공개 노출 분류·위치 정책
 

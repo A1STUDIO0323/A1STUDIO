@@ -31,7 +31,53 @@ export type LongTermBookingForTemplate = {
    * - 혼합: 여러 항목 → 다중 라인 양식
    */
   priceBreakdown?: PriceBreakdownItem[];
+  /**
+   * 날짜별 이용시간이 서로 다른 경우(예외 시간 입력) true.
+   * true면 "하루 N시간 × M일" 곱셈 표기 대신 시간그룹 표기로 전환.
+   */
+  mixedTimes?: boolean;
+  /**
+   * 시간그룹 라벨 (여러 줄). 예외 시간이 있을 때 날짜를 시간대별로 묶어 보여준다.
+   * 예) "18시~21시 (2, 14, 16)\n12시~15시 (7, 9)"
+   */
+  timeGroupsLabel?: string | null;
 };
+
+/** 특정 이용일의 시작/종료 시간 오버라이드 (예외 시간) */
+export type DayTimeOverride = { day: number; startHour: number; endHour: number };
+
+/**
+ * 이용일들을 (시작,종료) 시간 그룹으로 묶는다.
+ * - overrides에 없는 날짜는 기본 시간(defaultStart/End)을 사용
+ * - 요금/이용 안내문의 시간 표기, 가격 자동계산 미리보기에 공통 사용
+ */
+export function buildTimeGroups(
+  usageDates: number[],
+  defaultStartHour: number,
+  defaultEndHour: number,
+  overrides: DayTimeOverride[] = []
+): {
+  groups: { startHour: number; endHour: number; days: number[] }[];
+  label: string;
+  mixed: boolean;
+} {
+  const ovMap = new Map(overrides.map((o) => [o.day, o]));
+  const groupMap = new Map<string, { startHour: number; endHour: number; days: number[] }>();
+  for (const day of [...usageDates].sort((a, b) => a - b)) {
+    const ov = ovMap.get(day);
+    const s = ov ? ov.startHour : defaultStartHour;
+    const e = ov ? ov.endHour : defaultEndHour;
+    const key = `${s}-${e}`;
+    const g = groupMap.get(key) ?? { startHour: s, endHour: e, days: [] };
+    g.days.push(day);
+    groupMap.set(key, g);
+  }
+  const groups = [...groupMap.values()].sort(
+    (a, b) => a.startHour - b.startHour || a.endHour - b.endHour
+  );
+  const label = groups.map((g) => `${g.startHour}시~${g.endHour}시 (${g.days.join(", ")})`).join("\n");
+  return { groups, label, mixed: groups.length > 1 };
+}
 
 export type PriceBreakdownItem = {
   priceType: PriceType;
@@ -55,20 +101,25 @@ export function computeLongTermBreakdown(
   month1to12: number,
   usageDates: number[],
   startHour: number,
-  endHour: number
+  endHour: number,
+  /** 날짜별 시간 오버라이드(예외 시간). 해당 날짜는 기본 시작/종료 대신 이 값을 사용 */
+  overrides: DayTimeOverride[] = []
 ): {
   totalOriginal: number;
   totalEvent: number;
   totalHours: number;
   breakdown: PriceBreakdownItem[];
 } {
-  const startTime = `${String(startHour).padStart(2, "0")}:00`;
-  const endTime = `${String(endHour).padStart(2, "0")}:00`;
-
+  const ovMap = new Map(overrides.map((o) => [o.day, o]));
   const agg: Map<PriceType, { hours: number; original: number; event: number; days: Set<number> }> = new Map();
   let totalHours = 0;
 
   for (const day of usageDates) {
+    const ov = ovMap.get(day);
+    const sh = ov ? ov.startHour : startHour;
+    const eh = ov ? ov.endHour : endHour;
+    const startTime = `${String(sh).padStart(2, "0")}:00`;
+    const endTime = `${String(eh).padStart(2, "0")}:00`;
     const date = new Date(year, month1to12 - 1, day);
     const r = calcHourlyMixed(date, startTime, endTime);
     totalHours += r.duration;
@@ -126,10 +177,18 @@ export function buildPaymentNoticeText(b: LongTermBookingForTemplate): string {
     `2.연락처: ${b.customerPhone}`,
     "",
     "3.이용 요일/시간/날짜:",
-    `${dayLabel}/${b.startHour}시~${b.endHour}시/${b.usageMonth} (${formatDateList(b.usageDates)}) 총 ${totalDays}일`,
+    ...(b.mixedTimes && b.timeGroupsLabel
+      ? [
+          `${dayLabel}/${b.usageMonth} (${formatDateList(b.usageDates)}) 총 ${totalDays}일`,
+          "ㄴ 시간대별 안내:",
+          ...b.timeGroupsLabel.split("\n").map((l) => `  • ${l}`),
+        ]
+      : [`${dayLabel}/${b.startHour}시~${b.endHour}시/${b.usageMonth} (${formatDateList(b.usageDates)}) 총 ${totalDays}일`]),
     "",
     "4.이용 가격:",
-    `총 ${totalDays}일, 하루 ${b.hoursPerDay}시간 (${totalDays}*${b.hoursPerDay})= ${b.totalHours}시간.`,
+    b.mixedTimes
+      ? `총 ${totalDays}일 = ${b.totalHours}시간 (날짜별 이용시간 상이).`
+      : `총 ${totalDays}일, 하루 ${b.hoursPerDay}시간 (${totalDays}*${b.hoursPerDay})= ${b.totalHours}시간.`,
     ...(b.priceBreakdown && b.priceBreakdown.length >= 2
       ? [
           // 시간대 혼합: 한 줄 확장
@@ -187,7 +246,9 @@ export function buildUsageNoticeText(b: LongTermBookingForTemplate): string {
     "이용 날짜:",
     `- ${b.usageMonth}`,
     `- ${formatDateList(b.usageDates)}일`,
-    `- ${b.startHour}시~${b.endHour}시`,
+    ...(b.mixedTimes && b.timeGroupsLabel
+      ? b.timeGroupsLabel.split("\n").map((l) => `- ${l}`)
+      : [`- ${b.startHour}시~${b.endHour}시`]),
     "",
     "[ 📌입실 안내 ]",
     "연습실 비밀번호: 0323",
