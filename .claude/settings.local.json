@@ -7,7 +7,8 @@
       "Bash(git push *)",
       "Bash(npx tsc *)",
       "Bash(npx --yes dotenv-cli -e .env.local -- npx prisma db push --accept-data-loss)",
-      "Bash(git commit -m 'feat\\(admin/long-term-bookings\\): 월별 수익 집계 표 추가 + fix\\(mypage\\): 모바일 탭 가로 스크롤 *)"
+      "Bash(git commit -m 'feat\\(admin/long-term-bookings\\): 월별 수익 집계 표 추가 + fix\\(mypage\\): 모바일 탭 가로 스크롤 *)",
+      "Bash(git commit -m 'fix\\(header\\): 모바일 드로어에 관리자 메뉴 추가 — ADMIN 계정 모바일 접속 시 관리자 진입 불가 해결 *)"
     ]
   }
 }

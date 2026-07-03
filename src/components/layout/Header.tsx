@@ -380,6 +380,36 @@ export default function Header() {
           </div>
         )}
 
+        {/* 관리자 메뉴 (모바일) — ADMIN 자동 감지, 데스크탑 관리자 드롭다운과 동일 항목 */}
+        {isAdmin && (
+          <div className="border-b border-[#D8CCBC] px-5 py-3">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[#B98768]">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              관리자 메뉴
+            </div>
+            <div className="space-y-0.5">
+              <Link
+                href={getFullyGuardedHref("/admin")}
+                className="block rounded-lg border border-[#B98768]/40 bg-[#B98768]/10 px-3 py-2.5 text-sm font-semibold text-[#B98768] transition-colors hover:bg-[#B98768]/20"
+              >
+                관리자 대시보드
+              </Link>
+              <Link
+                href={getFullyGuardedHref("/admin/members")}
+                className="block rounded-lg px-3 py-2 text-sm text-[#3B342F] transition-colors hover:bg-[#EFE7DA] hover:text-[#B98768]"
+              >
+                회원관리
+              </Link>
+              <Link
+                href={getFullyGuardedHref("/admin/class-requests")}
+                className="block rounded-lg px-3 py-2 text-sm text-[#3B342F] transition-colors hover:bg-[#EFE7DA] hover:text-[#B98768]"
+              >
+                클래스요청관리
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* 네비게이션 목록 */}
         <nav className="flex-1 overflow-y-auto px-3 py-3">
           {NAV_LINKS.map((link: NavLinkItem) =>
