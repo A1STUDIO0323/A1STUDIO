@@ -491,12 +491,12 @@ function MyPageContent() {
           <p className="mt-2 text-[#6f655d]">{user.email}</p>
         </div>
 
-        {/* 탭 네비게이션 */}
+        {/* 탭 네비게이션 — 모바일에서 가로 스크롤(드래그) 가능 */}
         <div className="mb-8 border-b border-[#D8CCBC]">
-          <div className="flex gap-1">
+          <div className="flex gap-1 overflow-x-auto">
             <button
               onClick={() => setActiveTab("points")}
-              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 font-semibold transition-colors sm:px-6 ${
                 activeTab === "points"
                   ? "border-b-2 border-[#B98768] text-[#B98768]"
                   : "text-[#6f655d] hover:text-[#3B342F]"
@@ -507,7 +507,7 @@ function MyPageContent() {
             </button>
             <button
               onClick={() => setActiveTab("reservations")}
-              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 font-semibold transition-colors sm:px-6 ${
                 activeTab === "reservations"
                   ? "border-b-2 border-[#B98768] text-[#B98768]"
                   : "text-[#6f655d] hover:text-[#3B342F]"
@@ -518,7 +518,7 @@ function MyPageContent() {
             </button>
             <button
               onClick={() => setActiveTab("classes")}
-              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 font-semibold transition-colors sm:px-6 ${
                 activeTab === "classes"
                   ? "border-b-2 border-[#B98768] text-[#B98768]"
                   : "text-[#6f655d] hover:text-[#3B342F]"
@@ -529,7 +529,7 @@ function MyPageContent() {
             </button>
             <button
               onClick={() => setActiveTab("account")}
-              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 font-semibold transition-colors sm:px-6 ${
                 activeTab === "account"
                   ? "border-b-2 border-[#B98768] text-[#B98768]"
                   : "text-[#6f655d] hover:text-[#3B342F]"
@@ -540,7 +540,7 @@ function MyPageContent() {
             </button>
             <button
               onClick={() => setActiveTab("cm")}
-              className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 font-semibold transition-colors sm:px-6 ${
                 activeTab === "cm"
                   ? "border-b-2 border-[#B98768] text-[#B98768]"
                   : "text-[#6f655d] hover:text-[#3B342F]"

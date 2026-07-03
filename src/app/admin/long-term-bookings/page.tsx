@@ -613,6 +613,44 @@ export default function LongTermBookingsAdminPage() {
     return { pending, scheduled, totalAmount };
   }, [items]);
 
+  // 월별 수익 집계 (취소 제외) — 연도는 이용안내문 예약 일정(KST) 우선, 없으면 등록일 기준 롤오버 보정
+  const monthlyRevenue = useMemo(() => {
+    type MonthlyRow = {
+      key: string;
+      label: string;
+      count: number;
+      total: number;
+      confirmed: number;
+    };
+    const map = new Map<string, MonthlyRow>();
+    for (const it of items) {
+      if (it.status === "CANCELLED") continue;
+      const monthNum = parseMonthNumber(it.usage_month);
+      let year: number | null = null;
+      const sched = (it.usage_notice_schedule ?? []).find((s) => s.scheduledAt);
+      if (sched) {
+        const kst = new Date(new Date(sched.scheduledAt).getTime() + 9 * 60 * 60 * 1000);
+        year = kst.getUTCFullYear();
+      }
+      if (year === null) {
+        const createdKst = new Date(new Date(it.created_at).getTime() + 9 * 60 * 60 * 1000);
+        year = createdKst.getUTCFullYear();
+        // 등록 시점보다 이른 월이면 다음 해 이용으로 간주 (예: 12월 등록 → 1월 이용)
+        if (monthNum !== null && monthNum < createdKst.getUTCMonth() + 1) year += 1;
+      }
+      const mm = monthNum ?? 0;
+      const key = `${year}-${String(mm).padStart(2, "0")}`;
+      const label = mm > 0 ? `${year}년 ${mm}월` : `${year}년 (월 미상: ${it.usage_month})`;
+      const row = map.get(key) ?? { key, label, count: 0, total: 0, confirmed: 0 };
+      row.count += 1;
+      row.total += it.final_amount;
+      if (it.payment_confirmed_at) row.confirmed += it.final_amount;
+      map.set(key, row);
+    }
+    // 최신 월이 위로
+    return [...map.values()].sort((a, b) => b.key.localeCompare(a.key));
+  }, [items]);
+
   if (!isAdmin) return <AdminGate />;
 
   return (
@@ -664,6 +702,42 @@ export default function LongTermBookingsAdminPage() {
               <div className="mt-1 text-2xl font-bold">{formatKrw(stats.totalAmount)}</div>
             </div>
           </div>
+
+          {/* 월별 수익 */}
+          {monthlyRevenue.length > 0 && (
+            <div className="mb-6 rounded-2xl border border-[#D8CCBC] bg-white p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-bold">월별 수익 (취소 제외)</h2>
+                <div className="text-xs text-[#6f655d]">이용월 기준 집계</div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-[#F7F3EB] text-left text-xs text-[#6f655d]">
+                    <tr>
+                      <th className="px-3 py-2">이용월</th>
+                      <th className="px-3 py-2 text-right">건수</th>
+                      <th className="px-3 py-2 text-right">총 매출</th>
+                      <th className="px-3 py-2 text-right">입금확인</th>
+                      <th className="px-3 py-2 text-right">입금대기</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyRevenue.map((m) => (
+                      <tr key={m.key} className="border-t border-[#EFE7DA]">
+                        <td className="px-3 py-2 font-bold">{m.label}</td>
+                        <td className="px-3 py-2 text-right">{m.count}건</td>
+                        <td className="px-3 py-2 text-right font-bold">{formatKrw(m.total)}</td>
+                        <td className="px-3 py-2 text-right text-emerald-700">{formatKrw(m.confirmed)}</td>
+                        <td className={cn("px-3 py-2 text-right", m.total - m.confirmed > 0 ? "text-amber-700" : "text-[#6f655d]")}>
+                          {formatKrw(m.total - m.confirmed)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* 폼 */}
           {showForm && (
