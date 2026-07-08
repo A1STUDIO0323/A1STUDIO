@@ -269,6 +269,7 @@ export default function PartyRoomPage() {
                 <li>· 조리 행위 불가 (전기조리도구·가스버너 등 반입 금지)</li>
                 <li>· 기준 인원(10인) 초과 시 사전 문의 없이 이용 불가</li>
                 <li>· 미성년자 동반 이용 불가</li>
+                <li>· 외부 신발 착용 불가 (실내화 또는 여분의 깨끗한 신발 이용)</li>
               </ul>
             </div>
           </div>

@@ -52,7 +52,7 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
     name: "A1 Room",
     description:
       "보컬·댄스·연기·뮤지컬 연습이 모두 가능한 약 20평 단독 공간입니다. 전신거울, 전자피아노, 촬영용 조명, 삼각대, 보면대, 무선마이크, 요가매트, 폼롤러가 구비되어 있습니다.",
-    capacity: 6,
+    capacity: 8,
     sizeM2: 66,
     amenities: [
       "전신거울",
@@ -67,6 +67,7 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
     cautions: [
       "예약 시간 내 준비·정리 포함 (시간 엄수)",
       "음식물 반입 금지 (음료 페트병 가능)",
+      "외부 신발 금지 (실내화 또는 여분의 깨끗한 신발 이용)",
       "추가 장비 반입 전 사전 문의",
     ],
     priceWeekdayDay: 7000,
