@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
+  fetchExternalIntervals,
   fetchPracticeIntervals,
   partyPackageInterval,
   overlaps,
@@ -102,7 +103,12 @@ export async function GET(request: NextRequest) {
 
     // 교차검사: 같은 물리 공간의 연습실(reservations) 점유와 시간이 겹치는 날짜도 차단
     // (연습실 00:00~02:00 예약이 전날 나잇/올데이 패키지와 겹치는 경우 등)
-    const practiceIntervals = await fetchPracticeIntervals(startDate, endDate);
+    // 외부 플랫폼(스페이스클라우드·네이버) 예약도 동일하게 교차 차단
+    const [practiceOnly, externalIntervals] = await Promise.all([
+      fetchPracticeIntervals(startDate, endDate),
+      fetchExternalIntervals(startDate, endDate),
+    ]);
+    const practiceIntervals = [...practiceOnly, ...externalIntervals];
     if (practiceIntervals.length > 0) {
       const lastDay = new Date(parseInt(year), parseInt(monthNum), 0).getDate();
       for (let d = 1; d <= lastDay; d++) {

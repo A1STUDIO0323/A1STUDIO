@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  fetchExternalIntervals,
   fetchPartyIntervals,
   fetchPracticeIntervals,
 } from "@/lib/space-availability";
@@ -34,9 +35,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 파티룸 예약 (이미 자정 넘김 지원)
-    const partyIntervals = await fetchPartyIntervals(dateStr, dateStr);
-    for (const iv of partyIntervals) {
+    // 파티룸 예약(자정 넘김 지원) + 외부 플랫폼 예약(스페이스클라우드·네이버)
+    const [partyIntervals, externalIntervals] = await Promise.all([
+      fetchPartyIntervals(dateStr, dateStr),
+      fetchExternalIntervals(dateStr, dateStr),
+    ]);
+    for (const iv of [...partyIntervals, ...externalIntervals]) {
       const s = Math.max(iv.startMin, dayStartMin);
       const e = Math.min(iv.endMin, dayEndMin);
       if (s < e) {

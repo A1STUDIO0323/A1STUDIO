@@ -122,6 +122,9 @@ export function getPartyRoomConfirmMessage(info: ReservationInfo): string {
     packageInfo = '나잇 패키지 (19:00~익일 10:00)';
   } else if (info.packageType === 'allday') {
     packageInfo = '올데이 패키지 (10:00~익일 10:00)';
+  } else {
+    // 외부 플랫폼 예약 등 패키지 구분이 없는 경우 — 시간 범위 그대로 표기
+    packageInfo = `${info.startTime}~${info.endTime}`;
   }
   
   return `안녕하세요, A1 STUDIO입니다! ◡̎ 
@@ -157,6 +160,16 @@ export function getPartyRoomConfirmMessage(info: ReservationInfo): string {
 즐겁고 안전한 시간 되시길 바랍니다 😊
 감사합니다!
 A1 STUDIO`;
+}
+
+/**
+ * 외부 플랫폼(스페이스클라우드·네이버 스마트플레이스) 예약자 이용안내 메시지
+ * 기존 확정안내 템플릿을 공간 유형에 따라 재사용한다.
+ */
+export function getExternalReservationGuideMessage(info: ReservationInfo): string {
+  return info.roomType === 'party'
+    ? getPartyRoomConfirmMessage(info)
+    : getPracticeRoomConfirmMessage(info);
 }
 
 /**

@@ -1,0 +1,20 @@
+{
+  "name": "a1studio-sync-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "스페이스클라우드/네이버 스마트플레이스 예약 동기화 에이전트 (24시간 PC 상주)",
+  "type": "module",
+  "scripts": {
+    "login": "tsx src/login.ts",
+    "start": "tsx src/main.ts",
+    "once": "tsx src/main.ts --once"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "playwright": "^1.49.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

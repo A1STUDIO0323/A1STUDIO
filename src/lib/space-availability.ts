@@ -14,7 +14,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
  */
 
 export type SpaceInterval = {
-  source: "practice" | "party";
+  source: "practice" | "party" | "external";
   startMin: number; // 절대 분 (dayNumber*1440 + 분)
   endMin: number;
 };
@@ -165,6 +165,43 @@ export async function fetchPartyIntervals(
 }
 
 /**
+ * external_reservations(스페이스클라우드·네이버 스마트플레이스) 점유 구간 — 범위 양끝 ±1일 패딩.
+ * sync-agent가 upsert한 외부 플랫폼 예약도 홈페이지 가용성에서 제외한다.
+ * 테이블이 아직 없거나 조회 실패 시 빈 배열(기존 흐름 유지).
+ */
+export async function fetchExternalIntervals(
+  fromDate: string,
+  toDate: string
+): Promise<SpaceInterval[]> {
+  const supabase = getAdminClient();
+  const lo = addDaysStr(fromDate, -1);
+  const hi = addDaysStr(toDate, 1);
+  const { data, error } = await supabase
+    .from("external_reservations")
+    .select("date, start_time, end_time, end_date, status")
+    .gte("date", lo)
+    .lte("date", hi)
+    .in("status", ["confirmed", "CONFIRMED"]);
+  if (error) {
+    console.warn(`[space-availability] 외부 예약 조회 실패(무시): ${error.message}`);
+    return [];
+  }
+
+  const out: SpaceInterval[] = [];
+  for (const r of data ?? []) {
+    if (!r.date || !r.start_time || !r.end_time) continue;
+    const iv = toInterval(
+      String(r.date),
+      String(r.start_time),
+      String(r.end_time),
+      r.end_date ? String(r.end_date) : null
+    );
+    out.push({ source: "external", ...iv });
+  }
+  return out;
+}
+
+/**
  * 후보 예약이 reservations 테이블(연습실+booking 파티룸)과 겹치는지.
  * 파티룸 예약 라우트에서 호출 → 연습실 측 점유와의 교차검사.
  */
@@ -182,11 +219,11 @@ export async function hasPracticeConflict(
     candidate.endTime,
     candidate.endDate ?? null
   );
-  const intervals = await fetchPracticeIntervals(
-    candidate.date,
-    candidate.endDate ?? candidate.date
-  );
-  return intervals.some((iv) => overlaps(iv, candIv));
+  const [practice, external] = await Promise.all([
+    fetchPracticeIntervals(candidate.date, candidate.endDate ?? candidate.date),
+    fetchExternalIntervals(candidate.date, candidate.endDate ?? candidate.date),
+  ]);
+  return [...practice, ...external].some((iv) => overlaps(iv, candIv));
 }
 
 /**
@@ -207,11 +244,11 @@ export async function hasPartyConflict(
     candidate.endTime,
     candidate.endDate ?? null
   );
-  const intervals = await fetchPartyIntervals(
-    candidate.date,
-    candidate.endDate ?? candidate.date
-  );
-  return intervals.some((iv) => overlaps(iv, candIv));
+  const [party, external] = await Promise.all([
+    fetchPartyIntervals(candidate.date, candidate.endDate ?? candidate.date),
+    fetchExternalIntervals(candidate.date, candidate.endDate ?? candidate.date),
+  ]);
+  return [...party, ...external].some((iv) => overlaps(iv, candIv));
 }
 
 /**
@@ -234,9 +271,10 @@ export async function hasAnySpaceConflict(
   );
   const from = candidate.date;
   const to = candidate.endDate ?? candidate.date;
-  const [practice, party] = await Promise.all([
+  const [practice, party, external] = await Promise.all([
     fetchPracticeIntervals(from, to),
     fetchPartyIntervals(from, to),
+    fetchExternalIntervals(from, to),
   ]);
-  return [...practice, ...party].some((iv) => overlaps(iv, candIv));
+  return [...practice, ...party, ...external].some((iv) => overlaps(iv, candIv));
 }
