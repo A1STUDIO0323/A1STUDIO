@@ -17,7 +17,14 @@ export type Equipment = {
 
 export const EQUIPMENT_CATEGORIES: Record<
   EquipmentCategory,
-  { label: string; sublabel: string; icon: string; description: string }
+  {
+    label: string;
+    sublabel: string;
+    icon: string;
+    description: string;
+    /** 설명 뒤에 볼드로 강조 표시할 문구 */
+    descriptionEmphasis?: string;
+  }
 > = {
   common: {
     label: "공통 비품",
@@ -43,7 +50,8 @@ export const EQUIPMENT_CATEGORIES: Record<
     sublabel: "유료",
     icon: "✨",
     description:
-      "연습실 이용 시 추가 요금을 지불하면 사용할 수 있는 옵션 비품입니다. 파티룸 이용 시에는 기본 포함됩니다.",
+      "연습실 이용 시 추가 요금을 지불하면 사용할 수 있는 옵션 비품입니다.",
+    descriptionEmphasis: "파티룸 이용 시에는 기본 포함됩니다.",
   },
 };
 

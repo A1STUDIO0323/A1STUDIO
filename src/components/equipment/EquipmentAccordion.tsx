@@ -69,6 +69,14 @@ export function EquipmentAccordion() {
                   </div>
                   <p className="mt-1 hidden text-sm text-[var(--color-text-muted)] sm:block">
                     {info.description}
+                    {info.descriptionEmphasis && (
+                      <>
+                        {" "}
+                        <strong className="font-bold text-[var(--color-text)]">
+                          {info.descriptionEmphasis}
+                        </strong>
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -93,6 +101,14 @@ export function EquipmentAccordion() {
               <div className="border-t border-[var(--color-border)] px-4 py-5 sm:px-8 sm:py-6">
                 <p className="mb-5 text-sm text-[var(--color-text-muted)] sm:hidden">
                   {info.description}
+                  {info.descriptionEmphasis && (
+                    <>
+                      {" "}
+                      <strong className="font-bold text-[var(--color-text)]">
+                        {info.descriptionEmphasis}
+                      </strong>
+                    </>
+                  )}
                 </p>
                 <ul className="space-y-4">
                   {items.map((equipment) => (
