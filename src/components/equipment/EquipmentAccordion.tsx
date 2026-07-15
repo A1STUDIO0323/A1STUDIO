@@ -154,6 +154,11 @@ function EquipmentRow({ equipment }: { equipment: Equipment }) {
             <span className="text-sm font-medium text-[var(--color-accent)]">
               {equipment.quantity}개
             </span>
+            {equipment.optionPrice != null && (
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                +{equipment.optionPrice.toLocaleString()}원
+              </span>
+            )}
           </div>
           <p className="mb-2 text-xs text-[var(--color-text-subtle)]">
             모델명: {equipment.model ?? "별도 문의"}

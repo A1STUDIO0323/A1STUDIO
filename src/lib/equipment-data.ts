@@ -7,6 +7,8 @@ export type Equipment = {
   quantity: number;
   /** 모델명 (확인된 경우에만 표기) */
   model?: string;
+  /** 추가옵션 비품의 1회 이용 요금 (원) */
+  optionPrice?: number;
   description: string;
   usage: string[];
   images: string[];
@@ -135,16 +137,6 @@ export const EQUIPMENT_LIST: Equipment[] = [
     description: "다양한 색상 연출 가능한 컬러조명 14개",
     usage: ["공간 분위기 연출", "댄스 연습 시 무대 조명", "색상 및 밝기 조절"],
     images: ["/equipment/color-light.jpg"],
-    status: "available",
-  },
-  {
-    id: "theater-light",
-    name: "극장조명 (전구등)",
-    category: "common",
-    quantity: 4,
-    description: "극장 스타일 전구 조명 4개",
-    usage: ["빈티지 분위기 연출", "무대 조명", "사진 촬영 배경"],
-    images: ["/equipment/theater-light.jpg"],
     status: "available",
   },
   {
@@ -282,11 +274,16 @@ export const EQUIPMENT_LIST: Equipment[] = [
   // ── 추가옵션 비품 (유료) ──────────────────────────
   {
     id: "special-light",
-    name: "특수조명 (무대조명)",
+    name: "특수조명 (극장조명·무대조명)",
     category: "option",
     quantity: 4,
+    optionPrice: 3000,
     description: "무대 연출용 특수 효과 조명 4개",
-    usage: ["무대 특수효과", "파티 연출", "창의적인 촬영"],
+    usage: [
+      "무대 특수효과 및 빈티지 분위기 연출",
+      "파티 연출",
+      "사진·영상 촬영 배경",
+    ],
     images: ["/equipment/special-light.jpg"],
     status: "available",
   },
@@ -295,6 +292,7 @@ export const EQUIPMENT_LIST: Equipment[] = [
     name: "무선 블루투스 마이크",
     category: "option",
     quantity: 2,
+    optionPrice: 3000,
     description: "고품질 무선 마이크 2개",
     usage: [
       "보컬 연습, 뮤지컬 연습에 활용",

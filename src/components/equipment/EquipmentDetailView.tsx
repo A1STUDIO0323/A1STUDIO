@@ -117,6 +117,12 @@ export function EquipmentDetailView({ equipment }: Props) {
 
               <div className="mb-8 flex flex-wrap items-center gap-4 sm:gap-6">
                 <div className="rounded-xl bg-[var(--color-surface)] px-5 py-3 sm:px-6">
+                  <div className="text-sm text-[var(--color-text-subtle)]">모델명</div>
+                  <div className="text-lg font-semibold text-[var(--color-text)]">
+                    {equipment.model ?? "별도 문의"}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-[var(--color-surface)] px-5 py-3 sm:px-6">
                   <div className="text-sm text-[var(--color-text-subtle)]">수량</div>
                   <div className="text-2xl font-bold text-[var(--color-accent)]">
                     {equipment.quantity}개
@@ -128,6 +134,14 @@ export function EquipmentDetailView({ equipment }: Props) {
                     {equipment.status === "available" ? "이용 가능" : "도입 예정"}
                   </div>
                 </div>
+                {equipment.optionPrice != null && (
+                  <div className="rounded-xl bg-amber-50 px-5 py-3 sm:px-6">
+                    <div className="text-sm text-amber-600">추가옵션 요금</div>
+                    <div className="text-2xl font-bold text-amber-700">
+                      +{equipment.optionPrice.toLocaleString()}원
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mb-8">
