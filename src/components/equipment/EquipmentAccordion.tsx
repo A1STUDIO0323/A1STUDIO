@@ -115,24 +115,21 @@ function EquipmentRow({ equipment }: { equipment: Equipment }) {
 
   return (
     <li>
-      <Link
-        href={`/equipment/${equipment.id}`}
-        className="group flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4 transition-all hover:-translate-y-0.5 hover:border-[var(--color-accent)] hover:shadow-md sm:flex-row sm:gap-6 sm:p-5"
-      >
+      <div className="flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4 transition-all hover:border-[var(--color-accent)] hover:shadow-md sm:flex-row sm:items-center sm:gap-6 sm:p-5">
         {/* 사진 */}
-        <div className="relative aspect-[4/3] w-full flex-shrink-0 overflow-hidden rounded-lg bg-[var(--color-surface)] sm:aspect-square sm:w-32">
+        <div className="relative aspect-[4/3] w-full flex-shrink-0 overflow-hidden rounded-lg bg-[var(--color-surface)] sm:aspect-square sm:w-24">
           {imageSrc && !imageFailed ? (
             <Image
               src={imageSrc}
               alt={equipment.name}
               fill
               className="object-cover"
-              sizes="(max-width: 640px) 100vw, 128px"
+              sizes="(max-width: 640px) 100vw, 96px"
               onError={() => setImageFailed(true)}
             />
           ) : (
             <div
-              className="absolute inset-0 flex items-center justify-center text-5xl opacity-20"
+              className="absolute inset-0 flex items-center justify-center text-4xl opacity-20"
               aria-hidden
             >
               {info.icon}
@@ -145,10 +142,10 @@ function EquipmentRow({ equipment }: { equipment: Equipment }) {
           )}
         </div>
 
-        {/* 비품명 / 모델명 / 사용방법 */}
+        {/* 비품명 / 모델명 / 설명 */}
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h3 className="text-base font-semibold text-[var(--color-text)] transition-colors group-hover:text-[var(--color-accent)] sm:text-lg">
+            <h3 className="text-base font-semibold text-[var(--color-text)] sm:text-lg">
               {equipment.name}
             </h3>
             <span className="text-sm font-medium text-[var(--color-accent)]">
@@ -160,27 +157,25 @@ function EquipmentRow({ equipment }: { equipment: Equipment }) {
               </span>
             )}
           </div>
-          <p className="mb-2 text-xs text-[var(--color-text-subtle)]">
+          <p className="mb-1 text-xs text-[var(--color-text-subtle)]">
             모델명: {equipment.model ?? "별도 문의"}
           </p>
-          <ul className="space-y-1">
-            {equipment.usage.map((line, index) => (
-              <li
-                key={index}
-                className="flex items-start gap-2 text-sm text-[var(--color-text-muted)]"
-              >
-                <span className="mt-0.5 text-[var(--color-accent)]" aria-hidden>
-                  ·
-                </span>
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
-          <span className="mt-3 inline-block text-xs text-[var(--color-text-subtle)] transition-colors group-hover:text-[var(--color-accent)]">
-            자세히 보기 →
-          </span>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {equipment.description}
+          </p>
         </div>
-      </Link>
+
+        {/* 사용방법 버튼 */}
+        <div className="flex-shrink-0">
+          <Link
+            href={`/equipment/${equipment.id}`}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--color-accent)] px-5 py-2.5 text-sm font-semibold text-[var(--color-accent)] transition-all hover:bg-[var(--color-accent)] hover:text-white sm:w-auto"
+          >
+            사용방법
+            <span aria-hidden>→</span>
+          </Link>
+        </div>
+      </div>
     </li>
   );
 }
