@@ -201,6 +201,8 @@
 
 ## 9. 환경 변수
 
+> **⚠️ 기본 가이드**: 환경 변수를 새로 추가하면 로컬 `.env.local`과 **Vercel 프로젝트 환경 변수(Settings → Environment Variables)** 양쪽에 모두 추가해야 한다. 로컬에만 넣으면 배포 환경에서 동작하지 않는다. Vercel 쪽은 사용자가 직접 입력해야 하는 외부 작업이므로 변수명·값·적용 환경(Production/Preview)을 안내할 것 (지침 10-2 참조).
+
 - **DB**: `DATABASE_URL`, `PG_ALLOW_SELF_SIGNED_CERT`
 - **Supabase**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - **OAuth**: `AUTH_KAKAO_ID`, `AUTH_KAKAO_SECRET`, `NEXT_PUBLIC_KAKAO_CONFIGURED`, `NEXT_PUBLIC_GOOGLE_CONFIGURED`
