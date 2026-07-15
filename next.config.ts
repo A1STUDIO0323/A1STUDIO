@@ -16,6 +16,16 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "60mb",
     },
   },
+  async redirects() {
+    return [
+      {
+        // 대표소개 페이지를 회사소개로 통합 (2026-07)
+        source: "/about/ceo",
+        destination: "/about/company",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

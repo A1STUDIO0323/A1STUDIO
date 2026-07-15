@@ -45,7 +45,6 @@ export const NAV_LINKS = [
     href: "/about/company",
     children: [
       { label: "회사 소개", href: "/about/company" },
-      { label: "대표 소개", href: "/about/ceo" },
       { label: "공간 소개", href: "/about/space" },
       { label: "비품 및 시설", href: "/equipment" },
     ],

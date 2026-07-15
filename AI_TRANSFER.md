@@ -63,7 +63,7 @@
 ## 3. 라우트
 
 ### Public 페이지 (`src/app/`)
-홈, 소개(/about/company, /ceo, /space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + **/one-day-class/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='oneday', 실제 DB) + /one-day-class/list + /one-day-class/requests (MEMBER 전용) + /one-day-class/apply-cm + **/one-day-class/cm-list** (can_oneday=true 승인 CM 공개), **/lessons** + **/lessons/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='lesson', 실제 DB) + /lessons/list + /lessons/requests (MEMBER 전용) + **/lessons/cm-list** (can_lesson=true 승인 CM 공개), /party-room + /party-room/booking + /party-room/booking/complete, **/reservations/status** (통합 예약현황 캘린더 — 연습실·파티룸·장기대관 시간 블록), **/long-term/apply** (고객용 장기대관 신청 폼, status='REQUESTED'로 저장), /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms, **/intake + /intake/details** (웹사이트 제작 의뢰 인테이크 폼)
+홈, 소개(/about/company — 회사·대표 소개 통합(구 /about/ceo는 301 리다이렉트), /about/space), /equipment, /equipment/[id], /spaces/[id], /booking + /booking/complete + /booking/payment/kakao/{success,cancel,fail}, /charge + /charge/{success,cancel,fail}, /pricing, /guide, /location, /contact, /events, /notices, /reviews, /one-day-class + **/one-day-class/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='oneday', 실제 DB) + /one-day-class/list + /one-day-class/requests (MEMBER 전용) + /one-day-class/apply-cm + **/one-day-class/cm-list** (can_oneday=true 승인 CM 공개), **/lessons** + **/lessons/announcements** (CM·ADMIN 공고 등록 — `class_offerings` type='lesson', 실제 DB) + /lessons/list + /lessons/requests (MEMBER 전용) + **/lessons/cm-list** (can_lesson=true 승인 CM 공개), /party-room + /party-room/booking + /party-room/booking/complete, **/reservations/status** (통합 예약현황 캘린더 — 연습실·파티룸·장기대관 시간 블록), **/long-term/apply** (고객용 장기대관 신청 폼, status='REQUESTED'로 저장), /board + /board/[id] + /board/write + /board/guide + /board/lost, /mypage, /dashboard, /login, /signup, /signup/error, /forgot-password, /reset-password, /find-account, /onboarding/phone, /onboarding/profile, /privacy, /terms, **/intake + /intake/details** (웹사이트 제작 의뢰 인테이크 폼)
 
 ### Admin 페이지 (`/admin/*`)
 /admin, /admin/board, /admin/class-offerings, /admin/class-requests, /admin/cm-applications, /admin/cm-settlements, /admin/intakes, /admin/members, /admin/reservations/calendar, /admin/reviews
@@ -96,7 +96,7 @@
 ## 4. 네비게이션 구조 (`src/lib/constants.ts NAV_LINKS`)
 
 - **홈** → `/`
-- **소개** ▼ 회사 소개 / 대표 소개 / 공간 소개 / 비품 및 시설
+- **소개** ▼ 회사 소개(대표 소개 통합) / 공간 소개 / 비품 및 시설
 - **예약하기** ▼ 예약현황(`/reservations/status`) / 연습실(`/booking`) / 파티룸(`/party-room`) / 장기대관(`/long-term/apply`)
 - **원데이클래스** ▼ 안내(`/one-day-class`) / 공고 목록(`/one-day-class/list`) / 공고 등록(`/one-day-class/announcements`, CM·ADMIN 전용) / 요청(`/one-day-class/requests`, MEMBER 전용) / CM 목록(`/one-day-class/cm-list`, can_oneday=true 승인 CM)
 - **개인레슨** ▼ 안내(`/lessons`) / 공고 목록(`/lessons/list`) / 공고 등록(`/lessons/announcements`, CM·ADMIN 전용) / 요청(`/lessons/requests`, MEMBER 전용) / CM 목록(`/lessons/cm-list`, can_lesson=true 승인 CM)

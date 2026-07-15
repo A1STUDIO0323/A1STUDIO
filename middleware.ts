@@ -39,7 +39,7 @@ const AUTH_ONLY_PATHS = ["/login", "/signup"];
  */
 const LOW_SECURITY_PATHS = [
   "/", // 홈
-  "/about", // 소개 (회사소개/대표소개/공간소개)
+  "/about", // 소개 (회사소개(대표소개 통합)/공간소개)
   "/equipment", // 비품및시설 (소개 하위)
   "/spaces", // 공간소개
   "/pricing", // 이용안내 - 요금안내
