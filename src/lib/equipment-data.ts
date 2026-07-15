@@ -140,6 +140,16 @@ export const EQUIPMENT_LIST: Equipment[] = [
     status: "available",
   },
   {
+    id: "theater-light",
+    name: "극장조명 (전구등)",
+    category: "common",
+    quantity: 4,
+    description: "극장 스타일 전구 조명 4개",
+    usage: ["빈티지 분위기 연출", "무대 조명", "사진 촬영 배경"],
+    images: ["/equipment/theater-light.jpg"],
+    status: "available",
+  },
+  {
     id: "music-reactive-light",
     name: "음악반응 조명",
     category: "common",
@@ -274,16 +284,12 @@ export const EQUIPMENT_LIST: Equipment[] = [
   // ── 추가옵션 비품 (유료) ──────────────────────────
   {
     id: "special-light",
-    name: "특수조명 (극장조명·무대조명)",
+    name: "특수조명 (무대조명)",
     category: "option",
     quantity: 4,
     optionPrice: 3000,
     description: "무대 연출용 특수 효과 조명 4개",
-    usage: [
-      "무대 특수효과 및 빈티지 분위기 연출",
-      "파티 연출",
-      "사진·영상 촬영 배경",
-    ],
+    usage: ["무대 특수효과", "파티 연출", "창의적인 촬영"],
     images: ["/equipment/special-light.jpg"],
     status: "available",
   },
