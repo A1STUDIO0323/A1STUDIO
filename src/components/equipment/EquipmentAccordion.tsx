@@ -20,7 +20,7 @@ const CATEGORY_ORDER: EquipmentCategory[] = [
 
 export function EquipmentAccordion() {
   const [openCategory, setOpenCategory] = useState<EquipmentCategory | null>(
-    "common"
+    null
   );
 
   return (
