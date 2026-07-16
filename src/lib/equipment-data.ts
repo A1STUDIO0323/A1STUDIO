@@ -264,10 +264,10 @@ export const EQUIPMENT_LIST: Equipment[] = [
     name: "냉장고",
     category: "party",
     quantity: 1,
-    description: "음료 및 간식 보관용 냉장고 (도입 예정)",
+    description: "음료 및 간식 보관용 냉장고",
     usage: ["음료 보관", "간식 보관", "편의 향상"],
     images: ["/equipment/refrigerator.jpg"],
-    status: "upcoming",
+    status: "available",
   },
   {
     id: "board-game",

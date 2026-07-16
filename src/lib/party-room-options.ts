@@ -10,7 +10,7 @@ export const PARTY_ROOM_AMENITIES = [
   { id: 'piano',       name: '전자피아노',    included: true,  comingSoon: false },
   { id: 'yoga_mat',    name: '요가매트',      included: true,  comingSoon: false },
   { id: 'air_purifier',name: '공기청정기',    included: true,  comingSoon: false },
-  { id: 'fridge',      name: '냉장고',        included: false, comingSoon: true  },
+  { id: 'fridge',      name: '냉장고',        included: false, comingSoon: false },
   { id: 'karaoke',     name: '노래방',        included: false, comingSoon: true  },
   { id: 'board_game',  name: '보드게임',      included: false, comingSoon: true  },
 ];
